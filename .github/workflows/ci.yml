@@ -31,6 +31,17 @@ jobs:
   windows-probe:
     name: Windows probe (${{ matrix.rid }})
     runs-on: windows-2025
+    # id-token lets this job sign in to Azure with GitHub OIDC (no stored
+    # password). Used only by the signing steps below.
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      # Signing runs only on main (the Azure federated credential trusts only
+      # refs/heads/main) and only once the owner has set the repository
+      # variables in docs/windows-signing.md. Otherwise builds stay unsigned
+      # and say so.
+      SIGN: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT != '' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
     strategy:
       matrix:
         rid: [win-x64, win-arm64]
@@ -49,6 +60,53 @@ jobs:
           }
           Copy-Item probes/windows/TESTER.md $out/
           Get-ChildItem $out -Filter *.pdb | Remove-Item
+      - name: Azure sign-in (OIDC)
+        if: env.SIGN == 'true'
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Sign with Azure Artifact Signing
+        if: env.SIGN == 'true'
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
+        with:
+          endpoint: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
+          files-folder: out/lockdin-probe-windows-${{ matrix.rid }}
+          files-folder-filter: exe,dll
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          description: Lockd In probe (test build)
+          exclude-environment-credential: true
+          exclude-workload-identity-credential: true
+          exclude-managed-identity-credential: true
+          exclude-shared-token-cache-credential: true
+          exclude-visual-studio-credential: true
+          exclude-visual-studio-code-credential: true
+          exclude-azure-cli-credential: false
+          exclude-azure-powershell-credential: true
+          exclude-azure-developer-cli-credential: true
+          exclude-interactive-browser-credential: true
+      - name: Verify signatures and record signing status
+        shell: pwsh
+        run: |
+          $out = "out/lockdin-probe-windows-${{ matrix.rid }}"
+          $files = Get-ChildItem $out -Include *.exe, *.dll -Recurse
+          $lines = foreach ($f in $files) {
+            $sig = Get-AuthenticodeSignature $f.FullName
+            $subject = if ($sig.SignerCertificate) { $sig.SignerCertificate.Subject } else { '-' }
+            "$($f.Name): $($sig.Status) ($subject)"
+            if ($env:SIGN -eq 'true' -and $sig.Status -ne 'Valid') {
+              Write-Host "::error title=Signing::$($f.Name) signature status $($sig.Status)"; $bad = $true
+            }
+          }
+          $head = if ($env:SIGN -eq 'true') { 'SIGNED with Azure Artifact Signing.' } else { 'UNSIGNED. Smart App Control will block these files; see docs/windows-signing.md.' }
+          Set-Content "$out/SIGNING.txt" (@($head, '') + $lines)
+          Write-Host "::notice title=Signing (${{ matrix.rid }})::$head $($lines -join '; ')"
+          if ($bad) { exit 1 }
       - uses: actions/upload-artifact@v4
         with:
           name: lockdin-probe-windows-${{ matrix.rid }}
