@@ -35,7 +35,9 @@ jobs:
         if: failure()
         working-directory: .
         run: |
-          grep -E '^e: |error:|What went wrong|^> |Lint found' build.log | head -40 | while IFS= read -r line; do echo "::error title=Build::${line:0:900}"; done
+          grep -E '^e: |error:|Lint found' build.log | head -30 | while IFS= read -r line; do echo "::error title=Build::${line:0:900}"; done
+          what=$(grep -A25 'What went wrong' build.log | head -40 | sed 's/%/%25/g' | tr '\n' '\r' | sed 's/\r/%0A/g')
+          [ -n "$what" ] && echo "::error title=Gradle::${what:0:3500}"
           python3 - <<'PY'
           import glob, xml.etree.ElementTree as ET
           for f in glob.glob("apps/android/app/build/test-results/**/*.xml", recursive=True):
