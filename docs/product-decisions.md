@@ -26,6 +26,7 @@ Three kinds of entry, kept apart on purpose:
 | R15 | State exact Android permission dependencies; verify Advanced Protection behavior rather than assume it. | Owner 2026-10-29 (review 2) |
 | R16 | An abruptly stopped component can't be relied on to report its own stop: use authenticated heartbeats and "unknown" when they expire. | Owner 2026-10-29 (review 2) |
 | R17 | The product is named **Lockd In** (was the working name "Focus"). Repository: `tftechrobotics/Lockd-In`. Trademark and store-name availability not yet checked. | Owner 2026-10-29 |
+| R18 | **Never disable device protections to test or install** (Smart App Control, Samsung Auto Blocker, Advanced Protection, Play Protect). Builds reach devices only through trusted channels: Windows binaries code-signed by a trusted CA; Android through Google Play (internal testing track). | Owner 2026-10-29 |
 | R11 | Everything else in `Focus_Project_Brief.md` (allowlist profiles per device, no force-closing or lost work, no hidden processes, no indefinite lockouts, offline execution, privacy minimums, etc.). | Brief v1.0 |
 
 ## Engineering recommendations (not approved)

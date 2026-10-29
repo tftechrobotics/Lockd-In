@@ -33,7 +33,7 @@ Likelihood/impact: H/M/L. Ordered by when the risk must be retired.
 | M1 now | Windows PC details (`winver`, CPU type) and ~15 min for the smoke test | — | Requested |
 | M1 now | Android phone model, Android version, Advanced Protection on/off; ~15 min for the smoke test | — | Requested |
 | M1 | A **disposable Windows 11 VM** for policy experiments. Hyper-V (Windows Pro) or VirtualBox, with Microsoft's evaluation image. Must be Pro/Enterprise to author App Control policies. | Free (evaluation) | Requested when the smoke tests pass |
-| M4/M7 | Google Play developer account | One-time fee (confirm) | Later |
+| **M1 now** | **Google Play developer account** (Samsung Auto Blocker blocked sideloading on the owner's S24+; R18 forbids switching it off). US$25 one-time; government ID + card in legal name; device verification via Play Console app; internal testing track (≤100 testers, available within minutes) | US$25 | **Owner action needed** |
 | M5 | Relay hosting | ~$5–10/month estimate, unverified | Later |
 | M6 | Google Cloud project + OAuth consent; later a domain and privacy policy | Domain fee | Later |
 | **M1 now** | **Windows code signing** (Smart App Control blocks unsigned builds on the owner's PC). Azure Artifact Signing ~$9.99/month (US individuals eligible) or OV certificate $150–300/year | Paid | **Owner decision needed** |
