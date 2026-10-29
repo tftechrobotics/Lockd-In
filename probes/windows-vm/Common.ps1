@@ -4,7 +4,7 @@
 # machine looks like a virtual machine AND -ConfirmDisposableVM is given.
 # Take a VM checkpoint/snapshot first.
 #
-# Rollback model (ownership manifest, C:\FocusProbeVM\owned.json):
+# Rollback model (ownership manifest, C:\LockdInProbeVM\owned.json):
 #   * Before changing anything, a script records exactly what it is about to
 #     change and the value that was there before (or that nothing was there).
 #   * Restore touches ONLY recorded items, and only if they still hold the
@@ -16,7 +16,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # FOCUSPROBE_VM_WORKDIR exists only so the bookkeeping can be unit-tested off Windows.
-$script:WorkDir = if ($env:FOCUSPROBE_VM_WORKDIR) { $env:FOCUSPROBE_VM_WORKDIR } else { 'C:\FocusProbeVM' }
+$script:WorkDir = if ($env:FOCUSPROBE_VM_WORKDIR) { $env:FOCUSPROBE_VM_WORKDIR } else { 'C:\LockdInProbeVM' }
 $script:ResultsFile = Join-Path $script:WorkDir 'results.jsonl'
 $script:OwnedFile = Join-Path $script:WorkDir 'owned.json'
 New-Item -ItemType Directory -Force -Path $script:WorkDir | Out-Null

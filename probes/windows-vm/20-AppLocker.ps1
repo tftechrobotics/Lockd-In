@@ -18,7 +18,7 @@
   Apply, measure, and exit WITHOUT removing. Then reboot, run 98-AfterReboot.ps1, then 99-Cleanup.ps1.
 
 .EXAMPLE
-  .\20-AppLocker.ps1 -TargetExe C:\FocusProbe\FocusTarget.exe -ConfirmDisposableVM
+  .\20-AppLocker.ps1 -TargetExe C:\LockdInProbe\LockdInTarget.exe -ConfirmDisposableVM
 #>
 param(
     [Parameter(Mandatory)][string]$TargetExe,
@@ -53,10 +53,10 @@ $denyId = [guid]::NewGuid().ToString()
 $policy = @"
 <AppLockerPolicy Version="1">
   <RuleCollection Type="Exe" EnforcementMode="Enabled">
-    <FilePathRule Id="$allowId" Name="FocusProbe allow all" Description="FocusProbe experiment" UserOrGroupSid="S-1-1-0" Action="Allow">
+    <FilePathRule Id="$allowId" Name="LockdInProbe allow all" Description="LockdInProbe experiment" UserOrGroupSid="S-1-1-0" Action="Allow">
       <Conditions><FilePathCondition Path="*" /></Conditions>
     </FilePathRule>
-    <FileHashRule Id="$denyId" Name="FocusProbe deny target" Description="FocusProbe experiment" UserOrGroupSid="S-1-1-0" Action="Deny">
+    <FileHashRule Id="$denyId" Name="LockdInProbe deny target" Description="LockdInProbe experiment" UserOrGroupSid="S-1-1-0" Action="Deny">
       <Conditions><FileHashCondition>
         <FileHash Type="SHA256" Data="$hash" SourceFileName="$name" SourceFileLength="$len" />
       </FileHashCondition></Conditions>

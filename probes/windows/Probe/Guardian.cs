@@ -1,16 +1,16 @@
 using System.Diagnostics;
 
-namespace FocusProbe;
+namespace LockdInProbe;
 
 /// <summary>
-/// Crash-recovery guardian. A second, windowless FocusProbe process that waits
+/// Crash-recovery guardian. A second, windowless LockdInProbe process that waits
 /// for the main probe to exit and then restores any audio the probe muted
 /// (from the shared ledger). It enforces nothing and holds no restriction
 /// itself: if the probe ends cleanly, the ledger is already empty.
 ///
 /// Limits (tested separately in TESTER.md): if the guardian and the probe are
 /// both killed (e.g. "End process tree", power loss), nothing restores audio
-/// until the next probe start or `FocusProbe --recover`.
+/// until the next probe start or `LockdInProbe --recover`.
 /// </summary>
 internal static class Guardian
 {
@@ -22,7 +22,7 @@ internal static class Guardian
             var self = Process.GetCurrentProcess();
             var exe = Environment.ProcessPath!;
             var args = new List<string>();
-            // Under `dotnet run`/`dotnet FocusProbe.dll` the host is dotnet.exe; pass the DLL too.
+            // Under `dotnet run`/`dotnet LockdInProbe.dll` the host is dotnet.exe; pass the DLL too.
             if (Path.GetFileNameWithoutExtension(exe).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
                 args.Add(typeof(Guardian).Assembly.Location);
             args.Add("--guardian");

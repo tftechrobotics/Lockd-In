@@ -18,7 +18,7 @@
 
     <!-- Narrow package visibility: home screen and the harmless target. No QUERY_ALL_PACKAGES. -->
     <queries>
-        <package android:name="app.focus.probetarget" />
+        <package android:name="app.lockdin.probetarget" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.HOME" />
@@ -45,7 +45,7 @@
             android:exported="false"
             android:excludeFromRecents="true"
             android:launchMode="singleTask"
-            android:taskAffinity="app.focus.probe.block" />
+            android:taskAffinity="app.lockdin.probe.block" />
 
         <service
             android:name=".ProbeService"

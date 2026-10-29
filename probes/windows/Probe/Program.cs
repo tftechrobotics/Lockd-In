@@ -1,11 +1,11 @@
-// FocusProbe — Windows per-user enforcement experiment. EXPERIMENT ONLY.
+// LockdInProbe — Windows per-user enforcement experiment. EXPERIMENT ONLY.
 //
 // Measures what an ordinary (unelevated) per-user process can do against a
 // restricted app, without closing it or touching its data:
 //   * detect its windows (foreground/restore events + 2 s sweep) and minimize them;
 //   * mute its audio sessions (they keep running — they are NOT paused);
 //   * notice launches. With --test-close-target-after-launch, and ONLY for the
-//     harmless FocusTarget.exe, it closes a copy shortly after it starts. That is
+//     harmless LockdInTarget.exe, it closes a copy shortly after it starts. That is
 //     detection followed by termination — NOT launch prevention (the process does
 //     start, briefly). It exists to measure timing, never to be applied to real
 //     apps, which can hold valuable state from the moment they start.
@@ -15,22 +15,22 @@
 //   * probe crashes or is killed              -> restored by a separate guardian
 //                                                process that waits on the probe;
 //   * probe AND guardian killed / power loss  -> NOT immediate: restored on the next
-//                                                probe start or `FocusProbe --recover`.
+//                                                probe start or `LockdInProbe --recover`.
 
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 
-namespace FocusProbe;
+namespace LockdInProbe;
 
 internal static class Program
 {
-    private const string HarmlessTarget = "FocusTarget.exe";
+    private const string HarmlessTarget = "LockdInTarget.exe";
 
     private static readonly HashSet<string> Blocked = new(StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<string> NeverTouch = new(StringComparer.OrdinalIgnoreCase)
     {
-        "explorer.exe", "taskmgr.exe", "dotnet.exe", "FocusProbe.exe", "Narrator.exe", "Magnify.exe",
+        "explorer.exe", "taskmgr.exe", "dotnet.exe", "LockdInProbe.exe", "Narrator.exe", "Magnify.exe",
         "osk.exe", "TextInputHost.exe", "ShellExperienceHost.exe", "StartMenuExperienceHost.exe",
         "SearchHost.exe", "LockApp.exe", "ctfmon.exe", "SystemSettings.exe",
     };
@@ -54,7 +54,7 @@ internal static class Program
     {
         if (!OperatingSystem.IsWindows())
         {
-            Console.Error.WriteLine("FocusProbe only runs on Windows.");
+            Console.Error.WriteLine("LockdInProbe only runs on Windows.");
             return 1;
         }
 
@@ -97,9 +97,9 @@ internal static class Program
         }
 
         Blocked.ExceptWith(NeverTouch);
-        if (Blocked.Count == 0) return Usage("Nothing to restrict. Example: --block FocusTarget.exe");
+        if (Blocked.Count == 0) return Usage("Nothing to restrict. Example: --block LockdInTarget.exe");
         if (_testCloseTarget && !(Blocked.Count == 1 && Blocked.Contains(HarmlessTarget)))
-            return Usage("--test-close-target-after-launch is only allowed with --block FocusTarget.exe. Focus never closes real apps.");
+            return Usage("--test-close-target-after-launch is only allowed with --block LockdInTarget.exe. Lockd In never closes real apps.");
 
         _endsAtUtc = DateTime.UtcNow.AddMinutes(minutes);
         _mainThreadId = Native.GetCurrentThreadId();
@@ -117,7 +117,7 @@ internal static class Program
             already_running_pids = _initialPids.Count,
         });
 
-        Console.WriteLine($"Focus probe running until {_endsAtUtc.ToLocalTime():h:mm:ss tt}.");
+        Console.WriteLine($"Lockd In probe running until {_endsAtUtc.ToLocalTime():h:mm:ss tt}.");
         Console.WriteLine($"Restricting: {string.Join(", ", Blocked)}");
         if (_initialPids.Count > 0)
             Console.WriteLine($"{_initialPids.Count} restricted process(es) were already running; they will be minimized/muted, not closed.");
@@ -170,8 +170,8 @@ internal static class Program
     private static int Usage(string problem)
     {
         Console.Error.WriteLine(problem);
-        Console.Error.WriteLine("Usage: FocusProbe --block FocusTarget.exe [--minutes 3] [--no-mute] [--test-close-target-after-launch]");
-        Console.Error.WriteLine("       FocusProbe --recover     (restore sound for anything an earlier run muted)");
+        Console.Error.WriteLine("Usage: LockdInProbe --block LockdInTarget.exe [--minutes 3] [--no-mute] [--test-close-target-after-launch]");
+        Console.Error.WriteLine("       LockdInProbe --recover     (restore sound for anything an earlier run muted)");
         return 2;
     }
 
@@ -310,7 +310,7 @@ internal static class Program
         var until = _endsAtUtc.ToLocalTime().ToString("h:mm tt");
         string text = minimized
             ? $"{id.Value.Exe} is restricted until {until}.\n\nFocus minimized it{(_mute ? " and muted its sound" : "")}. It is still open and may still be running — nothing was closed."
-            : $"{id.Value.Exe} is restricted, but Focus could not minimize it{(elevated == null ? " (it may be running as administrator)" : "")}.\n\nThis is a limitation being measured.";
+            : $"{id.Value.Exe} is restricted, but Lockd In could not minimize it{(elevated == null ? " (it may be running as administrator)" : "")}.\n\nThis is a limitation being measured.";
         Explain(text);
     }
 
@@ -319,7 +319,7 @@ internal static class Program
         if (Interlocked.Exchange(ref _shieldOpen, 1) == 1) return;
         new Thread(() =>
         {
-            Native.MessageBoxW(IntPtr.Zero, text, "Focus probe",
+            Native.MessageBoxW(IntPtr.Zero, text, "Lockd In probe",
                 Native.MB_OK | Native.MB_ICONINFORMATION | Native.MB_TOPMOST | Native.MB_SETFOREGROUND);
             Interlocked.Exchange(ref _shieldOpen, 0);
         }) { IsBackground = true }.Start();

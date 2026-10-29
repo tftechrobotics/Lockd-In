@@ -2,10 +2,10 @@ mod common;
 
 use chrono::{DateTime, Duration, Utc, Weekday};
 use common::*;
-use focus_core::conflicts::find_conflicts;
-use focus_core::plan::{PhaseKind, SessionPlan};
-use focus_core::session::*;
-use focus_core::timeline::{Occurrence, occurrence_on};
+use lockdin_core::conflicts::find_conflicts;
+use lockdin_core::plan::{PhaseKind, SessionPlan};
+use lockdin_core::session::*;
+use lockdin_core::timeline::{Occurrence, occurrence_on};
 
 fn brief_occ() -> Occurrence {
     let s = once("a", date(2026, 11, 3), time(18, 0), brief_plan());

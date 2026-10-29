@@ -7,7 +7,7 @@
 
 | Component | Implemented | Compiled / checked (where) | Tested on device / VM | Still proposed |
 |---|---|---|---|---|
-| `focus-core` | Yes | 21 tests (incl. 512-case property test), fmt, clippy — Ubuntu 24.04, Rust 1.97.0 | n/a (pure logic) | Heartbeat transport (M5), monotonic-clock tracking (M3/M4) |
+| `lockdin-core` | Yes | 21 tests (incl. 512-case property test), fmt, clippy — Ubuntu 24.04, Rust 1.97.0 | n/a (pure logic) | Heartbeat transport (M5), monotonic-clock tracking (M3/M4) |
 | Windows probe + target + guardian | Yes | Compiles, 0 warnings (.NET SDK 10.0.113, Linux) | **No** | — |
 | Android probe + target | Yes | Kotlin type-checks clean against AOSP `android-16.0.0_r2` framework jar (Kotlin 2.0.21). **No APK built yet** | **No** | — |
 | VM policy scripts | Yes | Parse + PSScriptAnalyzer clean (PowerShell 7.5.4); manifest logic unit-tested | **No** | — |
@@ -22,7 +22,7 @@ sources. It needs no Google Maven or NuGet access.
 
 1. **Detect-and-terminate ≠ prevention.** "Launch gating" removed. The probe's
    flag is now `--test-close-target-after-launch`, hard-limited to
-   FocusTarget. Production: never terminate real apps (R12). Prevention only
+   LockdInTarget. Production: never terminate real apps (R12). Prevention only
    via OS policy (App Control, or AppLocker); everything else gets
    work-preserving window/audio restriction.
 2. **Recovery stated accurately.**
@@ -32,7 +32,7 @@ sources. It needs no Google Maven or NuGet access.
      "nothing restarts" (`docs/enforcement-comparison.md`).
    - Tests R1–R6 are separate.
 3. **VM rollback rebuilt on an ownership manifest:**
-   - restores only Focus-owned values still equal to what it set;
+   - restores only Lockd In-owned values still equal to what it set;
    - reports conflicts;
    - refuses when pre-existing AppLocker EXE rules or extension policies exist;
    - never clears a policy for lack of a backup;

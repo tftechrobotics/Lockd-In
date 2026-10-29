@@ -7,7 +7,7 @@
 1. **Per-user agent:** window and audio restriction (minimize, mute) for
    anything not prevented; explanations, UI, tray. It records each mute
    before applying it so recovery is always possible.
-2. **Focus service (LocalSystem):**
+2. **Lockd In service (LocalSystem):**
    - **launch prevention** through a session-scoped, unsigned App Control
      policy (allow-all base plus deny rules for installed non-approved apps),
      only if VM go criteria pass; AppLocker if App Control fails them;
@@ -28,7 +28,7 @@
 - App Control policies are machine-wide (owner decision U3).
 - If no component survives to remove a policy, it stays in force (fail-closed).
   This is bounded by the scheduled cleanup task and measured in VM test 98.
-- An administrator can still remove Focus; that is detected via heartbeat
+- An administrator can still remove Lockd In; that is detected via heartbeat
   expiry, not prevented.
 
 ## Change log

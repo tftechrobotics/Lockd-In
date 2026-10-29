@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>LockdInProbe</AssemblyName>
+    <RootNamespace>LockdInProbe</RootNamespace>
+  </PropertyGroup>
+</Project>

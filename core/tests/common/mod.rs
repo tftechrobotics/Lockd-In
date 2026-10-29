@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 
 use chrono::{DateTime, NaiveDate, NaiveTime, TimeZone, Utc, Weekday};
 use chrono_tz::America::Chicago;
-use focus_core::plan::SessionPlan;
-use focus_core::schedule::{Recurrence, Schedule};
+use lockdin_core::plan::SessionPlan;
+use lockdin_core::schedule::{Recurrence, Schedule};
 
 pub fn date(y: i32, m: u32, d: u32) -> NaiveDate {
     NaiveDate::from_ymd_opt(y, m, d).unwrap()
@@ -26,7 +26,7 @@ pub fn chi(y: i32, mo: u32, d: u32, h: u32, mi: u32) -> DateTime<Utc> {
 
 pub fn once(id: &str, d: NaiveDate, start: NaiveTime, plan: SessionPlan) -> Schedule {
     Schedule {
-        contract_version: focus_core::CONTRACT_VERSION,
+        contract_version: lockdin_core::CONTRACT_VERSION,
         id: id.into(),
         name: "Study".into(),
         time_zone: "America/Chicago".into(),
@@ -45,7 +45,7 @@ pub fn weekly(
     plan: SessionPlan,
 ) -> Schedule {
     Schedule {
-        contract_version: focus_core::CONTRACT_VERSION,
+        contract_version: lockdin_core::CONTRACT_VERSION,
         id: id.into(),
         name: "Weeknights".into(),
         time_zone: "America/Chicago".into(),

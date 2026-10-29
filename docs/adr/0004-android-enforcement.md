@@ -7,7 +7,7 @@
 - **Detector:** usage access (UsageEvents polling) in a `specialUse`
   foreground service. AccessibilityService (window-change events only) is an
   optional faster mode, offered only if data justifies the Play review risk.
-- **Cover:** a Focus block screen brought to the front. This **depends on
+- **Cover:** a Lockd In block screen brought to the front. This **depends on
   `SYSTEM_ALERT_WINDOW`** ("Display over other apps"), whose grant is the
   documented background-activity-launch exception, even though nothing is
   drawn as an overlay. Overlay-only cover is measured but not recommended.
@@ -18,7 +18,7 @@
   **unverified** (probe A10). Sideloading is blocked under it (Doc), so testing
   on such a phone may need Play internal testing.
 - **Always allowed:** dialer/emergency, launcher, Settings, input methods,
-  assistive technology, Focus.
+  assistive technology, Lockd In.
 - **App picker:** launcher-intent `<queries>`, no `QUERY_ALL_PACKAGES`.
 - **Self-check:** every few seconds; any loss reported as `Degraded`.
 

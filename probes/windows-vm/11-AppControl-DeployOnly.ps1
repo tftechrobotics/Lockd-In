@@ -10,11 +10,11 @@
   Microsoft states policies are effective on all editions. This script checks
   whether CiTool exists and works on Home, whether the policy blocks the
   target, and whether it can be removed without a reboot.
-  Separately, Focus would need its own way to author policies on Home (e.g. an
+  Separately, Lockd In would need its own way to author policies on Home (e.g. an
   in-app XML-to-binary converter); see docs/enforcement-comparison.md.
 
 .EXAMPLE
-  .\11-AppControl-DeployOnly.ps1 -PolicyBinary C:\FocusProbeVM\{GUID}.cip -TargetExe C:\FocusProbe\FocusTarget.exe -ConfirmDisposableVM
+  .\11-AppControl-DeployOnly.ps1 -PolicyBinary C:\LockdInProbeVM\{GUID}.cip -TargetExe C:\LockdInProbe\LockdInTarget.exe -ConfirmDisposableVM
 #>
 param(
     [Parameter(Mandatory)][string]$PolicyBinary,
@@ -39,7 +39,7 @@ Write-Result $exp 'precheck' @{
 }
 if ($null -eq $citool) { Write-Host 'CiTool not present: record this and stop.'; return }
 
-Add-Owned @{ kind = 'appcontrol_policy'; experiment = $exp; policy_id = $policyId; name = 'FocusProbe (deploy-only)' }
+Add-Owned @{ kind = 'appcontrol_policy'; experiment = $exp; policy_id = $policyId; name = 'LockdInProbe (deploy-only)' }
 $sw = [Diagnostics.Stopwatch]::StartNew()
 $out = & CiTool.exe --update-policy $PolicyBinary -json 2>&1
 $blockMs = Measure-UntilLaunch -Path $TargetExe

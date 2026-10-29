@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace FocusProbe;
+namespace LockdInProbe;
 
 /// <summary>
 /// Per-process audio session control through Windows Core Audio (the same

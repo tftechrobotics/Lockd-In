@@ -4,7 +4,7 @@
   VM-ONLY. App Control for Business (WDAC) as TRUE launch prevention for one
   harmless executable: the process never starts. Measures apply/remove timing,
   effect on an already-running copy, and (with -SimulateCrash) what persists
-  when no Focus component is left to clean up.
+  when no Lockd In component is left to clean up.
 
 .DESCRIPTION
   Builds an "allow everything" base policy plus a hash deny rule for the
@@ -15,11 +15,11 @@
   deployment and enforcement on a Home VM separately from authoring.
 
 .PARAMETER SimulateCrash
-  Deploy, measure, and exit WITHOUT removing - as if Focus crashed and never
+  Deploy, measure, and exit WITHOUT removing - as if Lockd In crashed and never
   restarted. Then reboot the VM and run 98-AfterReboot.ps1, then 99-Cleanup.ps1.
 
 .EXAMPLE
-  .\10-AppControl.ps1 -TargetExe C:\FocusProbe\FocusTarget.exe -ConfirmDisposableVM
+  .\10-AppControl.ps1 -TargetExe C:\LockdInProbe\LockdInTarget.exe -ConfirmDisposableVM
 #>
 param(
     [Parameter(Mandatory)][string]$TargetExe,
@@ -38,7 +38,7 @@ $xml = Join-Path $WorkDir 'focus-deny-target.xml'
 Copy-Item "$env:windir\schemas\CodeIntegrity\ExamplePolicies\AllowAll.xml" $xml -Force
 $rules = New-CIPolicyRule -DriverFilePath $TargetExe -Level Hash -Deny
 Merge-CIPolicy -PolicyPaths $xml -OutputFilePath $xml -Rules $rules | Out-Null
-$policyId = Set-CIPolicyIdInfo -FilePath $xml -PolicyName 'FocusProbe deny FocusTarget' -ResetPolicyID
+$policyId = Set-CIPolicyIdInfo -FilePath $xml -PolicyName 'LockdInProbe deny LockdInTarget' -ResetPolicyID
 $policyId = ($policyId -replace '.*(\{[0-9A-Fa-f-]+\}).*', '$1')
 Set-RuleOption -FilePath $xml -Option 3 -Delete   # remove Audit Mode -> enforce
 $cip = Join-Path $WorkDir "$policyId.cip"
@@ -50,7 +50,7 @@ $running = Start-Process -FilePath $TargetExe -PassThru
 Start-Sleep -Seconds 2
 
 # 3. Record ownership first, then deploy and measure.
-Add-Owned @{ kind = 'appcontrol_policy'; experiment = $exp; policy_id = $policyId; name = 'FocusProbe deny FocusTarget' }
+Add-Owned @{ kind = 'appcontrol_policy'; experiment = $exp; policy_id = $policyId; name = 'LockdInProbe deny LockdInTarget' }
 $sw = [Diagnostics.Stopwatch]::StartNew()
 & CiTool.exe --update-policy $cip -json | Out-Null
 $deployMs = [int]$sw.Elapsed.TotalMilliseconds

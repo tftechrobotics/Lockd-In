@@ -1,4 +1,4 @@
-# ADR-0005: Local-first, no Focus accounts, device-group pairing
+# ADR-0005: Local-first, no Lockd In accounts, device-group pairing
 
 **Status:** **Recommendation — awaiting owner decision (U6).** Not accepted.
 

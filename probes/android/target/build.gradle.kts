@@ -1,15 +1,15 @@
-// Harmless test app for the Focus probe. EXPERIMENT ONLY.
+// Harmless test app for the Lockd In probe. EXPERIMENT ONLY.
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
 }
 
 android {
-    namespace = "app.focus.probetarget"
+    namespace = "app.lockdin.probetarget"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "app.focus.probetarget"
+        applicationId = "app.lockdin.probetarget"
         minSdk = 29
         targetSdk = 36
         versionCode = 2

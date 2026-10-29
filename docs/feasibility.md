@@ -91,7 +91,7 @@ Superseded by `docs/enforcement-comparison.md`. Key findings added on
 2026-10-29:
 
 - "Display over other apps" is a documented exception that lets an app start
-  an activity from the background (Doc). Focus can therefore bring a block
+  an activity from the background (Doc). Lockd In can therefore bring a block
   screen to the front, which moves the restricted app to the background,
   instead of relying on an overlay.
 - An overlay leaves the app resumed and audible underneath, and apps can hide
@@ -100,7 +100,7 @@ Superseded by `docs/enforcement-comparison.md`. Key findings added on
   - silences apps that have neither a visible activity nor a foreground service;
   - refuses audio focus requests from background apps.
 
-  Focus can take audio focus only while its block screen is visible.
+  Lockd In can take audio focus only while its block screen is visible.
 
 ### App selection
 
@@ -142,7 +142,7 @@ Development on the owner's own phone via USB/ADB is unaffected for now.
 | Testing-mode refresh tokens expire after about 7 days; unverified apps are capped at about 100 users | Prior knowledge (both pages mention limits without numbers) |
 
 **Proposal:** request `calendar.freebusy` + `calendar.calendarlist.readonly`
-only. Focus then never receives event titles, attendees or descriptions —
+only. Lockd In then never receives event titles, attendees or descriptions —
 just busy intervals, which the free/busy API already expands for recurring
 events. Reminders are local notifications for accepted sessions, so no write
 scope is needed. Writing sessions back to Google Calendar stays a separate

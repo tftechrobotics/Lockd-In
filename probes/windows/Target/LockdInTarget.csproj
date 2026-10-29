@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <AssemblyName>FocusTarget</AssemblyName>
-    <RootNamespace>FocusProbe</RootNamespace>
+    <AssemblyName>LockdInTarget</AssemblyName>
+    <RootNamespace>LockdInProbe</RootNamespace>
     <!-- Windowed app: no console window. -->
     <OutputType>WinExe</OutputType>
   </PropertyGroup>

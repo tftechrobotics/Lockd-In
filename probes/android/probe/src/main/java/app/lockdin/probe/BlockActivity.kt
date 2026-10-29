@@ -1,4 +1,4 @@
-package app.focus.probe
+package app.lockdin.probe
 
 import android.app.Activity
 import android.content.Context
@@ -62,7 +62,7 @@ class BlockActivity : Activity() {
             gravity = Gravity.CENTER
         })
         col.addView(TextView(this).apply {
-            text = "Focus moved it to the background. It was not closed, and anything you had open in it is still there."
+            text = "Lockd In moved it to the background. It was not closed, and anything you had open in it is still there."
             textSize = 16f
             gravity = Gravity.CENTER
             setPadding(0, 24, 0, 24)

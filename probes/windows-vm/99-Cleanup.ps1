@@ -1,8 +1,8 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-  VM-ONLY. Removes ONLY what the Focus experiments recorded in the ownership
-  manifest (C:\FocusProbeVM\owned.json). Never resets or clears anything that
+  VM-ONLY. Removes ONLY what the Lockd In experiments recorded in the ownership
+  manifest (C:\LockdInProbeVM\owned.json). Never resets or clears anything that
   is not recorded there. Safe to run repeatedly. Restoring the VM checkpoint is
   still the cleanest reset.
 

@@ -15,14 +15,14 @@ param(
 . "$PSScriptRoot\Common.ps1"
 Assert-DisposableVM -Confirmed:$ConfirmDisposableVM
 $exp = 'firewall'
-$group = 'FocusProbeExperiment'
+$group = 'LockdInProbeExperiment'
 if (Get-NetFirewallRule -Group $group -ErrorAction SilentlyContinue) {
     throw "Rules in group '$group' already exist. Run 99-Cleanup.ps1 first."
 }
 
 Add-Owned @{ kind = 'firewall_group'; experiment = $exp; group = $group }
 $sw = [Diagnostics.Stopwatch]::StartNew()
-New-NetFirewallRule -DisplayName "FocusProbe block $([IO.Path]::GetFileName($ProgramPath))" -Group $group `
+New-NetFirewallRule -DisplayName "LockdInProbe block $([IO.Path]::GetFileName($ProgramPath))" -Group $group `
     -Direction Outbound -Program $ProgramPath -Action Block -Profile Any | Out-Null
 Write-Result $exp 'rule_added' @{ add_ms = [int]$sw.Elapsed.TotalMilliseconds; program = [IO.Path]::GetFileName($ProgramPath) }
 

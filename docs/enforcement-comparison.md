@@ -18,9 +18,9 @@ the product.
 | Term | Meaning |
 |---|---|
 | **Launch prevention** | The OS refuses to start the program. No process exists, so no work can be lost. |
-| **Detect-and-terminate** | The program starts; Focus notices it and kills it. **Not prevention.** A process that has started can already hold valuable state: restored tabs, a reopened document, an unsaved draft, an in-progress download or sync. **Focus never does this to real apps** (requirement R12). The Windows probe does it only to the harmless FocusTarget, to measure detection timing. |
-| **Window restriction** | Focus minimizes or covers the program's windows. The program keeps running. |
-| **Audio restriction** | Focus mutes the program's audio sessions (Windows) or asks players to stop via audio focus (Android). Playback may continue silently or, on Android, keep playing in apps that ignore focus. |
+| **Detect-and-terminate** | The program starts; Lockd In notices it and kills it. **Not prevention.** A process that has started can already hold valuable state: restored tabs, a reopened document, an unsaved draft, an in-progress download or sync. **Lockd In never does this to real apps** (requirement R12). The Windows probe does it only to the harmless LockdInTarget, to measure detection timing. |
+| **Window restriction** | Lockd In minimizes or covers the program's windows. The program keeps running. |
+| **Audio restriction** | Lockd In mutes the program's audio sessions (Windows) or asks players to stop via audio focus (Android). Playback may continue silently or, on Android, keep playing in apps that ignore focus. |
 | **Paused** | Not used. Nothing above pauses an app (requirement R3). |
 
 ---
@@ -37,8 +37,8 @@ the product.
 | **Scope** | Current user | Machine (service) + current user | Per user or group (rules carry a user/group SID) | **Whole machine**: affects every account on the PC during a session |
 | **Ordinary bypass routes** | End task; run app as admin (UIPI, Test W3); another account; uninstall | Stop/uninstall the service: admin + UAC prompt; Safe Mode; another OS | Admin stops AppIDSvc ("stopping this service prevents AppLocker policies from being enforced", Doc) or edits policy; renamed copies defeat path rules; hash rules break on app updates | Admin removes the policy; hash rules break on updates (publisher rules survive them for signed apps) |
 | **Edition support** | All Win 11 | All Win 11 | All editions on Win 10 2004+ and all Win 11 after KB5024351 (Doc) | Enforcement on all editions (Doc). Microsoft's authoring cmdlets aren't on Home, and the MDM ApplicationControl CSP doesn't list Home (Doc). See "App Control on Windows Home" below. |
-| **Policy conflicts** | None | Browser policies show "managed by your organization"; may clash with work/school management | Merges with local policy; any EXE rule makes that category default-deny unless allow rules exist | Smart App Control interplay unknown (Test); a policy blocking boot-critical drivers can stop boot (Doc). Focus would only deny user-mode apps on an allow-all base. |
-| **Removal** | Nothing system-wide | Service removal + reconciliation | Remove only Focus-owned rules | `CiTool --remove-policy`: rebootless for unsigned policies on Win 11 2024 update and later (Doc); every supported Win 11 release (25H2, 26H2) qualifies. Never use signed policies. |
+| **Policy conflicts** | None | Browser policies show "managed by your organization"; may clash with work/school management | Merges with local policy; any EXE rule makes that category default-deny unless allow rules exist | Smart App Control interplay unknown (Test); a policy blocking boot-critical drivers can stop boot (Doc). Lockd In would only deny user-mode apps on an allow-all base. |
+| **Removal** | Nothing system-wide | Service removal + reconciliation | Remove only Lockd In-owned rules | `CiTool --remove-policy`: rebootless for unsigned policies on Win 11 2024 update and later (Doc); every supported Win 11 release (25H2, 26H2) qualifies. Never use signed policies. |
 | **After a crash** | Fails open (restriction stops) | Service fails open; anything it applied persists until reconciled | **Fails closed**: rules persist until removed | **Fails closed**: policy persists, including across reboot (Test 98) |
 
 ### App Control on Windows Home (corrected)
@@ -48,7 +48,7 @@ The pieces are:
 
 - **Enforcement:** effective on all editions (Doc).
 - **Deployment:** `CiTool` ships in Windows 11 22H2+ images (Doc); whether it is present and works on Home is **Test 11**. The MDM CSP route doesn't list Home (Doc).
-- **Authoring:** the policy is a binary compiled from XML. Off Home, Microsoft's `ConvertFrom-CIPolicy` does this. An open-source, **MIT-licensed** implementation, AppControl Manager (HotCakeX/Harden-Windows-Security), contains its own XML↔binary converter in C#. We confirmed this by reading its source. Focus could therefore compile policies itself. The format is undocumented by Microsoft, so this adds a maintenance and correctness risk, mitigated by round-trip tests against `CiTool` on every supported Windows build.
+- **Authoring:** the policy is a binary compiled from XML. Off Home, Microsoft's `ConvertFrom-CIPolicy` does this. An open-source, **MIT-licensed** implementation, AppControl Manager (HotCakeX/Harden-Windows-Security), contains its own XML↔binary converter in C#. We confirmed this by reading its source. Lockd In could therefore compile policies itself. The format is undocumented by Microsoft, so this adds a maintenance and correctness risk, mitigated by round-trip tests against `CiTool` on every supported Windows build.
 
 Verdict: **not ruled out on Home**. It depends on Test 11 plus a correctness
 spike of in-app policy compilation.
@@ -74,20 +74,20 @@ otherwise.** Nothing is ever terminated.
    - portable or newly installed apps;
    - apps run as administrator, which the service handles because the agent can't;
    - the whole session, if prevention is unavailable.
-3. **Before a session starts:** Focus lists open non-approved apps. Each can be
+3. **Before a session starts:** Lockd In lists open non-approved apps. Each can be
    closed by the user, with the app's own save prompts, or left minimized and
-   muted. Focus never closes them.
+   muted. Lockd In never closes them.
 
 **Limitations of this approach, stated plainly:**
-- Prevention covers only apps Focus knows are installed. New, portable or renamed copies fall back to window and audio restriction.
+- Prevention covers only apps Lockd In knows are installed. New, portable or renamed copies fall back to window and audio restriction.
 - App Control is machine-wide: other accounts on the same PC are affected during a session (owner decision U3).
 - An administrator can remove the policy or stop the service.
 - Already-running apps are minimized and muted, never paused, and their background work continues.
-- On Home, prevention depends on Focus compiling policies itself.
+- On Home, prevention depends on Lockd In compiling policies itself.
 
 ### Recovery: what restores audio and temporary policies
 
-Audio means mutes Focus applied. Temporary policies means App Control or
+Audio means mutes Lockd In applied. Temporary policies means App Control or
 AppLocker rules, browser policies and firewall rules applied for a session.
 
 | Situation | Audio | Temporary policies | Tested? |
@@ -98,14 +98,14 @@ AppLocker rules, browser policies and firewall rules applied for a session.
 | **Service crashes** | Agent unaffected | Service Control Manager restarts the service (product, M3), which reconciles: expired → removed | Not yet; M3 |
 | Service stopped by an admin | Agent restores on its own release | **Stay in force** until something removes them → fail-closed | VM 98 measures persistence |
 | **Reboot** mid-session | Process memory gone. Whether Windows remembers per-app mute is **unknown** | Policies persist (Test 98). Product plan: boot-time reconciliation by the service, plus a separate Task Scheduler cleanup task registered with each policy, triggered at session end and at startup | Probe R6; VM 98 |
-| **Neither component ever restarts** (service disabled/removed, task deleted) | Muted until the user unmutes in Volume Mixer or runs recovery | Policies remain: apps stay blocked. Recovery = Focus uninstaller, `CiTool --remove-policy`, or Safe Mode. This is the fail-closed risk that the go criteria must bound | VM `-SimulateCrash` + 98 + 99 |
+| **Neither component ever restarts** (service disabled/removed, task deleted) | Muted until the user unmutes in Volume Mixer or runs recovery | Policies remain: apps stay blocked. Recovery = Lockd In uninstaller, `CiTool --remove-policy`, or Safe Mode. This is the fail-closed risk that the go criteria must bound | VM `-SimulateCrash` + 98 + 99 |
 
 ### Tamper reporting (corrected)
 
 A service that is abruptly stopped, crashes or loses power **cannot report its
 own stop**. The design instead relies on:
 - **authenticated heartbeats** from each device, signed with its device key;
-- the peer marking a device **Unknown** when heartbeats expire (implemented in `focus-core`: no fresh report → Unknown);
+- the peer marking a device **Unknown** when heartbeats expire (implemented in `lockdin-core`: no fresh report → Unknown);
 - the device reporting the gap and its cause, if it can tell, **after** it restarts.
 
 A clean, orderly stop may send a final message, as a courtesy only. Nothing
@@ -116,7 +116,7 @@ depends on it.
 | Approach | Verdict |
 |---|---|
 | Per-app outbound firewall rule (service-applied, session-scoped) | Candidate complement for unapproved browsers/apps; VM test 40 |
-| Browser policies: disable private mode; force-install the Focus extension | Candidate; whether Chrome/Edge honor them on an unmanaged PC is VM test 30 |
+| Browser policies: disable private mode; force-install the Lockd In extension | Candidate; whether Chrome/Edge honor them on an unmanaged PC is VM test 30 |
 | Process suspension (a true pause) | Not now: no documented whole-process API for desktop apps; hang risk |
 | Kernel driver (process-creation callback could refuse launches) | Rejected for v1: signing burden and risk out of proportion |
 | Assigned Access (kiosk), Microsoft Family Safety | Rejected: kiosk replaces the desktop; Family Safety needs a child account |

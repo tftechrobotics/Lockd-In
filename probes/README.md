@@ -6,13 +6,13 @@ as "working blocking" until its results are recorded in `docs/milestones.md`.
 
 | Folder | What | Implemented | Compiled / checked (where) | Tested on device/VM |
 |---|---|---|---|---|
-| `windows/` | `FocusProbe.exe`: per-user minimize, per-app mute with ledger and a **guardian** process for crash recovery, launch detection. `FocusTarget.exe`: harmless app that logs its own exposure and mute state. | Yes | Compiles with .NET SDK 10.0.113, warnings as errors (Linux). Self-contained Windows executables come from CI, which also runs a headless start/release/exit check. | No |
-| `android/` | `focus-probe.apk`: usage-access or accessibility detector; block screen, overlay or home cover; audio-focus option; battery baseline; logs permission changes, Advanced Protection state, reboot and swipe. `focus-probe-target.apk`: harmless app with tone, picture-in-picture and self-measured exposure. | Yes | Kotlin **type-checks with zero errors and warnings** against the AOSP `android-16.0.0_r2` framework jar (Kotlin 2.0.21, Linux). **Full APK build not yet done**: AGP/aapt2 live only on Google's Maven, which this sandbox can't reach. CI does it. | No |
+| `windows/` | `LockdInProbe.exe`: per-user minimize, per-app mute with ledger and a **guardian** process for crash recovery, launch detection. `LockdInTarget.exe`: harmless app that logs its own exposure and mute state. | Yes | Compiles with .NET SDK 10.0.113, warnings as errors (Linux). Self-contained Windows executables come from CI, which also runs a headless start/release/exit check. | No |
+| `android/` | `lockdin-probe.apk`: usage-access or accessibility detector; block screen, overlay or home cover; audio-focus option; battery baseline; logs permission changes, Advanced Protection state, reboot and swipe. `lockdin-probe-target.apk`: harmless app with tone, picture-in-picture and self-measured exposure. | Yes | Kotlin **type-checks with zero errors and warnings** against the AOSP `android-16.0.0_r2` framework jar (Kotlin 2.0.21, Linux). **Full APK build not yet done**: AGP/aapt2 live only on Google's Maven, which this sandbox can't reach. CI does it. | No |
 | `windows-vm/` (**separate download**) | App Control (Pro build + Home deploy-only), AppLocker, browser policies, firewall, after-reboot check, ownership-based cleanup. Refuse to run unless on a VM with `-ConfirmDisposableVM`. | Yes | Parse clean and **PSScriptAnalyzer clean** (PowerShell 7.5.4, Linux). Ownership-manifest bookkeeping unit-tested off Windows. | No |
 
 ## Safety rules all probes follow
 
-- Never terminate the user's apps. The only exception is `--test-close-target-after-launch`, a timing measurement that is hard-restricted to the harmless `FocusTarget.exe`. That is detect-and-terminate, not launch prevention.
+- Never terminate the user's apps. The only exception is `--test-close-target-after-launch`, a timing measurement that is hard-restricted to the harmless `LockdInTarget.exe`. That is detect-and-terminate, not launch prevention.
 - Never discard data.
 - Never require disabling Smart App Control or Advanced Protection.
 - Stop by themselves (≤ 60 min).

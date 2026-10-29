@@ -1,14 +1,14 @@
 //! Print the timeline for a schedule JSON file, or for the brief's example.
 //!
-//!   cargo run -p focus-core --example timeline [schedule.json] [date]
+//!   cargo run -p lockdin-core --example timeline [schedule.json] [date]
 
 use std::str::FromStr;
 
 use chrono::{NaiveDate, NaiveTime};
 use chrono_tz::Tz;
-use focus_core::plan::SessionPlan;
-use focus_core::schedule::{Recurrence, Schedule};
-use focus_core::timeline::occurrence_on;
+use lockdin_core::plan::SessionPlan;
+use lockdin_core::schedule::{Recurrence, Schedule};
+use lockdin_core::timeline::occurrence_on;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -21,7 +21,7 @@ fn main() {
             })
         }
         None => Schedule {
-            contract_version: focus_core::CONTRACT_VERSION,
+            contract_version: lockdin_core::CONTRACT_VERSION,
             id: "example".into(),
             name: "Example from brief".into(),
             time_zone: "America/Chicago".into(),

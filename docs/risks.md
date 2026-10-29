@@ -12,7 +12,7 @@ Likelihood/impact: H/M/L. Ordered by when the risk must be retired.
 | R6 | Persistent OS policy left behind when nothing restarts (fail-closed: apps stay blocked) | M | H | Service reconciliation on start; separate scheduled cleanup task per policy; never signed policies; measured via `-SimulateCrash` + reboot; GO only if bounded | M1/M3 |
 | R6b | App Control binary format is undocumented: an in-app compiler (needed on Home) could produce wrong policies after Windows changes | M | H | Round-trip tests against `CiTool` on every supported build; allow-all base + deny-only rules; refuse to deploy on validation failure | M3 |
 | R6c | App Control is machine-wide: other accounts on a shared PC are affected during a session | M | M | Owner decision U3; AppLocker per-user rules as alternative | M1/M3 |
-| R6d | Rollback overwrites someone else's settings | L | H | Ownership manifest: restore only values still equal to what Focus set; report conflicts; refuse when pre-existing EXE rules or extension policies exist | M1 |
+| R6d | Rollback overwrites someone else's settings | L | H | Ownership manifest: restore only values still equal to what Lockd In set; report conflicts; refuse when pre-existing EXE rules or extension policies exist | M1 |
 | R7 | Privileged service adds attack surface (local privilege escalation via IPC), and cannot report its own abrupt stop | M | H | Authenticated ACL'd pipe, request validation, threat model, least functionality | M3/M7 |
 | R8 | Play rejects `specialUse` foreground service or accessibility declaration | M | H | Proper disclosures; app keeps working with honest Degraded status; owner-device testing via sideload meanwhile | M4/M7 |
 | R9 | Advanced Protection blocks sideloading (documented) and accessibility mode (reported); effect on usage access / overlay permission / background launch unverified | M | M | Default path doesn't need accessibility; probe A10 verifies the rest; Play internal testing for such phones; never ask users to disable it | M1/M4 |
@@ -23,7 +23,7 @@ Likelihood/impact: H/M/L. Ordered by when the risk must be retired.
 | R14 | Pairing abuse / unauthorized remote changes | L | H | Physical QR + confirmation, signatures, revocation, visible notifications | M5 |
 | R15 | Clock skew between devices | M | L | Absolute instants; skew detection and warning | M5 |
 | R16 | Google OAuth verification delay | M | L | Calendar optional; Testing mode for development | M6 |
-| R17 | Owner stops/uninstalls Focus as administrator | H | L | Accepted limit (R2): detected and reported, not prevented | — |
+| R17 | Owner stops/uninstalls Lockd In as administrator | H | L | Accepted limit (R2): detected and reported, not prevented | — |
 
 ## External prerequisites
 

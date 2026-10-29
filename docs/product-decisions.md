@@ -10,7 +10,7 @@ Three kinds of entry, kept apart on purpose:
 
 | # | Requirement | Source |
 |---|---|---|
-| R1 | Focus is a serious, **non-VPN** focus restriction app for personal Windows and Android devices. Approved apps are chosen separately per device; focus periods and breaks are scheduled and synchronized. | Owner 2026-10-29 |
+| R1 | Lockd In is a serious, **non-VPN** focus restriction app for personal Windows and Android devices. Approved apps are chosen separately per device; focus periods and breaks are scheduled and synchronized. | Owner 2026-10-29 |
 | R2 | Meaningful enforcement and resistance to casual bypass must coexist with preserving work and safe recovery. An administrator-owner can eventually bypass it; that does **not** redefine the product as "friction, never a lock". | Owner 2026-10-29 |
 | R3 | Never call an app "paused" while its process, audio or playback continues. | Owner 2026-10-29 |
 | R4 | In an allowlist session, an unsupported browser must not silently become an unrestricted route to blocked websites. | Owner 2026-10-29 |
@@ -25,6 +25,7 @@ Three kinds of entry, kept apart on purpose:
 | R14 | VM policy experiments preserve pre-existing settings, restore only what they changed, handle concurrent changes, never clear a policy because a backup is absent, and ship as a separate artifact. | Owner 2026-10-29 (review 2) |
 | R15 | State exact Android permission dependencies; verify Advanced Protection behavior rather than assume it. | Owner 2026-10-29 (review 2) |
 | R16 | An abruptly stopped component can't be relied on to report its own stop: use authenticated heartbeats and "unknown" when they expire. | Owner 2026-10-29 (review 2) |
+| R17 | The product is named **Lockd In** (was the working name "Focus"). Repository: `tftechrobotics/Lockd-In`. Trademark and store-name availability not yet checked. | Owner 2026-10-29 |
 | R11 | Everything else in `Focus_Project_Brief.md` (allowlist profiles per device, no force-closing or lost work, no hidden processes, no indefinite lockouts, offline execution, privacy minimums, etc.). | Brief v1.0 |
 
 ## Engineering recommendations (not approved)
@@ -46,7 +47,7 @@ Three kinds of entry, kept apart on purpose:
 | # | Question | Blocks |
 |---|---|---|
 | U1 | Is a Windows service running as SYSTEM, installed with admin consent, acceptable? | M3 architecture; not the current probes |
-| U2 | Unapproved apps already open when a session starts: offer to let the user close them, or minimize and mute them? Focus never closes them itself. | M2 design |
+| U2 | Unapproved apps already open when a session starts: offer to let the user close them, or minimize and mute them? Lockd In never closes them itself. | M2 design |
 | U3 | App Control policies are machine-wide: during a session, prevented apps would also be blocked for other Windows accounts on the same PC. Acceptable, or use per-user AppLocker rules (weaker: an admin can stop its service)? | After VM tests 10/20; not now |
 | U4 | Emergency recovery is immediate. Should it also require a typed confirmation and notify paired devices? | M2 design |
 | U5 | Override countdown length (recommended 90 s) and whether "end whole session" has a longer delay | M2 design |
@@ -60,10 +61,10 @@ Three kinds of entry, kept apart on purpose:
 
 | Date | Statement | Why |
 |---|---|---|
-| 2026-10-29 | "Focus is friction, never a lock" | Owner did not approve; replaced by R2 |
+| 2026-10-29 | "Lockd In is friction, never a lock" | Owner did not approve; replaced by R2 |
 | 2026-10-29 | "Proposed decisions stand unless you object" | Silence is not approval (owner) |
 | 2026-10-29 | Probe messages saying a covered or minimized app is "paused" | Inaccurate (R3) |
-| 2026-10-29 | Former U3 ("may Focus close a restricted app seconds after launch?") | Superseded by R12: Focus never terminates real apps |
+| 2026-10-29 | Former U3 ("may Lockd In close a restricted app seconds after launch?") | Superseded by R12: Lockd In never terminates real apps |
 | 2026-10-29 | "Launch gating" by detect-and-terminate | Not prevention (R12) |
 | 2026-10-29 | "App Control authoring not on Home, so impractical" | Wrong: enforcement works on all editions; authoring can be done in-app (see comparison) |
 | 2026-10-29 | "Service reports tamper events" | An abrupt stop can't self-report (R16) |

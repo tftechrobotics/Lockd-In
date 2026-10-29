@@ -2,7 +2,7 @@
 <#
 .SYNOPSIS
   VM-ONLY. Run after rebooting a VM that was left with a policy in place by
-  -SimulateCrash. Answers: when no Focus component restarts, does the block
+  -SimulateCrash. Answers: when no Lockd In component restarts, does the block
   persist across a reboot (fail-closed)? Then run 99-Cleanup.ps1.
 #>
 param(

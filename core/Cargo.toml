@@ -1,7 +1,7 @@
 [package]
-name = "focus-core"
+name = "lockdin-core"
 version = "0.1.0"
-description = "Platform-neutral scheduling, session-state and protection-status logic for Focus."
+description = "Platform-neutral scheduling, session-state and protection-status logic for Lockd In."
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true

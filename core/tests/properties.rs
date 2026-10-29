@@ -4,12 +4,12 @@ mod common;
 
 use chrono::{Duration, NaiveDate, NaiveTime};
 use common::*;
-use focus_core::plan::{MAX_SESSION_MINUTES, PhaseKind, Segment, SessionPlan};
-use focus_core::schedule::Recurrence;
-use focus_core::session::{
+use lockdin_core::plan::{MAX_SESSION_MINUTES, PhaseKind, Segment, SessionPlan};
+use lockdin_core::schedule::Recurrence;
+use lockdin_core::session::{
     EmergencyRecovery, OverrideRecord, OverrideScope, SessionControls, evaluate,
 };
-use focus_core::timeline::occurrence_on;
+use lockdin_core::timeline::occurrence_on;
 use proptest::prelude::*;
 
 fn plan_strategy() -> impl Strategy<Value = SessionPlan> {

@@ -1,4 +1,4 @@
-//! Focus core: platform-neutral logic shared by the Windows and Android clients.
+//! Lockd In core: platform-neutral logic shared by the Windows and Android clients.
 //!
 //! This crate owns *what should happen and when*. It never touches the
 //! operating system. Native clients own *making it happen* (enforcement) and

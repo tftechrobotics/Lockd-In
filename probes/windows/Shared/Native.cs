@@ -1,9 +1,9 @@
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace FocusProbe;
+namespace LockdInProbe;
 
-/// <summary>Win32 declarations shared by FocusProbe and FocusTarget.</summary>
+/// <summary>Win32 declarations shared by LockdInProbe and LockdInTarget.</summary>
 internal static class Native
 {
     // WinEvent hooks

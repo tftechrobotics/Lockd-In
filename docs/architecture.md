@@ -21,7 +21,7 @@ device and VM evidence exists (`docs/milestones.md`).
 └─────────────────────────┬─────────────────────────┘                             │
                           │ C ABI (C#)                                            │
                           └───────────────────────┬───────────────────────────────┘
-                              focus-core (Rust) — no OS, network or clock access
+                              lockdin-core (Rust) — no OS, network or clock access
           schedule · timeline (DST) · session state · override scopes · emergency recovery
           · release reasons · conflicts · protection status (Unknown for silent peers)
                  · (M5) sync protocol, pairing crypto · (M3) persistence/migrations
@@ -33,7 +33,7 @@ device and VM evidence exists (`docs/milestones.md`).
 
 | Layer | Owns | Must not |
 |---|---|---|
-| **focus-core** | What should happen and when; why nothing is restricted (`release_reason`); the truthful per-device status | Touch the OS, network or clock. `now` is passed in |
+| **lockdin-core** | What should happen and when; why nothing is restricted (`release_reason`); the truthful per-device status | Touch the OS, network or clock. `now` is passed in |
 | **Enforcer** (native) | Making restriction happen; reporting what it observed (`Verified` / `Degraded` / `NotEnforcing`) | Decide policy; claim success without a self-check; call an app "paused" while it runs |
 | **Windows service** (if approved) | Privileged actions only, behind an authenticated, ACL-restricted local IPC: launch prevention by policy, audio recovery, reconciliation of anything it applied (plus a separate scheduled cleanup task per policy) | Terminate real apps (R12); hold UI; accept unvalidated requests; leave OS settings behind |
 | **Scheduler** (native) | Waking at `next_transition`, on resume, on clock or time-zone change and on sync; then calling `evaluate` | Count seconds to keep time |

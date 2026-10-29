@@ -3,10 +3,10 @@ mod common;
 use chrono::{Duration, TimeZone, Utc, Weekday};
 use chrono_tz::America::Chicago;
 use common::*;
-use focus_core::ValidationError;
-use focus_core::plan::{PhaseKind, Segment, SessionPlan};
-use focus_core::schedule::{Exception, Schedule, ScheduleParseError};
-use focus_core::timeline::{DstAdjustment, occurrence_on, occurrences_between};
+use lockdin_core::ValidationError;
+use lockdin_core::plan::{PhaseKind, Segment, SessionPlan};
+use lockdin_core::schedule::{Exception, Schedule, ScheduleParseError};
+use lockdin_core::timeline::{DstAdjustment, occurrence_on, occurrences_between};
 
 #[test]
 fn brief_example_timeline() {
@@ -219,7 +219,7 @@ fn schedule_validation() {
 
     let mut w = weekly("w", &[], date(2026, 11, 2), time(18, 0), brief_plan());
     assert_eq!(w.validate(), Err(ValidationError::NoWeekdays));
-    w.recurrence = focus_core::schedule::Recurrence::Weekly {
+    w.recurrence = lockdin_core::schedule::Recurrence::Weekly {
         days: vec![Weekday::Mon],
         starts_on: date(2026, 11, 2),
         ends_on: Some(date(2026, 11, 1)),

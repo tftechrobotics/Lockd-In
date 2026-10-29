@@ -1,4 +1,4 @@
-package app.focus.probe
+package app.lockdin.probe
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -132,7 +132,7 @@ class ProbeService : Service() {
 
     private fun startInForeground() {
         val nm = getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(NotificationChannel(CHANNEL, "Focus session", NotificationManager.IMPORTANCE_LOW))
+        nm.createNotificationChannel(NotificationChannel(CHANNEL, "Lockd In session", NotificationManager.IMPORTANCE_LOW))
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         val stop = PendingIntent.getService(
             this, 1, Intent(this, ProbeService::class.java).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE
@@ -141,7 +141,7 @@ class ProbeService : Service() {
             .format(java.util.Date(ProbeSession.endsAtMs(this)))
         val baseline = ProbeSession.detector(this) == ProbeSession.Detector.NONE_BASELINE
         val n = Notification.Builder(this, CHANNEL)
-            .setContentTitle(if (baseline) "Focus probe baseline run" else "Focus probe session")
+            .setContentTitle(if (baseline) "Lockd In probe baseline run" else "Lockd In probe session")
             .setContentText(if (baseline) "Measuring battery only, nothing is blocked. Ends $until" else "Restricted apps are blocked until $until")
             .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
             .setContentIntent(open)
@@ -158,7 +158,7 @@ class ProbeService : Service() {
     companion object {
         private const val CHANNEL = "session"
         private const val NOTIFICATION_ID = 1
-        const val ACTION_STOP = "app.focus.probe.STOP"
+        const val ACTION_STOP = "app.lockdin.probe.STOP"
 
         fun start(ctx: Context) {
             ctx.startForegroundService(Intent(ctx, ProbeService::class.java))

@@ -1,4 +1,4 @@
-# Focus
+# Lockd In
 
 A serious, non-VPN focus restriction app for personal Windows and Android
 devices: scheduled focus periods and breaks, approved apps per device,
@@ -11,7 +11,7 @@ no restriction has been demonstrated on a device. Read `HANDOFF.md` first.
 
 | Path | What | Evidence |
 |---|---|---|
-| `core/` | `focus-core` (Rust): schedules, DST, session state, override scopes, emergency recovery, release reasons, conflicts, per-device status (Unknown for silent peers) | 21 tests pass (Linux) |
+| `core/` | `lockdin-core` (Rust): schedules, DST, session state, override scopes, emergency recovery, release reasons, conflicts, per-device status (Unknown for silent peers) | 21 tests pass (Linux) |
 | `probes/windows/` | Windows probe + guardian + harmless target (C#/.NET 10) | Compiles; not run on Windows |
 | `probes/android/` | Android probe + harmless target (Kotlin) | Type-checks against API 36; APK not yet built (CI) |
 | `probes/windows-vm/` | VM-only policy experiments (PowerShell), separate download | Parse + lint clean; not run |

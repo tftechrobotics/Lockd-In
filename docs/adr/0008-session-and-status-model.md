@@ -1,6 +1,6 @@
 # ADR-0008: Separate release reasons and "unknown" peer status
 
-**Status:** Implemented in `focus-core` (tested on Linux, 21 tests). Product
+**Status:** Implemented in `lockdin-core` (tested on Linux, 21 tests). Product
 defaults (delays, freshness window) are recommendations awaiting owner decision U4/U5.
 
 ## Decision

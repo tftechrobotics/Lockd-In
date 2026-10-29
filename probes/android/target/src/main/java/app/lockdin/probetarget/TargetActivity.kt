@@ -1,4 +1,4 @@
-package app.focus.probetarget
+package app.lockdin.probetarget
 
 import android.app.Activity
 import android.app.PictureInPictureParams
@@ -23,7 +23,7 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 /**
- * Harmless app for testing the Focus probe. It holds no user data. It logs,
+ * Harmless app for testing the Lockd In probe. It holds no user data. It logs,
  * from its own point of view, how long it stayed usable ("exposure") before
  * something covered it or sent it to the background, and what happened to its
  * sound. Optionally plays a quiet tone and can enter picture-in-picture.
@@ -40,7 +40,7 @@ class TargetActivity : Activity() {
         super.onCreate(savedInstanceState)
         val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(40, 40, 40, 40) }
         col.addView(TextView(this).apply {
-            text = "Focus Probe Target\n\nA harmless test app. It holds no data and can be closed or uninstalled any time."
+            text = "Lockd In Probe Target\n\nA harmless test app. It holds no data and can be closed or uninstalled any time."
             textSize = 18f
         })
         col.addView(Button(this).apply {

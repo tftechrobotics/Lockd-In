@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "app.focus.probe"
+    namespace = "app.lockdin.probe"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "app.focus.probe"
+        applicationId = "app.lockdin.probe"
         minSdk = 29 // UsageEvents.Event.ACTIVITY_RESUMED
         targetSdk = 36
         versionCode = 2

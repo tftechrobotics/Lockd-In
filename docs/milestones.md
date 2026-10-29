@@ -31,7 +31,7 @@ Each row records evidence separately: **implemented** (code exists),
 
 **Windows per-user layer — GO** if:
 - the smoke test passes;
-- minimize p95 ≤ 500 ms, sweep ≤ 2.5 s, mute ≤ 2 s (FocusTarget and one real browser);
+- minimize p95 ≤ 500 ms, sweep ≤ 2.5 s, mute ≤ 2 s (LockdInTarget and one real browser);
 - R1–R3 restore sound as specified, and R4/R5 restore it via `--recover`;
 - no data loss.
 

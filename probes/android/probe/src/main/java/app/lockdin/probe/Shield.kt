@@ -1,4 +1,4 @@
-package app.focus.probe
+package app.lockdin.probe
 
 import android.content.Context
 import android.content.Intent

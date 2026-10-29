@@ -42,7 +42,7 @@ jobs:
       - name: Publish self-contained single-file executables
         shell: pwsh
         run: |
-          $out = "out/focus-probe-windows-${{ matrix.rid }}"
+          $out = "out/lockdin-probe-windows-${{ matrix.rid }}"
           foreach ($p in 'Probe', 'Target') {
             dotnet publish probes/windows/$p -c Release -r ${{ matrix.rid }} --self-contained true `
               -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o $out
@@ -56,22 +56,22 @@ jobs:
         if: matrix.rid == 'win-x64'
         shell: pwsh
         run: |
-          $out = "out/focus-probe-windows-win-x64"
-          $t = Start-Process "$out/FocusTarget.exe" -ArgumentList '--silent' -PassThru
-          $p = Start-Process "$out/FocusProbe.exe" -ArgumentList '--block','FocusTarget.exe','--minutes','0.5' -PassThru -Wait -NoNewWindow
+          $out = "out/lockdin-probe-windows-win-x64"
+          $t = Start-Process "$out/LockdInTarget.exe" -ArgumentList '--silent' -PassThru
+          $p = Start-Process "$out/LockdInProbe.exe" -ArgumentList '--block','LockdInTarget.exe','--minutes','0.5' -PassThru -Wait -NoNewWindow
           if (-not $t.HasExited) { Stop-Process -Id $t.Id -Force }
-          $logs = Join-Path $env:LOCALAPPDATA 'FocusProbe'
+          $logs = Join-Path $env:LOCALAPPDATA 'LockdInProbe'
           $probeLog = Get-ChildItem $logs -Filter 'probe-*.jsonl' | Sort-Object LastWriteTime | Select-Object -Last 1
           Get-Content $probeLog.FullName
           if ($p.ExitCode -ne 0) { throw "probe exit code $($p.ExitCode)" }
           if (-not (Select-String -Path $probeLog.FullName -Pattern '"evt":"released"' -Quiet)) { throw 'probe did not log a release' }
           if (-not (Select-String -Path $probeLog.FullName -Pattern '"evt":"guardian_started","data":\{"ok":true' -Quiet)) { throw 'guardian did not start' }
-          & "$out/FocusProbe.exe" --recover
+          & "$out/LockdInProbe.exe" --recover
           if ($LASTEXITCODE -ne 0) { throw '--recover failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: focus-probe-windows-${{ matrix.rid }}
-          path: out/focus-probe-windows-${{ matrix.rid }}
+          name: lockdin-probe-windows-${{ matrix.rid }}
+          path: out/lockdin-probe-windows-${{ matrix.rid }}
           retention-days: 30
 
   vm-experiments:
@@ -92,7 +92,7 @@ jobs:
       - name: Package (scripts + harmless x64 target only)
         shell: pwsh
         run: |
-          $out = 'out/focus-vm-policy-experiments-DISPOSABLE-VM-ONLY'
+          $out = 'out/lockdin-vm-policy-experiments-DISPOSABLE-VM-ONLY'
           New-Item -ItemType Directory $out | Out-Null
           Copy-Item probes/windows-vm/* $out/
           dotnet publish probes/windows/Target -c Release -r win-x64 --self-contained true `
@@ -100,8 +100,8 @@ jobs:
           Get-ChildItem $out -Filter *.pdb | Remove-Item
       - uses: actions/upload-artifact@v4
         with:
-          name: focus-vm-policy-experiments-DISPOSABLE-VM-ONLY
-          path: out/focus-vm-policy-experiments-DISPOSABLE-VM-ONLY
+          name: lockdin-vm-policy-experiments-DISPOSABLE-VM-ONLY
+          path: out/lockdin-vm-policy-experiments-DISPOSABLE-VM-ONLY
           retention-days: 30
 
   android-probe:
@@ -122,12 +122,12 @@ jobs:
         run: ./gradlew --no-daemon :probe:assembleDebug :target:assembleDebug
       - name: Collect
         run: |
-          mkdir -p ../../out/focus-probe-android
-          cp probe/build/outputs/apk/debug/probe-debug.apk ../../out/focus-probe-android/focus-probe.apk
-          cp target/build/outputs/apk/debug/target-debug.apk ../../out/focus-probe-android/focus-probe-target.apk
-          cp TESTER.md ../../out/focus-probe-android/
+          mkdir -p ../../out/lockdin-probe-android
+          cp probe/build/outputs/apk/debug/probe-debug.apk ../../out/lockdin-probe-android/lockdin-probe.apk
+          cp target/build/outputs/apk/debug/target-debug.apk ../../out/lockdin-probe-android/lockdin-probe-target.apk
+          cp TESTER.md ../../out/lockdin-probe-android/
       - uses: actions/upload-artifact@v4
         with:
-          name: focus-probe-android
-          path: out/focus-probe-android
+          name: lockdin-probe-android
+          path: out/lockdin-probe-android
           retention-days: 30

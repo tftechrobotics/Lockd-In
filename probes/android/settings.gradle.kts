@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "FocusProbes"
+rootProject.name = "LockdInProbes"
 include(":probe", ":target")

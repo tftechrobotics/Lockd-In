@@ -1,4 +1,4 @@
-package app.focus.probe
+package app.lockdin.probe
 
 import android.app.AppOpsManager
 import android.content.Context
@@ -18,7 +18,7 @@ import java.io.File
 /** Probe session settings. Persisted so they survive process death. */
 object ProbeSession {
     private const val PREFS = "probe"
-    const val TARGET_PACKAGE = "app.focus.probetarget"
+    const val TARGET_PACKAGE = "app.lockdin.probetarget"
 
     enum class Detector { USAGE_STATS, ACCESSIBILITY, NONE_BASELINE }
 

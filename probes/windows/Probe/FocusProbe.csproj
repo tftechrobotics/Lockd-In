@@ -1,6 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <AssemblyName>FocusProbe</AssemblyName>
-    <RootNamespace>FocusProbe</RootNamespace>
-  </PropertyGroup>
-</Project>

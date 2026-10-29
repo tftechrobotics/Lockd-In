@@ -1,4 +1,4 @@
-package app.focus.probe
+package app.lockdin.probe
 
 import android.app.Activity
 import android.app.AlertDialog
@@ -43,10 +43,10 @@ class MainActivity : Activity() {
             col.addView(this)
         }
 
-        note("Focus probe — experiment build", 18f, 0)
+        note("Lockd In probe — experiment build", 18f, 0)
         note(
             "Measures whether this phone can detect and block a chosen app. Start with the smoke test, " +
-                "which uses the harmless Focus Probe Target app and ends by itself after 3 minutes."
+                "which uses the harmless Lockd In Probe Target app and ends by itself after 3 minutes."
         )
         note(
             "Privacy: the log on this phone records the package names of apps you open during a session, " +

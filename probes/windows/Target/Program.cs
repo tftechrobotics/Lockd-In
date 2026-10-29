@@ -1,4 +1,4 @@
-// FocusTarget — a harmless app for testing FocusProbe. EXPERIMENT ONLY.
+// LockdInTarget — a harmless app for testing LockdInProbe. EXPERIMENT ONLY.
 //
 // It holds no user data. It shows a small window, optionally plays a quiet
 // looping tone, and logs from its own point of view what happened to it:
@@ -8,7 +8,7 @@
 
 using System.Runtime.InteropServices;
 
-namespace FocusProbe;
+namespace LockdInProbe;
 
 internal static class Program
 {
@@ -35,16 +35,16 @@ internal static class Program
             hInstance = hInstance,
             hCursor = Native.LoadCursorW(IntPtr.Zero, 32512), // IDC_ARROW
             hbrBackground = Native.COLOR_WINDOW + 1,
-            lpszClassName = "FocusTargetWindow",
+            lpszClassName = "LockdInTargetWindow",
         };
         if (Native.RegisterClassExW(ref wc) == 0) return 3;
 
-        var hwnd = Native.CreateWindowExW(0, "FocusTargetWindow", "Focus test target (harmless)",
+        var hwnd = Native.CreateWindowExW(0, "LockdInTargetWindow", "Lockd In test target (harmless)",
             Native.WS_OVERLAPPEDWINDOW | Native.WS_VISIBLE, Native.CW_USEDEFAULT, Native.CW_USEDEFAULT, 520, 200,
             IntPtr.Zero, IntPtr.Zero, hInstance, IntPtr.Zero);
         if (hwnd == IntPtr.Zero) return 4;
         Native.CreateWindowExW(0, "STATIC",
-            "This is a harmless test app for the Focus probe.\r\nIt holds no data. Close it any time.\r\n" +
+            "This is a harmless test app for the Lockd In probe.\r\nIt holds no data. Close it any time.\r\n" +
             (silent ? "Sound: off (--silent)." : "Sound: a quiet tone plays while it runs."),
             Native.WS_CHILD | Native.WS_VISIBLE, 16, 16, 480, 80, hwnd, IntPtr.Zero, hInstance, IntPtr.Zero);
         Native.ShowWindow(hwnd, Native.SW_SHOW);

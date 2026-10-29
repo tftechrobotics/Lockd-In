@@ -1,10 +1,10 @@
 using System.Text;
 using System.Text.Json;
 
-namespace FocusProbe;
+namespace LockdInProbe;
 
 /// <summary>
-/// Local JSON-lines log under %LOCALAPPDATA%\FocusProbe. Nothing is uploaded.
+/// Local JSON-lines log under %LOCALAPPDATA%\LockdInProbe. Nothing is uploaded.
 /// Entries contain executable names, timings and outcomes — never window
 /// titles or content. Executable names can still reveal what someone uses.
 /// </summary>
@@ -20,7 +20,7 @@ internal sealed class JsonLog : IDisposable
         get
         {
             var dir = System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FocusProbe");
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LockdInProbe");
             System.IO.Directory.CreateDirectory(dir);
             return dir;
         }
