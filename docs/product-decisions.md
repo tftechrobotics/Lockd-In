@@ -42,6 +42,9 @@ Three kinds of entry, kept apart on purpose:
 | E7 | DST: nonexistent start shifts later by the gap; repeated start uses the first occurrence (RFC 5545) | Implemented in core |
 | E8 | Supported OS at launch: Windows 11 25H2/26H2 x64+ARM64; Android minSdk 29 | Pending owner device details |
 | E9 | Rust shared core; WinUI 3; Kotlin/Compose | ADR-0001, ADR-0002 (engineering, reversible) |
+| E10 | First Play release of the probe omits the optional accessibility detector (avoids its declaration, video and review risk); added later only if usage access fails M1 (U8) | `docs/play/README.md` (reversible) |
+| E11 | Clock rule: sessions advance by monotonic time; after a reboot, max(wall clock, checkpoint + uptime). Clock set forward while the device is off can end a session early and is reported, not prevented | `core/src/clock.rs` |
+| E12 | M2 visual direction "Quiet instrument" (tokens, status language) | `docs/design.md`, design canvas |
 
 ## Unresolved decisions (need the owner)
 
