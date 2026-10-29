@@ -10,6 +10,8 @@ public static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        Log.Write($"start {Environment.ProcessId}");
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Write($"fatal: {e.ExceptionObject}");
         WinRT.ComWrappersSupport.InitializeComWrappers();
         var instance = AppInstance.FindOrRegisterForKey("lockdin-main");
         if (!instance.IsCurrent)
@@ -22,7 +24,8 @@ public static class Program
         Application.Start(init =>
         {
             SynchronizationContext.SetSynchronizationContext(new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread()));
-            _ = new App();
+            try { _ = new App(); }
+            catch (Exception ex) { Log.Write($"app init failed: {ex}"); throw; }
         });
         return 0;
     }

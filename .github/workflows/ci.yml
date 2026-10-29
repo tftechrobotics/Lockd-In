@@ -264,7 +264,13 @@ jobs:
           $log = Join-Path $env:LOCALAPPDATA 'LockdIn/logs/shell.log'
           $tail = if (Test-Path $log) { (Get-Content $log -Tail 12) -join '%0A' } else { 'no shell.log' }
           Write-Host "::notice title=Windows app launch test::exit=$code%0A$tail"
-          if ($code -ne 0) { Write-Host "::error title=Windows app launch test::exit $code"; exit 1 }
+          if ($code -ne 0) {
+            $ev = Get-WinEvent -LogName Application -MaxEvents 30 -ErrorAction SilentlyContinue |
+              Where-Object { $_.ProviderName -in '.NET Runtime', 'Application Error', 'Windows Error Reporting' -and $_.TimeCreated -gt (Get-Date).AddMinutes(-5) } |
+              Select-Object -First 3 | ForEach-Object { ($_.Message -replace "`r?`n", ' | ').Substring(0, [Math]::Min(1800, $_.Message.Length)) }
+            Write-Host "::error title=Windows app launch test::exit $code%0A$($ev -join '%0A---%0A')"
+            exit 1
+          }
           if (-not (Select-String -Path $log -SimpleMatch 'ui.ready' -Quiet)) { Write-Host "::error::Interface never reported ready"; exit 1 }
 
   # SPIKE (risk R6b): does our in-app App Control compiler produce the same
