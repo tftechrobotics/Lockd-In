@@ -46,11 +46,11 @@ Protected, Not yet applied, Degraded, Not enforcing, Unknown.
 ## Screens
 | Screen | Web | Windows | Android |
 |---|---|---|---|
-| Focus setup (intention, length, break, periods, profile, devices, next) | Implemented | Implemented (desktop layout, shared components) — not yet seen on a real PC | Mockup (reference) |
-| Active focus / break / unlock countdown / emergency / recap | Implemented | Implemented (shared) | — |
-| Schedule (list, editor, overlap error, empty) | Implemented | Implemented (shared) | — |
+| Focus setup (intention, length, break, periods, profile, devices, next) | Implemented | Implemented (desktop layout, shared components) — not yet seen on a real PC | Implemented (Compose) — emulator screenshots reviewed |
+| Active focus / break / unlock countdown / emergency / recap | Implemented | Implemented (shared) | Implemented (Compose) |
+| Schedule (list, editor, overlap error, empty) | Implemented | Implemented (shared) | Implemented (system time picker) |
 | Native chrome: title bar, tray icon + menu, close-to-tray notice | — | Implemented; CI launch test | — |
-| Profiles, Devices, Settings | Implemented (local) | — | — |
+| Profiles, Devices, Settings | Implemented (local) | Implemented (shared) | Implemented (local) |
 | Block screen, onboarding/permissions, pairing, presets, study timing | — | — | — |
 
 Verified (web, Chromium/Playwright): axe WCAG 2.2 A/AA with no violations on

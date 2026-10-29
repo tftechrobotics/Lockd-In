@@ -15,7 +15,9 @@ study timing → calendar and check-ins → location and SMS.
 | A5 | Main flow configure → start → focus → break → resume → finish (web, local timing only) | Done (Chromium-tested) |
 | A6 | Rust ↔ TypeScript parity vectors for session timing (R13 fallback) | Done (CI-enforced) |
 | A7 | Windows app: native shell + shared UI (R31) — title bar, tray menu, close-to-tray, single instance, offline bundled UI, bridge | In progress — implemented; CI build/launch test |
-| A8 | Android app shell (Compose) with bottom nav, insets, large fonts | Next |
+| A8 | Android app shell (Compose) with bottom nav, insets, large fonts | Done (emulator-tested in CI) — not yet on a phone |
+| A9 | Android toolchain upgrade: AGP 9.1 + compileSdk 37 for Compose 1.12+ | Later |
+| A10 | Port core `clock` (monotonic session time) to Kotlin and TypeScript | Next |
 
 ## B. Enforcement and trust (M1 continues in parallel)
 | # | Item | Status |

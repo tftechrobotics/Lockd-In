@@ -7,6 +7,8 @@
 Google Play (Android probe) so builds can run on real devices (R18). Developer:
 Android Compose shell in Cream & Ink, then presets/resources (C2–C3), then the
 Windows blocking agent (B4) and pairing relay (B6, needs hosting approval).
+Owner wants architecture built before device setup; Azure (pay-as-you-go,
+not free trial — Artifact Signing doesn't support trials) and Play wait.
 
 ## Status by evidence level
 
@@ -15,6 +17,7 @@ Windows blocking agent (B4) and pairing relay (B6, needs hosting approval).
 | `lockdin-core` | Yes, incl. `clock`; `examples/parity_vectors.rs` | 35 tests (3 property tests), fmt, clippy — Ubuntu 24.04, Rust 1.97.0 | n/a (pure logic) | Heartbeat transport (M5); native clock sources (M3/M4) |
 | **Web app** (`apps/web`) | Yes: Cream & Ink; Focus (setup → focus → break → resume → recap, unlock countdown, emergency), Schedule, Profiles, Devices, Settings; local storage only | 19 unit tests incl. 773 Rust parity samples; 23 Playwright tests (flow on a simulated clock, axe A/AA × 2 themes × all pages, keyboard, 200% text, 320/390 px) — Chromium, Linux | n/a (blocks nothing, by design) | Pairing/relay (U12), presets, study timing, nudges UI beyond tone |
 | **Windows app** (`apps/windows`) | Yes: WinUI 3 shell (Windows App SDK 2.5.1, .NET 10) hosting the shared UI in WebView2 (desktop layout); title bar, tray menu, close-to-tray, single instance, min size, offline bundle, validated bridge | Builds x64 + ARM64 in CI; 19 bridge tests (Linux + CI); **launch test passes on windows-2025** (window, tray, WebView2 loads bundled UI, handshake, clean quit) | **Not on a person's PC** (unsigned → Smart App Control) | Blocking agent (B4); launch at sign-in setting; installer (B7) |
+| **Android app** (`apps/android`) | Yes: Compose shell in Cream & Ink — bottom nav, Focus flow, unlock/emergency, recap, Schedule (system time picker), Profiles, Devices, Settings; Kotlin engine + schedule + state | 7 JVM unit tests (773 parity samples, DST, state codec) locally and in CI; lint; 10 Compose UI tests on API 35 emulator; screenshots on branch `ci-screenshots` (`git show origin/ci-screenshots:android/01-setup-light.png`) | **Not on a phone** (Play pending) | Blocking (from probe), notifications, clock port |
 | Cream & Ink design system | `design/tokens.json` + contrast check; wordmark, lock mark, library edge SVGs | Contrast check passes (24 pairs + control borders) | — | Windows (XAML) and Android (Compose) token outputs |
 | Windows probe + target + guardian | Yes | CI x64/ARM64 builds; headless runner sanity run passes | **No** — Smart App Control blocks unsigned build on owner PC | — |
 | Windows signing in CI | Yes (Azure Artifact Signing via OIDC, gated on repo variables, verifies every signature) | actionlint clean; unsigned path runs green | n/a | Needs owner's Azure account |
@@ -28,6 +31,17 @@ Windows blocking agent (B4) and pairing relay (B6, needs hosting approval).
 `tools/sandbox-checks.sh` reruns every Linux-side check (core, .NET builds,
 spike self-test, Kotlin type-check with an R stand-in, VM script lint,
 actionlint).
+
+## What changed this session (fifth, later)
+- Android app shell (A8). Compose BOM pinned to 2025.08.00 because 2026.x
+  requires AGP 9.1 + compileSdk 37 (A9). Local Kotlin checks without Maven:
+  `apt-get install junit4 libhamcrest-java libandroid-json-java`, then compile
+  `engine/`, `state/AppState.kt` and `src/test` with the Gradle-bundled kotlinc
+  (see the command in this session's history: classpath = kotlin-stdlib,
+  /usr/share/java/junit4-4.13.2.jar, hamcrest-core.jar, com.android.json.jar).
+- Android CI publishes UI-test screenshots to `ci-screenshots` (artifact
+  downloads are blocked from the sandbox; git fetch works).
+- Owner chose to build architecture before device setup (Azure, Play).
 
 ## What changed this session (fifth, continued)
 - Owner answered U11 → R31 (native shell + shared UI, desktop-specific

@@ -17,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -117,6 +118,7 @@ class AppTest {
     @Test fun invalidCustomLengthExplained() {
         launch()
         rule.onNodeWithText("Custom").performClick()
+        rule.onNode(hasText("Minutes")).performTextClearance()
         rule.onNode(hasText("Minutes")).performTextInput("0")
         rule.onNodeWithText("Lock in").performScrollTo().performClick()
         rule.onNodeWithText("Focus periods are 1–240 minutes.").performScrollTo().assertIsDisplayed()
