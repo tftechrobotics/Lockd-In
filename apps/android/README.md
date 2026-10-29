@@ -6,7 +6,7 @@ testing, `docs/play/README.md`). **No blocking yet**: the app says "Blocking not
 set up". Blocking (usage access + block screen) moves here from
 `probes/android` once the probe has passed on a real phone (M1).
 
-- Jetpack Compose (BOM 2026.09.00), Kotlin 2.2.20, AGP 8.13.0, minSdk 29, targetSdk 36.
+- Jetpack Compose (BOM 2025.08.00; newer needs AGP 9.1 + compileSdk 37), Kotlin 2.2.20, AGP 8.13.0, minSdk 29, targetSdk 36.
 - Bottom navigation: Focus, Schedule, Profiles. Settings in the top bar;
   Devices from the device row on Focus. Edge-to-edge with safe-drawing
   insets, IME padding, 48 dp targets, sp text, scrolling screens.
