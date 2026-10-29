@@ -1,20 +1,36 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 900" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <!-- Faint library architecture for the page edge: an arched window over a bookcase. Decorative only. -->
-  <!-- Arched window -->
-  <path d="M40 420 V170 A90 90 0 0 1 220 170 V420"/>
-  <path d="M52 420 V172 A78 78 0 0 1 208 172 V420"/>
-  <path d="M130 94 V420 M52 250 H208 M52 335 H208"/>
-  <path d="M91 106 V420 M169 106 V420"/>
-  <path d="M30 420 H230 M26 432 H234"/>
-  <!-- Keystone and sill -->
-  <path d="M122 80 L130 66 L138 80"/>
-  <!-- Column at the outer edge -->
-  <path d="M8 40 V900 M20 40 V900 M2 40 H26 M2 30 H26"/>
-  <!-- Bookcase -->
-  <path d="M30 470 H236 V900 M30 470 V900"/>
-  <path d="M30 560 H236 M30 650 H236 M30 740 H236 M30 830 H236"/>
-  <path d="M42 560 V490 M50 560 V496 M58 560 V486 M66 560 V500 M74 560 V492 M84 560 L98 500 M104 560 V488 M112 560 V494 M120 560 V490 M150 560 V498 M158 560 V486 M166 560 V496 M174 560 V490 M196 560 V500 M204 560 V488 M212 560 V494 M220 560 V492"/>
-  <path d="M42 650 V584 M52 650 V578 M60 650 V588 M70 650 V580 M78 650 V586 M110 650 V578 M118 650 V590 M126 650 V582 M134 650 V586 M142 650 L156 592 M176 650 V580 M184 650 V588 M192 650 V578 M200 650 V584 M210 650 V590 M220 650 V580"/>
-  <path d="M42 740 V672 M50 740 V680 M58 740 V668 M66 740 V676 M96 740 V672 M104 740 V680 M112 740 V670 M120 740 V676 M128 740 V684 M162 740 V670 M170 740 V678 M178 740 V672 M186 740 V682 M214 740 L226 684"/>
-  <path d="M42 830 V762 M50 830 V770 M58 830 V758 M90 830 V766 M98 830 V760 M106 830 V770 M114 830 V764 M140 830 V758 M148 830 V766 M156 830 V762 M164 830 V770 M200 830 V760 M208 830 V768 M216 830 V762 M224 830 V770"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 1120" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <!-- Faint library architecture for the window edge (Cream & Ink reference):
+       a tall arched window seen slightly in perspective, with a bookcase built
+       in front of its lower half. Decorative only; drawn in currentColor. -->
+  <!-- Arched window: outer frame, inner frame (receding), glazing -->
+  <path d="M-30 1120 V200 A105 105 0 0 1 180 200 V1120"/>
+  <path d="M-18 1120 V202 A93 93 0 0 1 168 202 V1120"/>
+  <path d="M6 560 V214 A77 77 0 0 1 156 210 V560"/>
+  <path d="M16 560 V216 A67 67 0 0 1 146 212 V560"/>
+  <!-- Mullions and transoms, transoms falling slightly toward the wall -->
+  <path d="M60 146 V560 M66 146 V560"/>
+  <path d="M110 150 V560 M115 152 V560"/>
+  <path d="M16 236 L146 248 M16 330 L146 340 M16 424 L146 432"/>
+  <path d="M16 241 L146 253 M16 335 L146 345 M16 429 L146 437"/>
+  <!-- Bookcase in front: shelf planks with a front edge -->
+  <path d="M-30 560 H196 V572 H-30"/>
+  <path d="M-30 700 H190 V711 H-30"/>
+  <path d="M-30 820 H186 V831 H-30"/>
+  <path d="M-30 960 H182 V971 H-30 M-30 1110 H178"/>
+  <path d="M168 831 V960 M164 971 V1110"/>
+  <path d="M-8 960 V880 H12 V960 M16 960 V892 H34 V960 M40 960 L58 896 L70 899 L54 960 M78 960 V884 H96 V960 M100 960 V900 H116 V960"/>
+  <path d="M-6 1110 V1030 H18 V1110 M22 1110 V1044 H38 V1110 M60 1110 V1080 H140 V1110 M66 1080 V1060 H132 V1080"/>
+  <path d="M176 572 V700 M172 711 V1120"/>
+  <!-- Upper shelf books -->
+  <path d="M-6 560 V478 H14 V560 M14 560 V490 H30 V560 M36 560 V470 H56 V560 M58 560 V496 H70 V560"/>
+  <path d="M-2 496 H10 M-2 502 H10 M40 488 H52 M40 494 H52"/>
+  <path d="M76 560 L92 504 L104 507 L90 560"/>
+  <path d="M112 560 V512 H124 V560 M126 560 V520 H136 V560"/>
+  <!-- Lower shelf books -->
+  <path d="M-8 700 V612 H12 V700 M14 700 V622 H32 V700 M34 700 V606 H54 V700 M58 700 V618 H76 V700 M78 700 V630 H94 V700"/>
+  <path d="M100 700 V614 H118 V700 M120 700 V626 H134 V700 M136 700 V616 H156 V700"/>
+  <path d="M38 626 H50 M38 632 H50 M104 632 H114 M104 638 H114 M140 634 H152"/>
+  <!-- Bottom shelf: books lying flat and a short stack -->
+  <path d="M-8 820 V792 H86 V820 M-4 792 V770 H78 V792 M2 770 V752 H70 V770"/>
+  <path d="M100 820 V744 H118 V820 M120 820 V756 H136 V820 M138 820 V748 H158 V820"/>
 </svg>

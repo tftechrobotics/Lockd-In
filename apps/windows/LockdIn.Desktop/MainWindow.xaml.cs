@@ -211,7 +211,7 @@ public sealed partial class MainWindow : Window
         tb.ButtonHoverBackgroundColor = hover;
         tb.ButtonHoverForegroundColor = ink;
         tb.ButtonPressedBackgroundColor = hover;
-        tb.ButtonInactiveForegroundColor = dark ? Rgb(0x8F8170) : Rgb(0x857868);
+        tb.ButtonInactiveForegroundColor = dark ? Rgb(0x8F8170) : Rgb(0x8F8270);
         ((FrameworkElement)Content).RequestedTheme = dark ? ElementTheme.Dark : ElementTheme.Light;
     }
 

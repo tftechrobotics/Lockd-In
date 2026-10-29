@@ -1,5 +1,6 @@
 package app.lockdin.ui
 
+import androidx.compose.material3.HorizontalDivider
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
@@ -71,7 +72,7 @@ fun LockdInApp(store: Store, clock: AppClock = AppClock.System, zone: ZoneId = Z
                     Image(
                         painterResource(R.drawable.wordmark), contentDescription = "Lockd In",
                         colorFilter = ColorFilter.tint(c.ink),
-                        modifier = Modifier.align(Alignment.Center).height(30.dp),
+                        modifier = Modifier.align(Alignment.Center).height(32.dp),
                     )
                     IconButton(onClick = { go(Route.SETTINGS) }, modifier = Modifier.align(Alignment.CenterEnd).padding(end = 4.dp)) {
                         LockdIcon(LIcon.Gear, description = "Settings")
@@ -79,20 +80,23 @@ fun LockdInApp(store: Store, clock: AppClock = AppClock.System, zone: ZoneId = Z
                 }
             },
             bottomBar = {
-                NavigationBar(containerColor = c.surface, contentColor = c.ink) {
+                Column {
+                HorizontalDivider(color = c.line)
+                NavigationBar(containerColor = c.ground, contentColor = c.ink) {
                     Route.entries.filter { it.tab }.forEach { r ->
                         NavigationBarItem(
                             selected = (if (route.tab) route else lastTab) == r,
                             onClick = { go(r) },
                             icon = { LockdIcon(r.icon) },
-                            label = { Text(r.label, style = Type.caption) },
+                            label = { Text(r.label, style = Type.caption.copy(fontWeight = if ((if (route.tab) route else lastTab) == r) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal)) },
                             modifier = Modifier.testTag("tab-${r.name.lowercase()}"),
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = c.ink, selectedTextColor = c.ink, indicatorColor = c.taupe,
+                                selectedIconColor = c.ink, selectedTextColor = c.ink, indicatorColor = c.taupeSoft,
                                 unselectedIconColor = c.inkMuted, unselectedTextColor = c.inkMuted,
                             ),
                         )
                     }
+                }
                 }
             },
         ) { padding ->

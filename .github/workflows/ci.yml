@@ -174,7 +174,7 @@ jobs:
     name: Windows app (${{ matrix.rid }})
     runs-on: windows-2025
     permissions:
-      contents: read
+      contents: write   # push design-review screenshots (x64 job only)
       id-token: write
     env:
       SIGN: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT != '' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
@@ -274,6 +274,30 @@ jobs:
             exit 1
           }
           if (-not (Select-String -Path $log -SimpleMatch 'ui.ready' -Quiet)) { Write-Host "::error::Interface never reported ready"; exit 1 }
+      - name: Screenshots of the real window (x64)
+        if: matrix.rid == 'win-x64'
+        shell: pwsh
+        run: |
+          ./apps/windows/scripts/capture-screenshots.ps1 -Exe "out/lockdin-windows-win-x64/LockdIn.exe" -OutDir out/win-shots
+          Write-Host "::notice title=Windows screenshots::$((Get-ChildItem out/win-shots).Name -join ' ')"
+      - name: Publish Windows screenshots to the ci-screenshots-windows branch
+        if: matrix.rid == 'win-x64' && github.event_name == 'push'
+        shell: bash
+        run: |
+          set -e
+          sha=$(git rev-parse --short HEAD)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin ci-screenshots-windows || true
+          if git rev-parse --verify origin/ci-screenshots-windows >/dev/null 2>&1; then
+            git worktree add ../win-shots origin/ci-screenshots-windows -B ci-screenshots-windows
+          else
+            git worktree add --orphan -b ci-screenshots-windows ../win-shots
+          fi
+          rm -rf ../win-shots/windows && mkdir -p ../win-shots/windows
+          cp out/win-shots/*.png ../win-shots/windows/
+          echo "Screenshots from commit $sha (GitHub windows-2025 runner, 100% scaling, real WinUI window)." > ../win-shots/windows/README.txt
+          cd ../win-shots && git add -A && git commit -qm "Windows screenshots for $sha" && git push -q origin ci-screenshots-windows
 
   # SPIKE (risk R6b): does our in-app App Control compiler produce the same
   # binary as Microsoft's ConvertFrom-CIPolicy? Builds files only. Nothing is

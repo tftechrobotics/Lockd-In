@@ -11,9 +11,10 @@
   --focus-ring: #302A25;
   --danger: #8E2F25;
   --danger-soft: #F3DED8;
-  --drawing: rgba(48,42,37,0.075);
+  --drawing: rgba(48,42,37,0.11);
   --grain: 0.05;
-  --control-line: #857868;
+  --control-line: #8F8270;
+  --status-dot: #8C6E57;
   --radius-control: 10px;
   --radius-surface: 16px;
   --radius-lock: 22px;
@@ -32,8 +33,9 @@
   --focus-ring: #F0E8DB;
   --danger: #EBA597;
   --danger-soft: #3E2420;
-  --drawing: rgba(240,232,219,0.06);
+  --drawing: rgba(240,232,219,0.075);
   --grain: 0.07;
   --control-line: #8F8170;
+  --status-dot: #C9A98D;
   color-scheme: dark;
 }

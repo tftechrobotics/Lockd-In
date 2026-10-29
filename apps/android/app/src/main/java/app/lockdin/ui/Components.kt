@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -64,44 +65,49 @@ import androidx.compose.ui.unit.dp
  * the ticking digits.
  */
 @Composable
-fun LockTimer(remainingMs: Long, caption: String, locked: Boolean, modifier: Modifier = Modifier, maxWidth: Dp = 220.dp) {
+fun LockTimer(remainingMs: Long, caption: String, locked: Boolean, modifier: Modifier = Modifier, maxWidth: Dp = 200.dp) {
     val c = LocalColors.current
     val body = if (locked) lerp(c.taupe, c.ink, 0.18f) else c.taupe
+    val shackleColor = if (locked) body else lerp(c.taupe, c.ground, 0.15f)
     val density = LocalDensity.current
     BoxWithConstraints(
         modifier
             .widthIn(max = maxWidth)
             .fillMaxWidth()
-            .aspectRatio(240f / 300f)
+            .aspectRatio(240f / 260f)
             .clearAndSetSemantics { contentDescription = "$caption: ${Fmt.spokenRemaining(remainingMs)}" },
     ) {
         val w = this.maxWidth
+        // Same geometry as the web lock (viewBox 0 36 240 260), measured from the approved reference.
         Canvas(Modifier.fillMaxSize()) {
             val s = size.width / 240f
+            fun y(v: Float) = (v - 36f) * s
             val shackle = Path().apply {
                 if (locked) {
-                    moveTo(62 * s, 138 * s); lineTo(62 * s, 96 * s)
-                    arcTo(Rect(62 * s, 38 * s, 178 * s, 154 * s), 180f, 180f, false)
+                    moveTo(75.5f * s, y(136f)); lineTo(75.5f * s, y(108f))
+                    arcTo(Rect(75.5f * s, y(63.5f), 164.5f * s, y(152.5f)), 180f, 180f, false)
+                    lineTo(164.5f * s, y(136f))
                 } else {
-                    moveTo(62 * s, 90 * s); lineTo(62 * s, 62 * s)
-                    arcTo(Rect(62 * s, 4 * s, 178 * s, 120 * s), 180f, 180f, false)
+                    moveTo(75.5f * s, y(136f)); lineTo(75.5f * s, y(94f))
+                    arcTo(Rect(75.5f * s, y(49.5f), 164.5f * s, y(138.5f)), 180f, 170f, false)
                 }
-                lineTo(178 * s, 138 * s)
             }
-            drawPath(shackle, body, style = Stroke(width = 24 * s, cap = StrokeCap.Round))
-            drawRoundRect(body, topLeft = Offset(14 * s, 120 * s), size = Size(212 * s, 172 * s), cornerRadius = CornerRadius(26 * s))
+            drawPath(shackle, shackleColor, style = Stroke(width = 22 * s, cap = StrokeCap.Round))
+            drawRoundRect(body, topLeft = Offset(14 * s, y(120f)), size = Size(212 * s, 172 * s), cornerRadius = CornerRadius(22 * s))
         }
-        // The digits are sized to the lock, not to the font-size setting: they are
-        // decorative here (TalkBack reads the summary), and must stay inside the body.
-        val digits = with(density) { (w * 0.24f).toSp() }
+        // Digits are sized to the lock, not to the font-size setting: TalkBack reads the
+        // summary, and the digits must stay inside the body.
+        val digits = with(density) { (w * 0.265f).toSp() }
+        val cap = with(density) { (w * 0.092f).toSp() }
         Column(
-            Modifier.fillMaxSize().padding(top = w * 0.5f, bottom = w * 0.04f, start = w * 0.08f, end = w * 0.08f),
+            Modifier.fillMaxSize().padding(top = w * 0.43f, bottom = w * 0.04f, start = w * 0.06f, end = w * 0.06f),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            ClockGlyph(c.ink, body, w * 0.1f)
-            Text(Fmt.countdown(remainingMs), style = Type.timer.copy(fontSize = digits, lineHeight = digits * 1.1f), color = c.ink, maxLines = 1)
-            Text(caption, style = Type.label, color = c.ink, textAlign = TextAlign.Center, maxLines = 2)
+            ClockGlyph(c.ink, body, w * 0.22f)
+            Spacer(Modifier.height(w * 0.02f))
+            Text(Fmt.countdown(remainingMs), style = Type.timer.copy(fontSize = digits, lineHeight = digits * 1.05f), color = c.ink, maxLines = 1)
+            Text(caption, style = Type.label.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = cap, lineHeight = cap * 1.2f), color = c.ink, textAlign = TextAlign.Center, maxLines = 2)
         }
     }
 }
@@ -112,8 +118,8 @@ private fun ClockGlyph(fill: Color, cut: Color, d: Dp) {
         val r = size.minDimension / 2
         drawCircle(fill, r)
         val c = Offset(r, r)
-        drawLine(cut, c, Offset(r, r * 0.45f), strokeWidth = r * 0.2f, cap = StrokeCap.Round)
-        drawLine(cut, c, Offset(r * 1.4f, r), strokeWidth = r * 0.2f, cap = StrokeCap.Round)
+        drawLine(cut, c, Offset(r, r * 0.42f), strokeWidth = r * 0.16f, cap = StrokeCap.Round)
+        drawLine(cut, c, Offset(r * 1.38f, r * 1.22f), strokeWidth = r * 0.16f, cap = StrokeCap.Round)
     }
 }
 
@@ -161,6 +167,65 @@ fun <T> SelectField(icon: LIcon, label: String, options: List<Pair<T, String>>, 
             Spacer(Modifier.width(10.dp))
             Text("$label · $current", style = Type.label, modifier = Modifier.weight(1f))
             LockdIcon(LIcon.ChevronDown, size = 20.dp)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            options.forEach { (value, text) ->
+                DropdownMenuItem(text = { Text(text, style = Type.body) }, onClick = { onSelect(value); open = false })
+            }
+        }
+    }
+}
+
+/** The reference's duration pills: separate rounded pills sharing the row (TalkBack: radio buttons). */
+@Composable
+fun <T> Pills(options: List<Pair<T, String>>, selected: T?, onSelect: (T) -> Unit, modifier: Modifier = Modifier) {
+    val c = LocalColors.current
+    val perRow = if (LocalDensity.current.fontScale > 1.4f) 2 else options.size
+    Column(modifier.fillMaxWidth().selectableGroup(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.chunked(perRow).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { (value, label) ->
+                    val on = value == selected
+                    Surface(
+                        shape = CircleShape,
+                        color = if (on) c.ink else c.taupeSoft,
+                        contentColor = if (on) c.onInk else c.ink,
+                        border = BorderStroke(1.dp, if (on) c.ink else c.line),
+                        modifier = Modifier.weight(1f).heightIn(min = 44.dp)
+                            .selectable(selected = on, role = Role.RadioButton, onClick = { onSelect(value) }),
+                    ) {
+                        Box(Modifier.heightIn(min = 44.dp).padding(horizontal = 4.dp), contentAlignment = Alignment.Center) {
+                            Text(label, style = Type.label, maxLines = 1, textAlign = TextAlign.Center)
+                        }
+                    }
+                }
+                repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+/** The reference's dropdown: leading icon, "Break · 10 min" style value, chevron. Opens a menu. */
+@Composable
+fun <T> IconSelect(icon: LIcon, label: String, options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, modifier: Modifier = Modifier) {
+    val c = LocalColors.current
+    var open by remember { mutableStateOf(false) }
+    val current = options.firstOrNull { it.first == selected }?.second ?: ""
+    Box(modifier) {
+        Surface(
+            onClick = { open = true },
+            shape = RoundedCornerShape(12.dp),
+            color = c.surface,
+            border = BorderStroke(1.dp, c.controlLine),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)
+                .semantics { contentDescription = "$label: $current. Change"; role = Role.Button },
+        ) {
+            Row(Modifier.heightIn(min = 52.dp).padding(start = 14.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                LockdIcon(icon, size = 22.dp, tint = c.ink)
+                Spacer(Modifier.width(12.dp))
+                Text(current, style = Type.body, color = c.ink, modifier = Modifier.weight(1f), maxLines = 1)
+                LockdIcon(LIcon.ChevronDown, size = 18.dp, tint = c.ink)
+            }
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             options.forEach { (value, text) ->
@@ -269,14 +334,14 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
     val c = LocalColors.current
     Button(
         onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
+        shape = CircleShape,
         colors = ButtonDefaults.buttonColors(containerColor = c.ink, contentColor = c.onInk),
-        modifier = modifier.fillMaxWidth().heightIn(min = 52.dp),
+        modifier = modifier.fillMaxWidth().heightIn(min = 54.dp),
     ) {
         Text(text, style = Type.button)
         if (arrow) {
             Spacer(Modifier.width(10.dp))
-            LockdIcon(LIcon.Arrow, tint = c.onInk, size = 18.dp)
+            LockdIcon(LIcon.Arrow, tint = c.onInk, size = 22.dp)
         }
     }
 }
@@ -309,30 +374,37 @@ fun Note(text: String, modifier: Modifier = Modifier) {
     }
 }
 
-data class DeviceRow(val icon: LIcon, val name: String, val status: String, val ok: Boolean)
+data class DeviceRow(val icon: LIcon, val text: String, val ok: Boolean)
 
 /** Honest readiness: blocking on this phone isn't built into the app yet; nothing is paired. */
 val PHONE_DEVICE_ROWS = listOf(
-    DeviceRow(LIcon.Phone, "This phone", "Blocking not set up", false),
-    DeviceRow(LIcon.Laptop, "PC", "Not paired", false),
+    DeviceRow(LIcon.Phone, "Phone blocking not set up", false),
+    DeviceRow(LIcon.Laptop, "PC not paired", false),
 )
 
+/** "▢ ● PC ready | ▯ ● Phone ready" — icon, status dot, phrase; centered with a divider. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DeviceStrip(onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val c = LocalColors.current
     Surface(
         onClick = onOpen,
-        color = c.ground,
+        color = Color.Transparent,
         modifier = modifier.fillMaxWidth().semantics(mergeDescendants = true) { role = Role.Button },
     ) {
-        FlowRow(Modifier.heightIn(min = 48.dp).padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            PHONE_DEVICE_ROWS.forEach { d ->
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    LockdIcon(d.icon, size = 16.dp)
-                    Text(d.name, style = Type.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = c.ink)
-                    Canvas(Modifier.size(6.dp)) { drawCircle(if (d.ok) c.ink else c.controlLine) }
-                    Text(d.status, style = Type.caption, color = c.inkMuted)
+        FlowRow(
+            Modifier.heightIn(min = 48.dp).padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+        ) {
+            PHONE_DEVICE_ROWS.forEachIndexed { i, d ->
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (i > 0) Box(Modifier.padding(horizontal = 6.dp).width(1.dp).height(18.dp).background(c.line))
+                    LockdIcon(d.icon, size = 20.dp, tint = c.ink)
+                    Canvas(Modifier.size(8.dp)) {
+                        if (d.ok) drawCircle(c.statusDot) else drawCircle(c.statusDot, style = Stroke(width = 1.5.dp.toPx()), radius = size.minDimension / 2 - 0.75.dp.toPx())
+                    }
+                    Text(d.text, style = Type.caption, color = c.ink)
                 }
             }
         }

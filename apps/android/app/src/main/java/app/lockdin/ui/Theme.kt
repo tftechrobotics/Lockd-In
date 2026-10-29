@@ -20,6 +20,7 @@ val Outfit = FontFamily(
     Font(R.font.outfit_500, FontWeight.Medium),
     Font(R.font.outfit_600, FontWeight.SemiBold),
     Font(R.font.outfit_700, FontWeight.Bold),
+    Font(R.font.outfit_800, FontWeight.ExtraBold),
 )
 val Figtree = FontFamily(
     Font(R.font.figtree_400, FontWeight.Normal),
@@ -31,15 +32,16 @@ val Figtree = FontFamily(
 val LocalColors = staticCompositionLocalOf { LightColors }
 
 object Type {
-    val display = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 30.sp, letterSpacing = (-0.2).sp)
-    val timer = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.Bold, fontSize = 52.sp, lineHeight = 56.sp, fontFeatureSettings = "tnum")
+    val display = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.Bold, fontSize = 28.sp, lineHeight = 34.sp, letterSpacing = (-0.4).sp)
+    val taskTitle = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 28.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    val timer = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.ExtraBold, fontSize = 52.sp, lineHeight = 56.sp, fontFeatureSettings = "tnum")
     val title = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 28.sp)
     val fact = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp, fontFeatureSettings = "tnum")
     val body = TextStyle(fontFamily = Figtree, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp)
     val bodyStrong = body.copy(fontWeight = FontWeight.SemiBold)
     val label = TextStyle(fontFamily = Figtree, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 20.sp)
     val caption = TextStyle(fontFamily = Figtree, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp)
-    val button = TextStyle(fontFamily = Figtree, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, lineHeight = 24.sp)
+    val button = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 24.sp)
 }
 
 @Composable

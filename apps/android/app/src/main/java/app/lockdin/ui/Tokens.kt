@@ -19,6 +19,7 @@ data class LockdInColors(
     val dangerSoft: Color,
     val drawing: Color,
     val controlLine: Color,
+    val statusDot: Color,
 )
 
 val LightColors = LockdInColors(
@@ -33,8 +34,9 @@ val LightColors = LockdInColors(
     focusRing = Color(0xFF302A25),
     danger = Color(0xFF8E2F25),
     dangerSoft = Color(0xFFF3DED8),
-    drawing = Color(0x13302A25),
-    controlLine = Color(0xFF857868),
+    drawing = Color(0x1C302A25),
+    controlLine = Color(0xFF8F8270),
+    statusDot = Color(0xFF8C6E57),
 )
 
 val DarkColors = LockdInColors(
@@ -49,6 +51,7 @@ val DarkColors = LockdInColors(
     focusRing = Color(0xFFF0E8DB),
     danger = Color(0xFFEBA597),
     dangerSoft = Color(0xFF3E2420),
-    drawing = Color(0x0FF0E8DB),
+    drawing = Color(0x13F0E8DB),
     controlLine = Color(0xFF8F8170),
+    statusDot = Color(0xFFC9A98D),
 )

@@ -1,6 +1,7 @@
 package app.lockdin.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.lockdin.engine.OverrideRecord
 import app.lockdin.engine.OverrideScope
 import app.lockdin.engine.OverrideState
@@ -80,7 +82,7 @@ fun FocusScreen(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -> 
     if (active == null) Setup(store, clock, zone, openDevices, openSchedule) else SessionView(store, active, clock, zone)
 }
 
-private val LENGTHS = listOf(10, 25, 40, 60)
+private val LENGTHS = listOf(25, 40, 60)
 
 @Composable
 private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -> Unit, openSchedule: () -> Unit) {
@@ -100,78 +102,82 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
     val segments = if (breakMin > 0) Session.roundsPlan(rounds, focus, breakMin) else Session.roundsPlan(1, focus, 0)
     val total = segments.sumOf { it.minutes }
 
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        SessionCard(lock = { LockTimer(focus * 60_000L, "Focus time", locked = false, maxWidth = 132.dp) }) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                FieldLabel("Task")
-                OutlinedTextField(
-                    value = intention,
-                    onValueChange = { intention = it.take(120) },
-                    placeholder = { Text("What are you working on?") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = fieldColors(),
-                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Task" },
-                )
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                FieldLabel("Duration")
-                Segmented(
-                    LENGTHS.map { it to "$it min" } + (-1 to "Custom"),
-                    if (custom) -1 else focus,
-                    { v -> if (v == -1) custom = true else { custom = false; focus = v; error = null } },
-                )
-                if (custom) {
-                    OutlinedTextField(
-                        value = customText,
-                        onValueChange = { t -> customText = t.filter(Char::isDigit).take(3); focus = customText.toIntOrNull() ?: 0; error = null },
-                        label = { Text("Minutes") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = fieldColors(),
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                    )
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                CompactSelect("Break", listOf(0 to "None") + listOf(5, 10, 15, 20).map { it to "$it min" }, breakMin, { breakMin = it; error = null }, Modifier.weight(1f))
-                CompactSelect("Focus periods", if (breakMin > 0) (2..6).map { it to "$it" } else listOf(1 to "1"), if (breakMin > 0) rounds else 1, { rounds = it }, Modifier.weight(1f), enabled = breakMin > 0)
-            }
-            CompactSelect("Profile", s.profiles.map { it.id to it.name }, profileId, { profileId = it }, Modifier.fillMaxWidth())
-            error?.let {
-                Surface(color = c.dangerSoft, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Assertive }) {
-                    Text(it, style = Type.label, color = c.danger, modifier = Modifier.padding(12.dp))
-                }
-            }
-            HorizontalDivider(color = c.line)
-            Text(
-                "Ends ${Fmt.clock(now + total * 60_000L, zone)} · " +
-                    (if (breakMin > 0) "$rounds × ${Fmt.minutes(focus)}, $breakMin min breaks" else Fmt.minutes(focus)),
-                style = Type.caption, color = c.inkMuted,
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        TaskTitle(intention, { intention = it.take(120) })
+        LockTimer(focus * 60_000L, "Focus time", locked = false, maxWidth = 196.dp)
+        Pills(
+            LENGTHS.map { it to "$it min" } + (-1 to "Custom"),
+            if (custom) -1 else focus,
+            { v -> if (v == -1) custom = true else { custom = false; focus = v; error = null } },
+        )
+        if (custom) {
+            OutlinedTextField(
+                value = customText,
+                onValueChange = { t -> customText = t.filter(Char::isDigit).take(3); focus = customText.toIntOrNull() ?: 0; error = null },
+                label = { Text("Minutes") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                shape = RoundedCornerShape(12.dp),
+                colors = fieldColors(),
+                modifier = Modifier.fillMaxWidth(),
             )
-            PrimaryButton("Lock in", onClick = {
-                val problem = Session.validatePlan(segments)
-                if (problem != null) error = problem
-                else store.startSession(
-                    clock.now(), segments, intention, profileId,
-                    LastChoice(focus, if (breakMin > 0) breakMin else s.last.breakMinutes, if (breakMin > 0) rounds else 1, profileId),
-                )
-            })
         }
+        val breakOptions = listOf(0 to "No break") + listOf(5, 10, 15, 20).map { it to "Break · $it min" }
+        if (breakMin > 0) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                IconSelect(LIcon.Coffee, "Break", breakOptions, breakMin, { breakMin = it; error = null }, Modifier.weight(1.35f))
+                IconSelect(LIcon.Focus, "Focus periods", (2..6).map { it to "× $it" }, rounds, { rounds = it }, Modifier.weight(1f))
+            }
+        } else {
+            IconSelect(LIcon.Coffee, "Break", breakOptions, breakMin, { breakMin = it; error = null }, Modifier.fillMaxWidth())
+        }
+        IconSelect(LIcon.Book, "Profile", s.profiles.map { it.id to "${it.name} profile" }, profileId, { profileId = it }, Modifier.fillMaxWidth())
+        error?.let {
+            Surface(color = c.dangerSoft, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Assertive }) {
+                Text(it, style = Type.label, color = c.danger, modifier = Modifier.padding(12.dp))
+            }
+        }
+        PrimaryButton("Lock in", onClick = {
+            val problem = Session.validatePlan(segments)
+            if (problem != null) error = problem
+            else store.startSession(
+                clock.now(), segments, intention, profileId,
+                LastChoice(focus, if (breakMin > 0) breakMin else s.last.breakMinutes, if (breakMin > 0) rounds else 1, profileId),
+            )
+        })
         DeviceStrip(onOpen = openDevices)
-        NextLink(upcoming?.let { "Next: ${it.session.title}, ${Fmt.dayLabel(it.start, now, zone).lowercase()} ${Fmt.clock(it.start, zone)}" }, openSchedule)
+        upcoming?.let { NextLink("Next: ${it.session.title} · ${Fmt.dayLabel(it.start, now, zone)} ${Fmt.clock(it.start, zone)}", openSchedule) }
     }
 }
 
+/** The task, edited in place as the screen's title (the reference's "TAM 212 · Practice problems" line). */
 @Composable
-private fun NextLink(text: String?, onClick: () -> Unit) {
+private fun TaskTitle(value: String, onChange: (String) -> Unit) {
+    val c = LocalColors.current
+    androidx.compose.foundation.text.BasicTextField(
+        value = value,
+        onValueChange = onChange,
+        singleLine = true,
+        textStyle = Type.taskTitle.copy(color = c.ink),
+        cursorBrush = androidx.compose.ui.graphics.SolidColor(c.ink),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { contentDescription = "Task" },
+        decorationBox = { inner ->
+            Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                if (value.isEmpty()) Text("What are you working on?", style = Type.taskTitle, color = c.inkMuted, modifier = Modifier.fillMaxWidth())
+                inner()
+            }
+        },
+    )
+}
+
+@Composable
+private fun NextLink(text: String, onClick: () -> Unit) {
     val c = LocalColors.current
     Surface(onClick = onClick, color = c.ground, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             LockdIcon(LIcon.Calendar, size = 16.dp, tint = c.inkMuted)
-            Text(text ?: "Plan a session", style = Type.caption, color = c.inkMuted, modifier = Modifier.weight(1f))
+            Text(text, style = Type.caption, color = c.ink, modifier = Modifier.weight(1f))
             LockdIcon(LIcon.Chevron, size = 16.dp, tint = c.inkMuted)
         }
     }
@@ -209,8 +215,8 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
     val tone = store.state.tone
     val task = session.intention
 
-    val status = when { lifted -> "Unlocked"; snap.restricting -> "Locked in"; else -> "On a break" }
-    val caption = if (phase.kind == PhaseKind.FOCUS) (if (focusCount > 1) "Focus $focusIndex of $focusCount" else "Focus") else "Break"
+    val status = when { lifted -> "Unlocked for now."; snap.restricting -> "Locked in."; else -> "On a break." }
+    val caption = if (phase.kind == PhaseKind.FOCUS) (if (focusCount > 1) "Focus $focusIndex of $focusCount" else "Focus time") else "Break"
     val nudge = when {
         phase.kind == PhaseKind.BREAK && remaining <= 60_000 -> message(tone, Moment.BREAK_ENDING, task)
         phase.kind == PhaseKind.BREAK -> message(tone, Moment.BREAK_START, time = Fmt.clock(phase.end, zone))
@@ -224,17 +230,17 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
         profile,
     ).joinToString(" · ")
 
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        SessionCard(lock = { LockTimer(remaining, caption, locked = snap.restricting, maxWidth = 150.dp) }) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                StatusLine("$status · $caption", snap.restricting, Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-                Text(task ?: if (phase.kind == PhaseKind.FOCUS) "Focus session" else "Break", style = Type.title, color = c.ink, modifier = Modifier.semantics { heading() })
-                Text(meta, style = Type.caption, color = c.inkMuted)
-            }
-            nudge?.let { Text(it, style = Type.body, color = c.inkMuted, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
-            HorizontalDivider(color = c.line)
-            OutPanel(store, session, snap, now, clock)
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(status, style = Type.display, color = c.ink, textAlign = TextAlign.Center,
+                modifier = Modifier.semantics { heading(); liveRegion = LiveRegionMode.Polite })
+            task?.let { Text(it, style = Type.body.copy(fontSize = 18.sp), color = c.ink, textAlign = TextAlign.Center) }
         }
+        LockTimer(remaining, caption, locked = snap.restricting, maxWidth = 196.dp)
+        Text(meta, style = Type.caption, color = c.inkMuted, textAlign = TextAlign.Center)
+        nudge?.let { Text(it, style = Type.body, color = c.inkMuted, textAlign = TextAlign.Center, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
+        HorizontalDivider(color = c.line)
+        OutPanel(store, session, snap, now, clock)
         HonestLine()
     }
 }
@@ -243,7 +249,7 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
 @Composable
 private fun HonestLine() {
     val c = LocalColors.current
-    Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)) {
         LockdIcon(LIcon.Info, size = 16.dp, tint = c.inkMuted)
         Text("Not blocking: blocking isn’t set up on this phone", style = Type.caption, color = c.inkMuted)
     }
@@ -344,17 +350,19 @@ private fun Recap(store: Store, session: ActiveSession, snap: Snapshot, clock: A
     }
     val focusedMin = occ.phases.filter { it.kind == PhaseKind.FOCUS }.sumOf { maxOf(0L, minOf(it.end, endedAt) - it.start) } / 60_000
     val how = when (snap.status) {
-        SessionStatus.COMPLETED -> "Finished as planned"
-        SessionStatus.ENDED_BY_OVERRIDE -> "Ended early with an unlock"
-        else -> "Ended with emergency recovery"
+        SessionStatus.COMPLETED -> "Finished as planned."
+        SessionStatus.ENDED_BY_OVERRIDE -> "Ended early with an unlock."
+        else -> "Ended with emergency recovery."
     }
-    SessionCard(lock = { LockTimer(0, "Done", locked = false, maxWidth = 132.dp) }) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            StatusLine("Session complete · $how", false)
-            Text(session.intention ?: "Focus session", style = Type.title, color = c.ink, modifier = Modifier.semantics { heading() })
-            Text("$focusedMin min focused · ${Fmt.clock(session.start, zone)}–${Fmt.clock(endedAt, zone)}", style = Type.caption, color = c.inkMuted)
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("Session complete.", style = Type.display, color = c.ink, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
+            session.intention?.let { Text(it, style = Type.body.copy(fontSize = 18.sp), color = c.ink, textAlign = TextAlign.Center) }
         }
-        if (snap.status == SessionStatus.COMPLETED) message(store.state.tone, Moment.DONE)?.let { Text(it, style = Type.body, color = c.inkMuted) }
+        LockTimer(0, "Done", locked = false, maxWidth = 170.dp)
+        Text("$focusedMin min focused · ${Fmt.clock(session.start, zone)}–${Fmt.clock(endedAt, zone)}", style = Type.caption, color = c.inkMuted, textAlign = TextAlign.Center)
+        Text(how, style = Type.bodyStrong, color = c.ink, textAlign = TextAlign.Center)
+        if (snap.status == SessionStatus.COMPLETED) message(store.state.tone, Moment.DONE)?.let { Text(it, style = Type.body, color = c.inkMuted, textAlign = TextAlign.Center) }
         PrimaryButton("Same again", arrow = false, onClick = {
             store.startSession(clock.now(), session.segments, session.intention, session.profileId, store.state.last)
         })

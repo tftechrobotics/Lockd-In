@@ -52,7 +52,7 @@ from fontTools.varLib.instancer import instantiateVariableFont
 fonts = ROOT / "apps/web/node_modules/@fontsource-variable"
 if not fonts.exists():
     sys.exit("Run `npm ci` in apps/web first (fonts come from @fontsource-variable).")
-for fam, file, weights in [("outfit", "outfit/files/outfit-latin-wght-normal.woff2", [500, 600, 700]),
+for fam, file, weights in [("outfit", "outfit/files/outfit-latin-wght-normal.woff2", [500, 600, 700, 800]),
                            ("figtree", "figtree/files/figtree-latin-wght-normal.woff2", [400, 500, 600])]:
     for w in weights:
         f = TTFont(fonts / file)

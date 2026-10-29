@@ -31,7 +31,7 @@ test('desktop layout: switch + menu, no masthead, honest PC status', async ({ pa
   await expect(page.getByRole('button', { name: /Lock in/ })).toBeVisible();
   await expect(page.locator('.masthead')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Focus' })).toHaveAttribute('aria-current', 'page');
-  await expect(page.getByText('Blocking not set up')).toBeVisible();
+  await expect(page.getByText('PC blocking not set up')).toBeVisible();
   await expect(page.getByText('This browser')).toHaveCount(0);
 });
 
@@ -83,16 +83,16 @@ test('desktop: minimum window size with 200% text has no horizontal scrolling', 
 
 test('bridge: reports session state and theme; tray command starts a 10-minute focus', async ({ page }) => {
   await page.goto(D);
-  await expect(page.getByText('Blocking not set up')).toBeVisible();
+  await expect(page.getByText('PC blocking not set up')).toBeVisible();
   const sent = () => page.evaluate(() => (window as unknown as { __sent: { type: string }[] }).__sent);
   expect((await sent()).map((m) => m.type)).toEqual(expect.arrayContaining(['ui.ready', 'ui.theme', 'ui.session_state']));
   await page.evaluate(() => (window as unknown as { __host: (d: unknown) => void }).__host({ v: 1, type: 'host.command', command: 'start_quick' }));
-  await expect(page.locator('.status')).toContainText('Locked in');
+  await expect(page.getByRole('heading', { name: 'Locked in.' })).toBeVisible();
   await expect(page.locator('.lock__time')).toHaveText(/^(10:00|09:5\d)$/);
   const last = (await sent()).filter((m) => m.type === 'ui.session_state').pop() as { active: boolean; endsAt: number };
   expect(last.active).toBe(true);
   expect(last.endsAt).toBeGreaterThan(Date.now() + 9 * 60_000);
   // Unknown commands are ignored.
   await page.evaluate(() => (window as unknown as { __host: (d: unknown) => void }).__host({ v: 1, type: 'host.command', command: 'end_session' }));
-  await expect(page.locator('.status')).toContainText('Locked in');
+  await expect(page.getByRole('heading', { name: 'Locked in.' })).toBeVisible();
 });

@@ -6,8 +6,8 @@ import {
 import { nextUp } from '../engine/schedule';
 import { getState, newId, update, useStore, type ActiveSession } from '../state/store';
 import { DeviceStrip } from './DeviceStrip';
-import { clockTime, countdown, dayLabel, minutesLabel } from './format';
-import { Icon } from './Icon';
+import { clockTime, countdown, dayLabel } from './format';
+import { Icon, type IconName } from './Icon';
 import { LockTimer } from './LockTimer';
 import { message } from './messages';
 import { layout, useHost } from '../platform';
@@ -30,7 +30,27 @@ export function FocusPage() {
   return active ? <SessionView session={active} /> : <Setup />;
 }
 
-const LENGTHS = [10, 25, 40, 60];
+const LENGTHS = [25, 40, 60];
+const BREAKS = [5, 10, 15, 20];
+
+/**
+ * The Focus composition shared by setup, session and recap. Web: headline,
+ * then lock beside the controls. Desktop (Windows shell): one centered column.
+ */
+function FocusLayout({ head, lock, children, foot }: {
+  head: React.ReactNode; lock: React.ReactNode; children: React.ReactNode; foot: React.ReactNode;
+}) {
+  return (
+    <div className={`page focus focus--${layout}`}>
+      <div className="focus__head">{head}</div>
+      <div className="focus__stage">
+        <div className="focus__lock">{lock}</div>
+        <div className="focus__controls">{children}</div>
+      </div>
+      <div className="focus__foot">{foot}</div>
+    </div>
+  );
+}
 
 function Setup() {
   const last = useStore((s) => s.last);
@@ -44,7 +64,7 @@ function Setup() {
   const [rounds, setRounds] = useState(Math.max(2, last.rounds));
   const [profileId, setProfileId] = useState(last.profileId);
   const [error, setError] = useState<string | null>(null);
-  const ids = { intent: useId(), len: useId(), custom: useId(), brk: useId(), rounds: useId(), prof: useId(), list: useId(), err: useId() };
+  const ids = { intent: useId(), len: useId(), custom: useId(), list: useId(), err: useId() };
   const upcoming = nextUp(schedule, Date.now());
 
   const segments = breakMin > 0 ? roundsPlan(rounds, focus, breakMin) : roundsPlan(1, focus, 0);
@@ -64,93 +84,108 @@ function Setup() {
     }));
   };
 
-  const totalMin = segments.reduce((a, s) => a + s.minutes, 0);
-  const endsAt = clockTime(Date.now() + totalMin * 60_000);
-  const plan = breakMin > 0 ? `${rounds} × ${minutesLabel(focus)}, ${breakMin} min breaks` : minutesLabel(focus);
+  const desktop = layout === 'desktop';
+  const task = (
+    <>
+      <input id={ids.intent} className={desktop ? 'task-title' : 'input'} value={intention} maxLength={120} list={ids.list}
+        placeholder={desktop ? 'What are you working on?' : 'e.g. TAM 212 · Practice problems'} autoComplete="off"
+        aria-label={desktop ? 'What are you working on?' : undefined}
+        onChange={(e) => setIntention(e.target.value)} />
+      <datalist id={ids.list}>{recent.map((r) => <option key={r.text} value={r.text} />)}</datalist>
+    </>
+  );
 
   return (
-    <div className={`page focus ${layout === 'desktop' ? 'focus--desktop' : ''}`}>
-      <h1 className="sr-only">Start a focus session</h1>
-      <form className="panel session-panel" onSubmit={(e) => { e.preventDefault(); start(); }} noValidate>
-        <div className="session-panel__lock">
-          <LockTimer remainingMs={focus * 60_000} caption="Focus time" locked={false} />
-        </div>
-        <div className="session-panel__body">
+    <form onSubmit={(e) => { e.preventDefault(); start(); }} noValidate>
+      <FocusLayout
+        head={desktop
+          ? <><h1 className="sr-only">Start a focus session</h1>{task}</>
+          : <h1 className="display">Ready when you are.</h1>}
+        lock={<LockTimer remainingMs={focus * 60_000} caption="Focus time" locked={false} />}
+        foot={<><DeviceStrip /><NextRow upcoming={upcoming} /></>}
+      >
+        {!desktop && (
           <div className="field">
-            <label htmlFor={ids.intent}>Task</label>
-            <input id={ids.intent} className="input input--task" value={intention} maxLength={120} list={ids.list}
-              placeholder="What are you working on?" autoComplete="off"
-              onChange={(e) => setIntention(e.target.value)} />
-            <datalist id={ids.list}>{recent.map((r) => <option key={r.text} value={r.text} />)}</datalist>
+            <label htmlFor={ids.intent}>What are you working on?</label>
+            {task}
           </div>
-
-          <div className="field">
-            <span className="field__label" id={ids.len}>Duration</span>
-            <div className="segmented" role="radiogroup" aria-labelledby={ids.len}>
-              {LENGTHS.map((m) => (
-                <button key={m} type="button" role="radio" aria-checked={!custom && focus === m}
-                  onClick={() => { setCustom(false); setFocus(m); setError(null); }}>{m} min</button>
-              ))}
-              <button type="button" role="radio" aria-checked={custom} onClick={() => setCustom(true)}>Custom</button>
-            </div>
-            {custom && (
-              <div className="inline-number">
-                <label htmlFor={ids.custom}>Minutes</label>
-                <input id={ids.custom} className="input input--number" type="number" inputMode="numeric"
-                  min={1} max={240} value={focus} aria-describedby={error ? ids.err : undefined}
-                  onChange={(e) => { setFocus(Math.round(Number(e.target.value)) || 0); setError(null); }} />
-              </div>
+        )}
+        <div className="field">
+          <div className="field__row">
+            <span className="field__label" id={ids.len}>Focus time</span>
+            {breakMin > 0 && (
+              <Select icon="focus" label="Focus periods" value={rounds} onChange={setRounds} quiet
+                options={[2, 3, 4, 5, 6].map((r) => [r, `${r} periods`])} />
             )}
           </div>
-
-          <div className="field-row">
-            <div className="field">
-              <label htmlFor={ids.brk}>Break</label>
-              <select id={ids.brk} className="input" value={breakMin} onChange={(e) => { setBreakMin(Number(e.target.value)); setError(null); }}>
-                <option value={0}>None</option>
-                {[5, 10, 15, 20].map((b) => <option key={b} value={b}>{b} min</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor={ids.rounds}>Focus periods</label>
-              <select id={ids.rounds} className="input" value={breakMin > 0 ? rounds : 1} disabled={breakMin === 0}
-                onChange={(e) => setRounds(Number(e.target.value))}>
-                {breakMin === 0 && <option value={1}>1</option>}
-                {[2, 3, 4, 5, 6].map((r) => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor={ids.prof}>Profile</label>
-              <select id={ids.prof} className="input" value={profileId} onChange={(e) => setProfileId(e.target.value)}>
-                {profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
+          <div className="pills" role="radiogroup" aria-labelledby={ids.len}>
+            {LENGTHS.map((m) => (
+              <button key={m} type="button" role="radio" className="pill" aria-checked={!custom && focus === m}
+                onClick={() => { setCustom(false); setFocus(m); setError(null); }}>{m} min</button>
+            ))}
+            <button type="button" role="radio" className="pill" aria-checked={custom} onClick={() => setCustom(true)}>Custom</button>
           </div>
-
-          {error && <p id={ids.err} className="error" role="alert">{error}</p>}
-          <div className="session-panel__footer">
-            <p className="summary">Ends {endsAt} · {plan}</p>
-            <button type="submit" className="button button--primary">Lock in <Icon name="arrow" size={18} /></button>
-          </div>
+          {custom && (
+            <div className="inline-number">
+              <label htmlFor={ids.custom}>Minutes</label>
+              <input id={ids.custom} className="input input--number" type="number" inputMode="numeric"
+                min={1} max={240} value={focus} aria-describedby={error ? ids.err : undefined}
+                onChange={(e) => { setFocus(Math.round(Number(e.target.value)) || 0); setError(null); }} />
+            </div>
+          )}
         </div>
-      </form>
-      <footer className="statusbar">
-        <DeviceStrip />
-        <NextRow upcoming={upcoming} />
-      </footer>
-    </div>
+        <div className="selects">
+          <Select icon="coffee" label="Break" value={breakMin} onChange={(v) => { setBreakMin(v); setError(null); }}
+            options={[[0, 'No break'], ...BREAKS.map((b) => [b, `Break · ${b} min`] as [number, string])]} />
+          <Select icon="book" label="Profile" value={profileId} onChange={setProfileId}
+            options={profiles.map((p) => [p.id, `${p.name} profile`])} />
+        </div>
+        {error && <p id={ids.err} className="error" role="alert">{error}</p>}
+        <button type="submit" className="button button--primary button--lockin">Lock in <Icon name="arrow" size={22} /></button>
+      </FocusLayout>
+    </form>
+  );
+}
+
+/** A native select dressed as the reference's dropdown: leading icon, value text, chevron. */
+function Select<T extends string | number>({ icon, label, value, options, onChange, quiet = false }: {
+  icon: IconName; label: string; value: T; options: [T, string][]; onChange: (v: T) => void; quiet?: boolean;
+}) {
+  return (
+    <span className={`select ${quiet ? 'select--quiet' : ''}`}>
+      {!quiet && <Icon name={icon} size={20} />}
+      <select aria-label={label} value={String(value)}
+        onChange={(e) => {
+          const raw = e.target.value;
+          onChange((typeof value === 'number' ? Number(raw) : raw) as T);
+        }}>
+        {options.map(([v, text]) => <option key={String(v)} value={String(v)}>{text}</option>)}
+      </select>
+      <Icon name="chevronDown" size={16} />
+    </span>
   );
 }
 
 function NextRow({ upcoming }: { upcoming: ReturnType<typeof nextUp> }) {
+  const when = upcoming ? `${upcoming.session.title} · ${dayLabel(upcoming.start)} ${clockTime(upcoming.start)}` : null;
+  if (layout === 'desktop') {
+    return (
+      <a className="next-card" href="#/schedule">
+        <Icon name="calendar" size={22} />
+        <span className="next-card__text">
+          <span className="next-card__label">Next up</span>
+          <span>{when ?? 'Nothing planned'}</span>
+        </span>
+        <Icon name="chevron" size={18} />
+      </a>
+    );
+  }
   return (
-    <a className="next" href="#/schedule">
-      <Icon name="calendar" size={18} />
-      {upcoming
-        ? <span>Next: {upcoming.session.title}, {dayLabel(upcoming.start).toLowerCase()} {clockTime(upcoming.start)}</span>
-        : <span>Plan a session</span>}
-      <Icon name="chevron" size={16} />
-    </a>
+    <div className="next">
+      <Icon name="calendar" size={22} />
+      <p><strong>Next:</strong> {when ?? 'nothing planned'}</p>
+      <a className="link-arrow" href="#/schedule">{upcoming ? 'View schedule' : 'Plan a session'} <Icon name="arrow" size={18} /></a>
+    </div>
   );
 }
 
@@ -177,39 +212,35 @@ function SessionView({ session }: { session: ActiveSession }) {
   const task = session.intention?.text;
   const lifted = snap.overrideState.type === 'active_for_focus_period';
 
-  const status = lifted ? 'Unlocked' : focusing ? 'Locked in' : 'On a break';
+  const status = lifted ? 'Unlocked for now.' : focusing ? 'Locked in.' : 'On a break.';
   const caption = phase.kind === 'focus'
-    ? (focusCount > 1 ? `Focus ${focusIndex} of ${focusCount}` : 'Focus')
+    ? (focusCount > 1 ? `Focus ${focusIndex} of ${focusCount}` : 'Focus time')
     : 'Break';
   const note = phase.kind === 'break'
     ? (remaining <= 60_000 ? message(tone, 'breakEnding', { task }) : message(tone, 'breakStart', { time: clockTime(phase.end) }))
     : lifted ? `Unlocked until ${clockTime((snap.overrideState as { until: number }).until)}. Later focus periods lock again.`
     : message(tone, 'focusStart', { task });
-  const meta = [
-    `${phase.kind === 'focus' ? (nextPhase ? 'Break at' : 'Ends') : 'Focus at'} ${clockTime(phase.end)}`,
-    nextPhase ? `Session ends ${clockTime(occ.end)}` : null,
-    profile?.name,
-  ].filter(Boolean).join(' · ');
+  const facts: [string, string][] = [
+    [phase.kind === 'focus' ? (nextPhase ? 'Break at' : 'Ends at') : 'Focus resumes', clockTime(phase.end)],
+    ...(nextPhase ? [['Session ends', clockTime(occ.end)] as [string, string]] : []),
+    ...(profile ? [['Profile', profile.name] as [string, string]] : []),
+  ];
 
   return (
-    <div className={`page focus ${layout === 'desktop' ? 'focus--desktop' : ''}`}>
-      <div className="panel session-panel">
-        <div className="session-panel__lock">
-          <LockTimer remainingMs={remaining} caption={caption} locked={focusing} />
-        </div>
-        <div className="session-panel__body">
-          <p className={`status status--${focusing ? 'locked' : 'open'}`} aria-live="polite">{status} · {caption}</p>
-          <h1 className="session-title">{task ?? (phase.kind === 'focus' ? 'Focus session' : 'Break')}</h1>
-          <p className="meta">{meta}</p>
-          {note && <p className="nudge" aria-live="polite">{note}</p>}
-          <OverridePanel session={session} snap={snap} now={now} />
-        </div>
-      </div>
-      <footer className="statusbar">
-        <HonestyNote />
-        <DeviceStrip />
-      </footer>
-    </div>
+    <FocusLayout
+      head={<>
+        <h1 className={layout === 'desktop' ? 'title' : 'display'} aria-live="polite">{status}</h1>
+        {task && <p className="subtitle">{task}</p>}
+      </>}
+      lock={<LockTimer remainingMs={remaining} caption={caption} locked={focusing} />}
+      foot={<><HonestyNote /><DeviceStrip /></>}
+    >
+      <dl className="facts">
+        {facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+      </dl>
+      {note && <p className="nudge" aria-live="polite">{note}</p>}
+      <OverridePanel session={session} snap={snap} now={now} />
+    </FocusLayout>
   );
 }
 
@@ -224,7 +255,7 @@ function HonestyNote() {
         : 'Not blocking: blocking isn’t set up on this PC';
   return (
     <a className="honesty" href="#/devices">
-      <Icon name="info" size={16} />
+      <Icon name="info" size={18} />
       <span>{text}</span>
     </a>
   );
@@ -318,8 +349,8 @@ function Recap({ session, snap }: { session: ActiveSession; snap: Snapshot }) {
   const focusedMs = occ.phases.filter((p) => p.kind === 'focus')
     .reduce((a, p) => a + Math.max(0, Math.min(p.end, endedAt) - p.start), 0);
   const unlockedEarly = session.controls.overrides.filter((o) => o.scope === 'current_focus_period' && o.cancelledAt === undefined).length;
-  const how = snap.status === 'completed' ? 'Finished as planned'
-    : snap.status === 'ended_by_override' ? 'Ended early with an unlock' : 'Ended with emergency recovery';
+  const how = snap.status === 'completed' ? 'Finished as planned.'
+    : snap.status === 'ended_by_override' ? 'Ended early with an unlock.' : 'Ended with emergency recovery.';
   const finish = () => update((s) => ({ ...s, active: null }));
   const again = () => getState().active && update((s) => ({
     ...s,
@@ -327,26 +358,29 @@ function Recap({ session, snap }: { session: ActiveSession; snap: Snapshot }) {
   }));
   const note = snap.status === 'completed' ? message(tone, 'done') : null;
 
-  const meta = [`${Math.round(focusedMs / 60_000)} min focused`, `${clockTime(session.start)}–${clockTime(endedAt)}`,
-    unlockedEarly > 0 ? `${unlockedEarly} period${unlockedEarly > 1 ? 's' : ''} unlocked early` : null].filter(Boolean).join(' · ');
+  const facts: [string, string][] = [
+    ['Focused', `${Math.round(focusedMs / 60_000)} min`],
+    ['Time', `${clockTime(session.start)}–${clockTime(endedAt)}`],
+    ...(unlockedEarly > 0 ? [['Unlocked early', `${unlockedEarly} period${unlockedEarly > 1 ? 's' : ''}`] as [string, string]] : []),
+  ];
 
   return (
-    <div className={`page focus ${layout === 'desktop' ? 'focus--desktop' : ''}`}>
-      <div className="panel session-panel">
-        <div className="session-panel__lock">
-          <LockTimer remainingMs={0} caption="Done" locked={false} />
-        </div>
-        <div className="session-panel__body">
-          <p className="status status--open">Session complete · {how}</p>
-          <h1 className="session-title">{session.intention?.text ?? 'Focus session'}</h1>
-          <p className="meta">{meta}</p>
-          {note && <p className="nudge">{note}</p>}
-          <div className="out__actions">
-            <button type="button" className="button button--primary" onClick={again}>Same again</button>
-            <button type="button" className="button" onClick={finish}>Done</button>
-          </div>
-        </div>
+    <FocusLayout
+      head={<>
+        <h1 className={layout === 'desktop' ? 'title' : 'display'}>Session complete.</h1>
+        {session.intention && <p className="subtitle">{session.intention.text}</p>}
+      </>}
+      lock={<LockTimer remainingMs={0} caption="Done" locked={false} />}
+      foot={null}
+    >
+      <dl className="facts">
+        {facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+      </dl>
+      <p className="nudge">{how}{note ? ` ${note}` : ''}</p>
+      <div className="out__actions">
+        <button type="button" className="button button--primary button--lockin" onClick={again}>Same again</button>
+        <button type="button" className="button" onClick={finish}>Done</button>
       </div>
-    </div>
+    </FocusLayout>
   );
 }

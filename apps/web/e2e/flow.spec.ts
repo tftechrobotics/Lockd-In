@@ -10,33 +10,33 @@ test.beforeEach(async ({ page }) => {
 test('configure → start → focus → break → resume → finish', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('button', { name: /Lock in/ })).toBeVisible();
-  await page.getByLabel('Task').fill('TAM 212 · Practice problems');
+  await page.getByLabel('What are you working on?').fill('TAM 212 · Practice problems');
   await page.getByRole('radio', { name: '25 min' }).click();
   await page.getByLabel('Break').selectOption('5');
   await page.getByLabel('Focus periods').selectOption('2');
   await page.getByRole('button', { name: /Lock in/ }).click();
 
-  await expect(page.locator('.status')).toContainText('Locked in');
+  await expect(page.getByRole('heading', { name: 'Locked in.' })).toBeVisible();
   await expect(page.getByText('TAM 212 · Practice problems')).toBeVisible();
   await expect(page.locator('.lock')).toHaveClass(/is-locked/);
   await expect(page.locator('.lock__time')).toHaveText('25:00');
   await expect(page.locator('.lock__caption')).toHaveText('Focus 1 of 2');
 
   await page.clock.fastForward(25 * MIN + 1000);
-  await expect(page.locator('.status')).toContainText('On a break');
+  await expect(page.getByRole('heading', { name: 'On a break.' })).toBeVisible();
   await expect(page.locator('.lock')).toHaveClass(/is-open/);
 
   await page.clock.fastForward(4 * MIN + 10_000); // 50 s left in the break
   await expect(page.getByText(/resumes in about a minute/)).toBeVisible();
 
   await page.clock.fastForward(60_000);
-  await expect(page.locator('.status')).toContainText('Locked in');
+  await expect(page.getByRole('heading', { name: 'Locked in.' })).toBeVisible();
   await expect(page.locator('.lock__caption')).toHaveText('Focus 2 of 2');
 
   await page.clock.fastForward(25 * MIN);
-  await expect(page.locator('.status')).toContainText('Session complete');
-  await expect(page.getByText(/50 min focused/)).toBeVisible();
-  await expect(page.getByText('Finished as planned')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Session complete.' })).toBeVisible();
+  await expect(page.getByText('50 min')).toBeVisible();
+  await expect(page.getByText('Finished as planned.')).toBeVisible();
   await page.getByRole('button', { name: 'Done' }).click();
   await expect(page.getByRole('button', { name: /Lock in/ })).toBeVisible();
   // Last choices are remembered.
@@ -45,12 +45,13 @@ test('configure → start → focus → break → resume → finish', async ({ p
 
 test('a running session survives a reload', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('radio', { name: '10 min' }).click();
+  await page.getByRole('radio', { name: 'Custom' }).click();
+  await page.getByLabel('Minutes', { exact: true }).fill('10');
   await page.getByLabel('Break').selectOption('0');
   await page.getByRole('button', { name: /Lock in/ }).click();
   await page.clock.fastForward(3 * MIN);
   await page.reload();
-  await expect(page.locator('.status')).toContainText('Locked in');
+  await expect(page.getByRole('heading', { name: 'Locked in.' })).toBeVisible();
   await expect(page.locator('.lock__time')).toHaveText('07:00');
 });
 
@@ -66,16 +67,16 @@ test('unlock for this focus period waits, can be cancelled, then locks again nex
   await expect(page.getByText(/Unlocking in 01:30/)).toBeVisible();
   await page.getByRole('button', { name: 'Cancel unlock' }).click();
   await page.clock.fastForward(2 * MIN);
-  await expect(page.locator('.status')).toContainText('Locked in');
+  await expect(page.getByRole('heading', { name: 'Locked in.' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Need out?' }).click();
   await page.getByRole('button', { name: 'Start unlock' }).click();
   await page.clock.fastForward(91_000);
-  await expect(page.locator('.status')).toContainText('Unlocked');
+  await expect(page.getByRole('heading', { name: 'Unlocked for now.' })).toBeVisible();
   await expect(page.locator('.lock')).toHaveClass(/is-open/);
 
   await page.clock.fastForward(28 * MIN); // ~31.5 min in: through the break into focus 2
-  await expect(page.locator('.status')).toContainText('Locked in');
+  await expect(page.getByRole('heading', { name: 'Locked in.' })).toBeVisible();
   await expect(page.locator('.lock__caption')).toHaveText('Focus 2 of 2');
 });
 
@@ -86,16 +87,16 @@ test('emergency recovery ends immediately and says how it ended', async ({ page 
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Keep going' }).last()).toBeFocused();
   await page.getByRole('button', { name: 'End session now' }).click();
-  await expect(page.locator('.status')).toContainText('Session complete');
-  await expect(page.getByText('Ended with emergency recovery')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Session complete.' })).toBeVisible();
+  await expect(page.getByText('Ended with emergency recovery.')).toBeVisible();
 });
 
 test('the web app never claims to block anything', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByText('Timer only')).toBeVisible();
+  await expect(page.getByText('Browser timer only')).toBeVisible();
   await page.getByRole('button', { name: /Lock in/ }).click();
   await expect(page.getByText(/Not blocking/)).toBeVisible();
-  await expect(page.getByText('Not paired').first()).toBeVisible();
+  await expect(page.getByText('PC not paired')).toBeVisible();
   await expect(page.getByText(/protected/i)).toHaveCount(0);
 });
 
@@ -166,7 +167,7 @@ test('keyboard: skip link, then reach and start a session without a mouse', asyn
   }
   await expect(page.getByRole('button', { name: /Lock in/ })).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page.locator('.status')).toContainText('Locked in');
+  await expect(page.getByRole('heading', { name: 'Locked in.' })).toBeVisible();
 });
 
 for (const w of [320, 390]) {

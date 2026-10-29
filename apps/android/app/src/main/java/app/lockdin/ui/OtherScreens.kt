@@ -234,8 +234,7 @@ fun DevicesScreen() {
             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically) {
                 LockdIcon(d.icon)
                 Spacer(Modifier.width(12.dp))
-                Text(d.name, style = Type.bodyStrong, color = c.ink, modifier = Modifier.weight(1f))
-                Text(d.status, style = Type.caption, color = c.inkMuted)
+                Text(d.text, style = Type.body, color = c.ink, modifier = Modifier.weight(1f))
             }
             HorizontalDivider(color = c.line)
         }

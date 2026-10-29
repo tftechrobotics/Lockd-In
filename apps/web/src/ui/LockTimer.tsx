@@ -4,9 +4,12 @@
 // technology; the minute-level summary is what gets announced.
 import { countdown, spokenRemaining } from './format';
 
-// Closed: both legs in the body. Open: the left leg lifts clear; the right stays seated.
-const CLOSED = 'M62 138 V96 a58 58 0 0 1 116 0 V138';
-const OPEN = 'M62 90 V62 a58 58 0 0 1 116 0 V138';
+// Geometry measured from the approved reference: the shackle is centered on the
+// body, its centerline 42% of the body's width, stroke 11%. Open: the left leg
+// stays seated and the right end stops just above the arc's midline (a
+// released shackle). Closed: the shackle drops and both legs are seated.
+const OPEN = 'M75.5 136 V94 A44.5 44.5 0 0 1 163.8 86.3';
+const CLOSED = 'M75.5 136 V108 A44.5 44.5 0 0 1 164.5 108 V136';
 
 interface Props {
   /** Milliseconds left in the current phase, or the planned length when idle. */
@@ -19,7 +22,7 @@ interface Props {
 export function LockTimer({ remainingMs, caption, locked, size = 'large' }: Props) {
   return (
     <figure className={`lock lock--${size} ${locked ? 'is-locked' : 'is-open'}`} aria-label={`${caption}: ${spokenRemaining(remainingMs)}`}>
-      <svg className="lock__art" viewBox="0 0 240 300" aria-hidden="true">
+      <svg className="lock__art" viewBox="0 36 240 260" aria-hidden="true">
         <path className="lock__shackle" d={locked ? CLOSED : OPEN} />
         <rect className="lock__body" x="14" y="120" width="212" height="172" rx="26" />
       </svg>
