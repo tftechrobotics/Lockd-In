@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The optional accessibility detector ships only in debug builds. The Play
+         (release) build leaves it out until its disclosure video and Play
+         declaration exist. See docs/play/README.md. -->
+    <bool name="accessibility_detector_available">true</bool>
+</resources>

@@ -33,7 +33,13 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            if (uploadStoreFile != null) signingConfig = signingConfigs.getByName("upload")
+            if (uploadStoreFile != null) {
+                signingConfig = signingConfigs.getByName("upload")
+            } else if (System.getenv("LOCKDIN_DEMO_DEBUG_SIGNED") == "1") {
+                // CI emulator demo only: an installable release build signed with
+                // the throwaway debug key. Never uploaded to Play.
+                signingConfig = signingConfigs.getByName("debug")
+            }
         }
     }
     compileOptions {

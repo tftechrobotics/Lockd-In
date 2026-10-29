@@ -41,9 +41,30 @@ KCP=$(ls "$GRADLE_LIB"/kotlin-compiler-embeddable-*.jar "$GRADLE_LIB"/kotlin-std
       "$GRADLE_LIB"/kotlin-script-runtime-*.jar "$GRADLE_LIB"/kotlin-daemon-embeddable-*.jar "$GRADLE_LIB"/trove4j*.jar \
       "$GRADLE_LIB"/annotations-*.jar "$GRADLE_LIB"/kotlinx-coroutines-core-jvm-*.jar 2>/dev/null | tr '\n' ':')
 STDLIB=$(ls "$GRADLE_LIB"/kotlin-stdlib-2*.jar)
+# Stand-in for the generated R class (the real one comes from the Gradle build in CI):
+# one Int constant per resource name found under src/main/res.
+gen_r() { # $1 module dir, $2 package, $3 output file
+  python3 -I - "$1" "$2" "$3" <<'PY'
+import sys, pathlib, re, collections
+mod, pkg, out = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+kinds = collections.defaultdict(set)
+for f in (mod / "src/main/res").rglob("*"):
+    if not f.is_file(): continue
+    d = f.parent.name.split("-")[0]
+    if d == "values":
+        for k, n in re.findall(r'<(bool|string|integer|color|dimen)\s+name="([A-Za-z0-9_]+)"', f.read_text()):
+            kinds[k].add(n)
+    else:
+        kinds[d].add(f.stem)
+body = "".join(f"    object {k} {{ " + "; ".join(f"const val {n} = 0" for n in sorted(v)) + " }\n" for k, v in sorted(kinds.items()))
+pathlib.Path(out).write_text(f"package {pkg}\n\n@Suppress(\"ClassName\")\nobject R {{\n{body}}}\n")
+PY
+}
 for m in probe target; do
+  pkg=$(grep -oE 'namespace = "[^"]+"' "$ROOT/probes/android/$m/build.gradle.kts" | cut -d'"' -f2)
+  mkdir -p "$CACHE/rstub/$m"; gen_r "$ROOT/probes/android/$m" "$pkg" "$CACHE/rstub/$m/R.kt"
   out=$(java -cp "$KCP" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -no-stdlib -no-reflect -jvm-target 17 \
-        -cp "$JAR:$STDLIB" -d "$CACHE/ktout/$m" $(find "$ROOT/probes/android/$m" -name '*.kt') 2>&1 | grep -v JAVA_TOOL || true)
+        -cp "$JAR:$STDLIB" -d "$CACHE/ktout/$m" "$CACHE/rstub/$m/R.kt" $(find "$ROOT/probes/android/$m" -name '*.kt') 2>&1 | grep -v JAVA_TOOL || true)
   if echo "$out" | grep -qE "error:|warning:"; then echo "$out"; fail=1; else echo "$m: clean"; fi
 done
 

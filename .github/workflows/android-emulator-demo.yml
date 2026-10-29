@@ -1,0 +1,49 @@
+# Records the Play Console demo video (foreground service) on an emulator and
+# keeps the probe's on-screen log as emulator-only evidence. Not a phone test.
+name: Android emulator demo
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["probes/android/**", ".github/workflows/android-emulator-demo.yml"]
+permissions:
+  contents: read
+jobs:
+  demo:
+    name: Record demo on emulator (API 35)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gradle/actions/wrapper-validation@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build installable release APKs (debug-key signed, demo only)
+        working-directory: probes/android
+        env:
+          LOCKDIN_DEMO_DEBUG_SIGNED: "1"
+        run: ./gradlew --no-daemon :probe:assembleRelease :target:assembleRelease
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run emulator and record
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: probes/android/ci/emulator-demo.sh probes/android/probe/build/outputs/apk/release/probe-release.apk probes/android/target/build/outputs/apk/release/target-release.apk out/emulator-demo
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lockdin-emulator-demo-EMULATOR-ONLY
+          path: out/emulator-demo
+          retention-days: 30

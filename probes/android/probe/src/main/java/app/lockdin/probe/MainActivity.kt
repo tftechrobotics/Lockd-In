@@ -43,6 +43,7 @@ class MainActivity : Activity() {
             col.addView(this)
         }
 
+        val a11y = resources.getBoolean(R.bool.accessibility_detector_available)
         note("Lockd In probe — experiment build", 18f, 0)
         note(
             "Measures whether this phone can detect and block a chosen app. Start with the smoke test, " +
@@ -63,7 +64,7 @@ class MainActivity : Activity() {
         button("Allow notifications") {
             if (Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
         }
-        button("Optional: accessibility detector") { accessibilityDisclosure() }
+        if (a11y) button("Optional: accessibility detector") { accessibilityDisclosure() }
 
         note("Smoke test", 16f)
         button("Run smoke test (harmless target, 3 minutes)") { smokeTest() }
@@ -80,14 +81,14 @@ class MainActivity : Activity() {
 
         note("Detector:", 14f, 8)
         detectorGroup = radios(
-            listOf(
+            listOfNotNull(
                 1 to "Usage access (polling)",
-                2 to "Accessibility events",
+                if (a11y) 2 to "Accessibility events" else null,
                 3 to "None — battery baseline run (blocks nothing)",
             ),
             when (ProbeSession.detector(this)) {
                 ProbeSession.Detector.USAGE_STATS -> 1
-                ProbeSession.Detector.ACCESSIBILITY -> 2
+                ProbeSession.Detector.ACCESSIBILITY -> if (a11y) 2 else 1
                 ProbeSession.Detector.NONE_BASELINE -> 3
             },
         )
@@ -232,7 +233,11 @@ class MainActivity : Activity() {
             appendLine("${mark(Capabilities.usageAccess(this@MainActivity))} Usage access")
             appendLine("${mark(Capabilities.overlay(this@MainActivity))} Display over other apps")
             appendLine("${mark(Capabilities.notifications(this@MainActivity))} Notifications")
-            appendLine("${mark(Capabilities.accessibilityEnabled(this@MainActivity))} Accessibility detector (optional)")
+            if (resources.getBoolean(R.bool.accessibility_detector_available)) {
+                appendLine("${mark(Capabilities.accessibilityEnabled(this@MainActivity))} Accessibility detector (optional)")
+            } else {
+                appendLine("Accessibility detector: not included in this build")
+            }
             appendLine("${mark(Capabilities.batteryUnrestricted(this@MainActivity))} Battery unrestricted (record, don't change for the smoke test)")
             appendLine(
                 "Advanced Protection: " + when (Capabilities.advancedProtection(this@MainActivity)) {
