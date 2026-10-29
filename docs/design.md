@@ -58,3 +58,14 @@ all five pages and the active session, light and dark; keyboard path from skip
 link to "Lock in"; no horizontal scroll at 320/390 px with 100% and 200% text.
 Not yet verified: a real screen reader (NVDA/TalkBack), Firefox/Safari,
 Windows high-contrast beyond `forced-colors` basics.
+
+## Revision 2026-10-29 — "less AI-generated" pass (owner feedback)
+
+Owner feedback: lock too large, too many words, "What's the move?" unwanted, overall not professional enough.
+Changes (web, desktop shell layout and Android):
+- Focus is one bordered **session panel**. The lock sits in a ground-colored band, about 172px on the web (148px desktop, 132–150dp phone), not the hero.
+- No display headline on Focus. The setup heading is screen-reader only; the active and recap screens use a small status line ("● Locked in · Focus 1 of 2") with the task as the title.
+- Short field labels above controls; a segmented duration control instead of pills; side-by-side Break and Focus periods selects.
+- One summary line ("Ends 5:53 PM · 2 × 40 min, 5 min breaks").
+- Honesty and device status are single muted lines under the panel that link to Devices; explanations live on the Devices page only.
+- Page headings are reduced to 1.6rem (web) / 24sp (Android). Copy on Schedule, Profiles, Devices and Settings is cut to one line each.
