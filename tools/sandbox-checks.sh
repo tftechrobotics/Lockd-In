@@ -23,9 +23,11 @@ echo "== Rust core"
 
 echo "== Windows probe (compile only)"
 if command -v dotnet >/dev/null; then
-  for p in Probe Target; do
+  for p in Probe Target AppControlSpike; do
     DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 dotnet build "$ROOT/probes/windows/$p" -c Release -p:UseAppHost=false -v q -nologo || fail=1
   done
+  echo "== App Control compiler spike (self-test; no deployment)"
+  DOTNET_CLI_TELEMETRY_OPTOUT=1 dotnet "$ROOT/probes/windows/AppControlSpike/bin/Release/net10.0/LockdInAppControlSpike.dll" selftest | tail -1 || fail=1
   rm -rf "$ROOT"/probes/windows/*/bin "$ROOT"/probes/windows/*/obj
 else echo "dotnet not installed (apt-get install dotnet-sdk-10.0)"; fail=1; fi
 

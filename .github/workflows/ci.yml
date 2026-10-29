@@ -142,6 +142,53 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Report '--recover failed' }
           Write-Host "Sanity run passed."
 
+  # SPIKE (risk R6b): does our in-app App Control compiler produce the same
+  # binary as Microsoft's ConvertFrom-CIPolicy? Builds files only. Nothing is
+  # deployed: no CiTool call exists in the spike or in this job.
+  appcontrol-spike:
+    name: App Control compiler spike (no deployment)
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: probes/windows/global.json
+      - name: Build and self-test
+        shell: pwsh
+        run: |
+          dotnet build probes/windows/AppControlSpike -c Release
+          dotnet probes/windows/AppControlSpike/bin/Release/net10.0/LockdInAppControlSpike.dll selftest
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Compare with Microsoft's compiler
+        shell: pwsh
+        run: |
+          $dll = 'probes/windows/AppControlSpike/bin/Release/net10.0/LockdInAppControlSpike.dll'
+          $out = Join-Path $env:RUNNER_TEMP 'spike'
+          dotnet $dll build --deny steam.exe=Steam --deny Discord.exe=Discord --deny LockdInTarget.exe=Target --out $out --policy-id 6d6b2f1e-1c5a-4b8e-9a51-0f3c2d7e9b10
+          if (-not (Get-Command ConvertFrom-CIPolicy -ErrorAction SilentlyContinue)) {
+            Write-Host "::warning title=App Control spike::ConvertFrom-CIPolicy is not available on this runner; byte comparison skipped."
+            exit 0
+          }
+          $ms = Join-Path $out 'microsoft.cip'
+          try {
+            ConvertFrom-CIPolicy -XmlFilePath (Join-Path $out 'policy.xml') -BinaryFilePath $ms | Out-Null
+          } catch {
+            Write-Host "::error title=App Control spike::Microsoft's compiler rejected our XML: $($_.Exception.Message)"
+            exit 1
+          }
+          $ours = [IO.File]::ReadAllBytes((Join-Path $out 'lockdin.cip'))
+          $theirs = [IO.File]::ReadAllBytes($ms)
+          $same = [Linq.Enumerable]::SequenceEqual($ours, $theirs)
+          $first = -1
+          if (-not $same) { for ($i = 0; $i -lt [Math]::Min($ours.Length, $theirs.Length); $i++) { if ($ours[$i] -ne $theirs[$i]) { $first = $i; break } } }
+          $a = dotnet $dll describe (Join-Path $out 'lockdin.cip')
+          $b = dotnet $dll describe $ms
+          Write-Host "::notice title=App Control spike (bytes)::identical=$same; ours=$($ours.Length) B; microsoft=$($theirs.Length) B; first difference at byte $first"
+          Write-Host "::notice title=App Control spike (ours)::$a"
+          Write-Host "::notice title=App Control spike (microsoft)::$b"
+          if (-not $same -and $a -ne $b) { Write-Host "::error title=App Control spike::Binaries differ in content, not just encoding"; exit 1 }
+          if (-not $same) { Write-Host "::warning title=App Control spike::Bytes differ but parsed content is identical" }
+
   vm-experiments:
     name: VM-only policy experiments (separate download)
     runs-on: windows-2025

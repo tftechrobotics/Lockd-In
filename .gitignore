@@ -10,3 +10,6 @@ local.properties
 *.jks
 *.keystore
 .env
+*.p12
+*.pfx
+*.cip

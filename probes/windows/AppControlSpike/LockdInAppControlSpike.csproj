@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- SPIKE ONLY (M1, R6b): build an App Control deny policy in code and compile
+       it to the binary .cip format without the ConfigCI module (absent on Home).
+       Never deploys anything. Vendor/HotCakeX is MIT-licensed third-party code. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>LockdInAppControlSpike</AssemblyName>
+    <RootNamespace>LockdIn.AppControlSpike</RootNamespace>
+    <!-- Vendored code keeps its own style; its warnings are not ours to fix. -->
+    <NoWarn>$(NoWarn);CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8625;CS0168;CS0219;IDE0005</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="$(MSBuildThisFileDirectory)../Shared/*.cs" />
+  </ItemGroup>
+</Project>

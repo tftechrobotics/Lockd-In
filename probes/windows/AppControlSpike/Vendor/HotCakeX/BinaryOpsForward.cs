@@ -1,0 +1,1672 @@
+// MIT License
+//
+// Copyright (c) 2023-Present - Violet Hansen - (aka HotCakeX on GitHub) - Email Address: spynetgirl@outlook.com
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// See here for more information: https://github.com/HotCakeX/Harden-Windows-Security/blob/main/LICENSE
+//
+
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.RegularExpressions;
+
+namespace AppControlManager.SiPolicy;
+
+internal static partial class BinaryOpsForward
+{
+	[GeneratedRegex(@"\$\(([^()]+)\)", RegexOptions.CultureInvariant | RegexOptions.IgnorePatternWhitespace)]
+	private static partial Regex MacroRegex();
+
+	/// <summary>
+	/// Writes a string value to the binary writer, with a trailing zero terminator.
+	/// </summary>
+	private static void WriteOptionalStringValue(string? value, BinaryWriter BodyWriter)
+	{
+		// if we have no actual text, write a zero-length prefix
+		if (string.IsNullOrWhiteSpace(value))
+		{
+			BodyWriter.Write(0U);
+		}
+		else
+		{
+			byte[] utf16Bytes = Encoding.Unicode.GetBytes(value);
+			uint length = (uint)utf16Bytes.Length;
+
+			BodyWriter.Write(length);
+
+			BodyWriter.Write(utf16Bytes);
+
+			int pad = (int)(-length & 3);
+			if (pad > 0)
+			{
+				Span<byte> padding = stackalloc byte[3];
+				padding.Clear();
+				BodyWriter.Write(padding[..pad]);
+			}
+		}
+
+		// and in every case, emit the trailing zero terminator
+		BodyWriter.Write(0U);
+	}
+
+	/// <summary>
+	/// Writes a counted array of bytes, padded to next 4-byte boundary.
+	/// </summary>
+	private static void WritePaddedCountedBytes(ReadOnlyMemory<byte> data, BinaryWriter BodyWriter)
+	{
+		uint length = (uint)data.Length;
+		BodyWriter.Write(length);
+		if (length == 0) return;
+
+		// write the actual data
+		BodyWriter.Write(data.Span);
+
+		// compute padding
+		int padding = -(int)length & 3;
+		if (padding > 0)
+		{
+			BodyWriter.Write(stackalloc byte[padding]);
+		}
+	}
+
+	/// <summary>
+	/// Validates the common binary-conversion constraints for Allow, Deny, and FileAttrib rules.
+	/// Generic FileRule objects are adapted to one of these concrete types before this method is called.
+	/// </summary>
+	private static void ValidateFileRuleForBinary(
+		string ruleId,
+		string ruleKind,
+		string? fileName,
+		string? internalName,
+		string? fileDescription,
+		string? productName,
+		string? packageFamilyName,
+		string? packageVersion,
+		string? minimumFileVersion,
+		string? maximumFileVersion,
+		ReadOnlyMemory<byte> hash,
+		string? appIDs,
+		string? filePath)
+	{
+		if (string.IsNullOrEmpty(ruleId))
+		{
+			throw new InvalidOperationException($"The {ruleKind} rule has an empty ID, making it invalid.");
+		}
+		if (appIDs is not null && (internalName is not null || fileDescription is not null || productName is not null || packageFamilyName is not null))
+		{
+			// AppIDs rules are per-app rules and the native converter rejects these metadata fields with AppIDs.
+			throw new InvalidOperationException($"The {ruleKind} rule with the ID {ruleId} has AppIDs with unsupported file metadata fields.");
+		}
+		bool APropertyExists = fileName is not null
+						 || fileDescription is not null
+						 || packageFamilyName is not null
+						 || internalName is not null
+						 || productName is not null
+						 || packageVersion is not null
+						 || minimumFileVersion is not null
+						 || maximumFileVersion is not null
+						 || filePath is not null;
+		bool NoPropertyExists = filePath is null
+						&& fileName is null
+						&& internalName is null
+						&& fileDescription is null
+						&& packageFamilyName is null
+						&& productName is null;
+		if (!hash.IsEmpty)
+		{
+			if (APropertyExists)
+			{
+				throw new InvalidOperationException($"The {ruleKind} rule with the ID {ruleId} has Hash property but also has other file properties, making it invalid.");
+			}
+		}
+		else if (NoPropertyExists)
+		{
+			throw new InvalidOperationException($"The {ruleKind} rule with the ID {ruleId} neither has Hash nor does it have any other file properties, making it invalid.");
+		}
+		ValidateVersionRange(minimumFileVersion, maximumFileVersion, ruleId);
+	}
+
+	/// <summary>
+	/// Writes a file rule as binary (for main file rules block).
+	/// </summary>
+	private static void ConvertFileRuleToBinary(ref Dictionary<string, uint> fileRuleIdToIndexMap, object fileRule, uint fileRuleIndex, BinaryWriter BodyWriter)
+	{
+		switch (fileRule)
+		{
+			case Allow allowRule:
+				ValidateFileRuleForBinary(allowRule.ID, nameof(Allow), allowRule.FileName, allowRule.InternalName, allowRule.FileDescription, allowRule.ProductName, allowRule.PackageFamilyName, allowRule.PackageVersion, allowRule.MinimumFileVersion, allowRule.MaximumFileVersion, allowRule.Hash, allowRule.AppIDs, allowRule.FilePath);
+				fileRuleIdToIndexMap.Add(allowRule.ID, fileRuleIndex);
+				BodyWriter.Write(1U);
+				WriteOptionalStringValue(allowRule.FileName, BodyWriter);
+				{
+					ulong minFileVersionNumber = Helper.ConvertStringVersionToUInt64(allowRule.MinimumFileVersion);
+					BodyWriter.Write((uint)(minFileVersionNumber & uint.MaxValue));
+					BodyWriter.Write((uint)(minFileVersionNumber >> 32));
+				}
+				WritePaddedCountedBytes(allowRule.Hash, BodyWriter);
+				break;
+
+			case Deny denyRule:
+				ValidateFileRuleForBinary(denyRule.ID, nameof(Deny), denyRule.FileName, denyRule.InternalName, denyRule.FileDescription, denyRule.ProductName, denyRule.PackageFamilyName, denyRule.PackageVersion, denyRule.MinimumFileVersion, denyRule.MaximumFileVersion, denyRule.Hash, denyRule.AppIDs, denyRule.FilePath);
+				fileRuleIdToIndexMap.Add(denyRule.ID, fileRuleIndex);
+				BodyWriter.Write(0U);
+				WriteOptionalStringValue(denyRule.FileName, BodyWriter);
+				{
+					ulong minFileVersionNumber = (denyRule.MinimumFileVersion is not null || denyRule.MaximumFileVersion is not null)
+						? Helper.ConvertStringVersionToUInt64(denyRule.MinimumFileVersion)
+						: Helper.ConvertStringVersionToUInt64(Atlas.DefaultMaxVersion);
+
+					BodyWriter.Write((uint)(minFileVersionNumber & uint.MaxValue));
+					BodyWriter.Write((uint)(minFileVersionNumber >> 32));
+				}
+				WritePaddedCountedBytes(denyRule.Hash, BodyWriter);
+				break;
+
+			case FileAttrib fileAttributeRule:
+				ValidateFileRuleForBinary(fileAttributeRule.ID, nameof(FileAttrib), fileAttributeRule.FileName, fileAttributeRule.InternalName, fileAttributeRule.FileDescription, fileAttributeRule.ProductName, fileAttributeRule.PackageFamilyName, fileAttributeRule.PackageVersion, fileAttributeRule.MinimumFileVersion, fileAttributeRule.MaximumFileVersion, fileAttributeRule.Hash, fileAttributeRule.AppIDs, fileAttributeRule.FilePath);
+				fileRuleIdToIndexMap.Add(fileAttributeRule.ID, fileRuleIndex);
+				BodyWriter.Write(2U);
+				WriteOptionalStringValue(fileAttributeRule.FileName, BodyWriter);
+				{
+					ulong minFileVersionNumber = Helper.ConvertStringVersionToUInt64(fileAttributeRule.MinimumFileVersion);
+					BodyWriter.Write((uint)(minFileVersionNumber & uint.MaxValue));
+					BodyWriter.Write((uint)(minFileVersionNumber >> 32));
+				}
+
+				WritePaddedCountedBytes(fileAttributeRule.Hash, BodyWriter);
+				break;
+
+			default:
+				throw new InvalidOperationException(Atlas.GetStr("FileRuleHasInvalidTypeMessage"));
+		}
+	}
+
+	/// <summary>
+	/// Writes a string or macro value (for AppIDs) to the binary writer.
+	/// </summary>
+	private static void ParseStringMacros(string? strs, ref Dictionary<string, string> mapMacroId2Value, BinaryWriter BodyWriter)
+	{
+		if (strs is null)
+		{
+			BodyWriter.Write(0U);
+			return;
+		}
+
+		if (strs.StartsWith('$'))
+		{
+			// Split by macro pattern, capturing the macro IDs in the result
+			string[] tokens = MacroRegex().Split(strs);
+
+			// Allocate array for replacements without zero-initializing
+			string[] replacements = GC.AllocateUninitializedArray<string>(tokens.Length);
+
+			uint count = 0;
+
+			foreach (string? token in tokens)
+			{
+				if (!string.IsNullOrEmpty(token))
+				{
+					if (!mapMacroId2Value.TryGetValue(token, out string? value))
+						throw new InvalidOperationException(
+							string.Format(
+								Atlas.GetStr("MacroNotDefinedMessage"),
+								token,
+								strs));
+
+					replacements[count++] = value;
+				}
+			}
+
+			if (count == 0)
+				throw new InvalidOperationException(
+					string.Format(
+						Atlas.GetStr("NoMacroFoundMessage"),
+						strs));
+
+			BodyWriter.Write(count);
+			for (uint i = 0; i < count; i++)
+				WriteOptionalStringValue(replacements[i], BodyWriter);
+		}
+		else
+		{
+			// Single literal string
+			BodyWriter.Write(1U);
+			WriteOptionalStringValue(strs, BodyWriter);
+		}
+	}
+
+	/// <summary>
+	/// Helper method to validate that MinVersion <= MaxVersion
+	/// </summary>
+	private static void ValidateVersionRange(string? minVersion, string? maxVersion, string ruleId)
+	{
+		if (maxVersion != null && minVersion != null)
+		{
+			ulong min = Helper.ConvertStringVersionToUInt64(minVersion);
+			ulong max = Helper.ConvertStringVersionToUInt64(maxVersion);
+
+			if (max < min)
+			{
+				throw new InvalidOperationException(
+					string.Format("For rule {0}, the minimum version {1} is greater than the maximum version {2}.", ruleId, minVersion, maxVersion));
+			}
+		}
+	}
+
+	/// <summary>
+	/// Writes AppIDs and MaximumFileVersion for file rules (AppIDs block).
+	/// </summary>
+	private static void WriteAppIdsAndMaxFileVersion(ref Dictionary<string, string> macroIdToValueMap, object fileRule, BinaryWriter BodyWriter)
+	{
+		switch (fileRule)
+		{
+			case Allow allowRule:
+				{
+					ValidateVersionRange(allowRule.MinimumFileVersion, allowRule.MaximumFileVersion, allowRule.ID);
+
+					ulong maxFileVersionNumber = 0;
+					if (allowRule.MaximumFileVersion is not null)
+					{
+						maxFileVersionNumber = Helper.ConvertStringVersionToUInt64(allowRule.MaximumFileVersion);
+					}
+
+					BodyWriter.Write((uint)(maxFileVersionNumber & uint.MaxValue));
+					BodyWriter.Write((uint)(maxFileVersionNumber >> 32));
+
+					ParseStringMacros(allowRule.AppIDs, ref macroIdToValueMap, BodyWriter);
+				}
+				break;
+
+			case Deny denyRule:
+				{
+					ValidateVersionRange(denyRule.MinimumFileVersion, denyRule.MaximumFileVersion, denyRule.ID);
+
+					ulong maxFileVersionNumber = 0;
+					if (denyRule.MaximumFileVersion is not null)
+					{
+						maxFileVersionNumber = Helper.ConvertStringVersionToUInt64(denyRule.MaximumFileVersion);
+					}
+
+					BodyWriter.Write((uint)(maxFileVersionNumber & uint.MaxValue));
+					BodyWriter.Write((uint)(maxFileVersionNumber >> 32));
+
+					ParseStringMacros(denyRule.AppIDs, ref macroIdToValueMap, BodyWriter);
+				}
+				break;
+
+			case FileAttrib fileAttributeRule:
+				{
+					ValidateVersionRange(fileAttributeRule.MinimumFileVersion, fileAttributeRule.MaximumFileVersion, fileAttributeRule.ID);
+
+					ulong maxFileVersionNumber = 0;
+					if (fileAttributeRule.MaximumFileVersion is not null)
+					{
+						maxFileVersionNumber = Helper.ConvertStringVersionToUInt64(fileAttributeRule.MaximumFileVersion);
+					}
+					else if (fileAttributeRule.Hash.IsEmpty)
+					{
+						// Emit the default maximum version for non-hash FileAttrib rules when no explicit maximum is present.
+						maxFileVersionNumber = Helper.ConvertStringVersionToUInt64(Atlas.DefaultMaxVersion);
+					}
+
+					BodyWriter.Write((uint)(maxFileVersionNumber & uint.MaxValue));
+					BodyWriter.Write((uint)(maxFileVersionNumber >> 32));
+
+					ParseStringMacros(fileAttributeRule.AppIDs, ref macroIdToValueMap, BodyWriter);
+				}
+				break;
+
+			default:
+				throw new InvalidOperationException(Atlas.GetStr("FileRuleHasInvalidTypeMessage"));
+		}
+	}
+
+	/// <summary>
+	/// Writes InternalName, FileDescription, ProductName for file rules.
+	/// </summary>
+	private static void WriteFileMetadata(object rule, BinaryWriter BodyWriter)
+	{
+		switch (rule)
+		{
+			case Allow allow:
+				WriteOptionalStringValue(allow.InternalName, BodyWriter);
+				WriteOptionalStringValue(allow.FileDescription, BodyWriter);
+				WriteOptionalStringValue(allow.ProductName, BodyWriter);
+				break;
+
+			case Deny deny:
+				WriteOptionalStringValue(deny.InternalName, BodyWriter);
+				WriteOptionalStringValue(deny.FileDescription, BodyWriter);
+				WriteOptionalStringValue(deny.ProductName, BodyWriter);
+				break;
+
+			case FileAttrib fileAttrib:
+				WriteOptionalStringValue(fileAttrib.InternalName, BodyWriter);
+				WriteOptionalStringValue(fileAttrib.FileDescription, BodyWriter);
+				WriteOptionalStringValue(fileAttrib.ProductName, BodyWriter);
+				break;
+
+			default:
+				throw new InvalidOperationException(Atlas.GetStr("FileRuleHasInvalidTypeMessage"));
+		}
+	}
+
+	/// <summary>
+	/// Writes PackageFamilyName and PackageVersion for file rules.
+	/// </summary>
+	private static void WritePackageInfo(object fileRule, BinaryWriter BodyWriter)
+	{
+		switch (fileRule)
+		{
+			case Allow allowRule:
+				{
+					WriteOptionalStringValue(allowRule.PackageFamilyName, BodyWriter);
+					ulong versionNumber = Helper.ConvertStringVersionToUInt64(allowRule.PackageVersion);
+
+					BodyWriter.Write((uint)(versionNumber & uint.MaxValue));
+					BodyWriter.Write((uint)(versionNumber >> 32));
+				}
+				break;
+
+			case Deny denyRule:
+				{
+					WriteOptionalStringValue(denyRule.PackageFamilyName, BodyWriter);
+					ulong versionNumber = Helper.ConvertStringVersionToUInt64(denyRule.PackageVersion);
+
+					BodyWriter.Write((uint)(versionNumber & uint.MaxValue));
+					BodyWriter.Write((uint)(versionNumber >> 32));
+				}
+				break;
+
+			case FileAttrib fileAttribRule:
+				{
+					WriteOptionalStringValue(fileAttribRule.PackageFamilyName, BodyWriter);
+					ulong versionNumber = Helper.ConvertStringVersionToUInt64(fileAttribRule.PackageVersion);
+
+					BodyWriter.Write((uint)(versionNumber & uint.MaxValue));
+					BodyWriter.Write((uint)(versionNumber >> 32));
+				}
+				break;
+
+			default:
+				throw new InvalidOperationException(Atlas.GetStr("FileRuleHasInvalidTypeMessage"));
+		}
+	}
+
+	/// <summary>
+	/// Writes FilePath for file rules.
+	/// </summary>
+	private static void WriteFilePath(object rule, BinaryWriter BodyWriter)
+	{
+		switch (rule)
+		{
+			case Allow allow:
+				WriteOptionalStringValue(allow.FilePath, BodyWriter);
+				break;
+
+			case Deny deny:
+				WriteOptionalStringValue(deny.FilePath, BodyWriter);
+				break;
+
+			case FileAttrib fileAttrib:
+				WriteOptionalStringValue(fileAttrib.FilePath, BodyWriter);
+				break;
+
+			default:
+				throw new InvalidOperationException(Atlas.GetStr("FileRuleHasInvalidTypeMessage"));
+		}
+	}
+
+	/// <summary>
+	/// Serializes a Signer into binary format.
+	/// </summary>
+	private static void ConvertSignerToBinary(Signer signerData, Dictionary<string, uint> ekuIdToIndexMap, Dictionary<string, uint> fileRuleIdToIndexMap, List<object>? fileRuleArray, BinaryWriter BodyWriter)
+	{
+		if (signerData.CertRoot.Type is CertEnumType.TBS)
+		{
+			BodyWriter.Write(0U); // TBS Cert Indicator
+			WritePaddedCountedBytes(signerData.CertRoot.Value, BodyWriter);
+		}
+		else
+		{
+			BodyWriter.Write(1U); // Public Key Indicator
+			BodyWriter.Write((uint)signerData.CertRoot.Value.Span[0]);
+		}
+
+		if (signerData.CertEKU is not null)
+		{
+			uint certEkuCount = 0;
+			for (int certEkuIndex = 0; certEkuIndex < signerData.CertEKU.Count; ++certEkuIndex)
+			{
+				if (signerData.CertEKU[certEkuIndex].Condition is null)
+					certEkuCount++;
+			}
+
+			BodyWriter.Write(certEkuCount);
+
+			for (int certEkuIndex = 0; certEkuIndex < signerData.CertEKU.Count; ++certEkuIndex)
+			{
+				CertEKU certEKU = signerData.CertEKU[certEkuIndex];
+				if (certEKU.Condition is not null)
+					continue;
+
+				if (!ekuIdToIndexMap.TryGetValue(certEKU.ID, out uint foundEkuIndex))
+					throw new InvalidOperationException(string.Format(Atlas.GetStr("SignerCertEkuReferenceError"), signerData.ID, certEKU.ID));
+
+				BodyWriter.Write(foundEkuIndex);
+			}
+		}
+		else
+		{
+			BodyWriter.Write(0U);
+		}
+
+		if (signerData.CertIssuer is not null)
+		{
+			WriteOptionalStringValue(signerData.CertIssuer.Value, BodyWriter);
+		}
+		else
+		{
+			WriteOptionalStringValue(null, BodyWriter);
+		}
+
+		if (signerData.CertPublisher is not null)
+		{
+			WriteOptionalStringValue(signerData.CertPublisher.Value, BodyWriter);
+		}
+		else
+		{
+			WriteOptionalStringValue(null, BodyWriter);
+		}
+
+		if (signerData.CertOemID is not null)
+		{
+			WriteOptionalStringValue(signerData.CertOemID.Value, BodyWriter);
+		}
+		else
+		{
+			WriteOptionalStringValue(null, BodyWriter);
+		}
+
+		if (signerData.FileAttribRef is not null)
+		{
+			// Only check if FileRules section is null or not when the Signer has any FileAttrib Refs, otherwise it's perfectly valid for a policy to not have a FileRules node/section and Signer not have any FileRule Refs.
+			ArgumentNullException.ThrowIfNull(fileRuleArray);
+
+			BodyWriter.Write((uint)signerData.FileAttribRef.Count);
+
+			for (uint fileAttribRefIndex = 0; fileAttribRefIndex < signerData.FileAttribRef.Count; ++fileAttribRefIndex)
+			{
+				if (!fileRuleIdToIndexMap.TryGetValue(signerData.FileAttribRef[(int)fileAttribRefIndex].RuleID, out uint foundFileRuleIndex))
+				{
+					throw new InvalidOperationException(
+						string.Format(
+							Atlas.GetStr("SignerFileAttribRefNotFoundError"),
+							signerData.ID,
+							signerData.FileAttribRef[(int)fileAttribRefIndex].RuleID));
+				}
+
+				if (fileRuleArray[(int)foundFileRuleIndex] is not FileAttrib)
+				{
+					throw new InvalidOperationException(
+						string.Format(
+							Atlas.GetStr("FileAttribRefTypeInvalidError"),
+							signerData.FileAttribRef[(int)fileAttribRefIndex].RuleID));
+				}
+
+				BodyWriter.Write(foundFileRuleIndex);
+			}
+		}
+		else
+		{
+			BodyWriter.Write(0U);
+		}
+	}
+
+	/// <summary>
+	/// Serializes a SigningScenario to binary.
+	/// </summary>
+	private static void ConvertScenarioToBinary(SigningScenario signingScenario, Dictionary<string, uint> scenarioIdToIndexMap, BinaryWriter BodyWriter)
+	{
+		if (string.IsNullOrEmpty(signingScenario.ID) || signingScenario.Value == 0 || signingScenario.ProductSigners is null)
+		{
+			throw new InvalidOperationException("The SigningScenario is invalid because it must have a non-empty ID, a non-zero Value, and ProductSigners.");
+		}
+
+		BodyWriter.Write((uint)signingScenario.Value);
+
+		if (signingScenario.InheritedScenarios is not null)
+		{
+			string[] splitInheritedScenarios = signingScenario
+				.InheritedScenarios
+				.Split([",", signingScenario.ID], StringSplitOptions.RemoveEmptyEntries);
+
+			BodyWriter.Write((uint)splitInheritedScenarios.Length);
+
+			foreach (string scenarioKey in splitInheritedScenarios)
+			{
+				if (!scenarioIdToIndexMap.TryGetValue(scenarioKey, out uint foundScenarioIndex))
+				{
+					throw new InvalidOperationException(
+						$"Encountered a SigningScenario with the ID {signingScenario.ID} which inherits an invalid signing scenario: {scenarioKey}."
+					);
+				}
+				BodyWriter.Write(foundScenarioIndex);
+			}
+		}
+		else
+		{
+			BodyWriter.Write(0U);
+		}
+
+		if (signingScenario.MinimumHashAlgorithm != 0 && signingScenario.MinimumHashAlgorithm is not null)
+		{
+			BodyWriter.Write((uint)signingScenario.MinimumHashAlgorithm);
+		}
+		else
+		{
+			BodyWriter.Write(32780U);
+		}
+	}
+
+	/// <summary>
+	/// Serializes AllowedSigners to binary.
+	/// </summary>
+	private static void ConvertAllowedSignersToBinary(AllowedSigners? allowedSigners, Dictionary<string, uint> signerIdToIndexMap, Dictionary<string, uint> fileRuleIdToIndexMap, List<object>? fileRuleArray, BinaryWriter BodyWriter)
+	{
+		if (allowedSigners is null)
+		{
+			BodyWriter.Write(0U);
+			return;
+		}
+
+		BodyWriter.Write((uint)allowedSigners.AllowedSigner.Count);
+		for (uint signerIndex = 0; signerIndex < allowedSigners.AllowedSigner.Count; ++signerIndex)
+		{
+			AllowedSigner signer = allowedSigners.AllowedSigner[(int)signerIndex];
+			if (!signerIdToIndexMap.TryGetValue(signer.SignerId, out uint foundSignerIndex))
+			{
+				throw new InvalidOperationException(
+					string.Format(
+						Atlas.GetStr("AllowedSignersSignerIdNotFoundMessage"),
+						signer.SignerId,
+						signerIndex));
+			}
+
+			BodyWriter.Write(foundSignerIndex);
+
+			if (signer.ExceptDenyRule is not null)
+			{
+				// Only check if <FileRules> node exists if ExceptDenyRule is being used
+				// Otherwise it can be null and policy will be valid.
+				ArgumentNullException.ThrowIfNull(fileRuleArray);
+
+				BodyWriter.Write((uint)signer.ExceptDenyRule.Count);
+
+				for (uint denyRuleCounter = 0; denyRuleCounter < signer.ExceptDenyRule.Count; ++denyRuleCounter)
+				{
+					ExceptDenyRule exceptionRule = signer.ExceptDenyRule[(int)denyRuleCounter];
+					if (!fileRuleIdToIndexMap.TryGetValue(exceptionRule.DenyRuleID, out uint foundDenyRuleIndex))
+					{
+						throw new InvalidOperationException(
+							string.Format(
+								Atlas.GetStr("AllowedSignersDenyRuleNotFoundMessage"),
+								exceptionRule.DenyRuleID,
+								signer.SignerId,
+								denyRuleCounter));
+					}
+
+					if (fileRuleArray[(int)foundDenyRuleIndex] is not Deny)
+					{
+						throw new InvalidOperationException(
+							string.Format(
+								Atlas.GetStr("AllowedSignersExceptDenyRuleTypeInvalidMessage"),
+								foundDenyRuleIndex,
+								exceptionRule.DenyRuleID));
+					}
+
+					BodyWriter.Write(foundDenyRuleIndex);
+				}
+			}
+			else
+			{
+				BodyWriter.Write(0U);
+			}
+		}
+	}
+
+	/// <summary>
+	/// Serializes DeniedSigners to binary.
+	/// </summary>
+	private static void ConvertDeniedSignersToBinary(DeniedSigners? deniedSigners, Dictionary<string, uint> signerIdToIndexMap, Dictionary<string, uint> fileRuleIdToIndexMap, List<object>? fileRuleArray, BinaryWriter BodyWriter)
+	{
+		if (deniedSigners is null)
+		{
+			BodyWriter.Write(0U);
+			return;
+		}
+
+		BodyWriter.Write((uint)deniedSigners.DeniedSigner.Count);
+		// Using uint instead of byte so policies with more than 255 denied signers serialize correctly.
+		for (uint signerIndex = 0; signerIndex < deniedSigners.DeniedSigner.Count; ++signerIndex)
+		{
+			string currentSignerId = deniedSigners.DeniedSigner[(int)signerIndex].SignerId;
+			if (!signerIdToIndexMap.TryGetValue(currentSignerId, out uint foundSignerIndex))
+				throw new InvalidOperationException(
+					string.Format(
+						Atlas.GetStr("DeniedSignersSignerIdNotFoundMessage"),
+						currentSignerId,
+						signerIndex));
+
+			BodyWriter.Write(foundSignerIndex);
+
+			List<ExceptAllowRule>? exceptAllow = deniedSigners.DeniedSigner[(int)signerIndex].ExceptAllowRule;
+
+			if (exceptAllow is not null)
+			{
+				// Only check if <FileRules> node in the policy exists if ExceptAllowRule is being used,
+				// Otherwise it can be null and policy will be valid.
+				ArgumentNullException.ThrowIfNull(fileRuleArray);
+
+				BodyWriter.Write((uint)exceptAllow.Count);
+
+				for (uint allowRuleIndex = 0; allowRuleIndex < exceptAllow.Count; ++allowRuleIndex)
+				{
+					string currentAllowRuleId = exceptAllow[(int)allowRuleIndex].AllowRuleID;
+
+					if (!fileRuleIdToIndexMap.TryGetValue(currentAllowRuleId, out uint foundAllowRuleIndex))
+					{
+						throw new InvalidOperationException(
+							string.Format(
+								Atlas.GetStr("DeniedSignersExceptAllowRuleNotFoundMessage"),
+								currentAllowRuleId,
+								currentSignerId,
+								allowRuleIndex));
+					}
+
+					object referencedRule = fileRuleArray[(int)foundAllowRuleIndex];
+					if (referencedRule is not Allow)
+					{
+						string actualType = referencedRule?.GetType().Name ?? "null";
+						throw new InvalidOperationException(
+							string.Format(
+								Atlas.GetStr("DeniedSignersExceptAllowRuleTypeInvalidMessage"),
+								foundAllowRuleIndex,
+								currentAllowRuleId,
+								actualType));
+					}
+
+					BodyWriter.Write(foundAllowRuleIndex);
+				}
+			}
+			else
+			{
+				BodyWriter.Write(0U);
+			}
+		}
+	}
+
+	/// <summary>
+	/// Serializes secure settings to binary.
+	/// </summary>
+	private static void ConvertSecureSettingsToBinary(Setting[] secureSetting, BinaryWriter BodyWriter)
+	{
+		if (secureSetting.Length == 0)
+		{
+			BodyWriter.Write(0U);
+			return;
+		}
+
+		if (secureSetting.Length > ushort.MaxValue)
+		{
+			throw new InvalidOperationException(string.Format(Atlas.GetStr("SettingsAndAppIDTagsCountExceeded"), ushort.MaxValue));
+		}
+
+		BodyWriter.Write((uint)secureSetting.Length);
+		secureSetting.AsSpan().Sort(Helper.CompareSettingObjects);
+
+		for (uint index = 0; index < secureSetting.Length; ++index)
+		{
+			string key = secureSetting[(int)index].Key;
+			string provider = secureSetting[(int)index].Provider;
+			string valueName = secureSetting[(int)index].ValueName;
+
+			// Secure setting Provider, Key, and ValueName are part of the binary lookup key and cannot be empty.
+			if (string.IsNullOrEmpty(key) || string.IsNullOrEmpty(provider) || string.IsNullOrEmpty(valueName))
+			{
+				throw new InvalidOperationException("The secure setting Provider, Key, and ValueName values must all be non-empty.");
+			}
+
+			WriteOptionalStringValue(provider, BodyWriter);
+			WriteOptionalStringValue(key, BodyWriter);
+			WriteOptionalStringValue(valueName, BodyWriter);
+
+			object data = secureSetting[(int)index].Value.Item;
+
+			if (data is string v2)
+			{
+				BodyWriter.Write(3U);
+				WriteOptionalStringValue(v2, BodyWriter);
+			}
+			else if (data is bool v1)
+			{
+				BodyWriter.Write(0U);
+				BodyWriter.Write((uint)(v1 ? 1 : 0));
+			}
+			else if (data is uint v)
+			{
+				BodyWriter.Write(1U);
+				BodyWriter.Write(v);
+			}
+			else if (data is ReadOnlyMemory<byte> binaryValue)
+			{
+				BodyWriter.Write(2U);
+				WritePaddedCountedBytes(binaryValue, BodyWriter);
+			}
+			else
+			{
+				throw new InvalidOperationException(Atlas.GetStr("PolicySettingInvalidValueElementMessage"));
+			}
+		}
+	}
+
+	/// <summary>
+	/// Serializes required file rules to binary.
+	/// </summary>
+	private static void ConvertRequiredFileRulesToBinary(FileRulesRef? fileRulesRef, Dictionary<string, uint> fileRuleIdToIndexMap, BinaryWriter BodyWriter)
+	{
+		if (fileRulesRef is not null && fileRulesRef.FileRuleRef.Count != 0)
+		{
+			List<uint> fileRuleIndexes = new(fileRulesRef.FileRuleRef.Count);
+
+			BodyWriter.Write((uint)fileRulesRef.FileRuleRef.Count);
+
+			for (uint ruleIndex = 0; ruleIndex < fileRulesRef.FileRuleRef.Count; ++ruleIndex)
+			{
+				string currentRuleId = fileRulesRef.FileRuleRef[(int)ruleIndex].RuleID;
+				if (!fileRuleIdToIndexMap.TryGetValue(currentRuleId, out uint foundFileRuleIndex))
+				{
+					throw new InvalidOperationException($"Encountered an invalid file rule ID: {currentRuleId}");
+				}
+
+				fileRuleIndexes.Add(foundFileRuleIndex);
+			}
+
+			fileRuleIndexes.Sort();
+
+			foreach (uint fileRuleIndex in CollectionsMarshal.AsSpan(fileRuleIndexes))
+			{
+				BodyWriter.Write(fileRuleIndex);
+			}
+		}
+		else
+		{
+			BodyWriter.Write(0U);
+		}
+	}
+
+	/// <summary>
+	/// Writes artifact rule references as counted artifact rule indexes.
+	/// Scenario ArtifactRulesRef entries are sorted by index,
+	/// while Signer ArtifactRuleRef entries keep their original order because that section is written order-preserving.
+	/// </summary>
+	private static void WriteArtifactRuleIndexes(List<ArtifactRuleRef>? artifactRuleRefs, Dictionary<string, uint> artifactRuleIdToIndexMap, BinaryWriter BodyWriter, bool sortIndexes)
+	{
+		if (artifactRuleRefs is not null && artifactRuleRefs.Count != 0)
+		{
+			List<uint> artifactRuleIndexes = new(artifactRuleRefs.Count);
+			BodyWriter.Write((uint)artifactRuleRefs.Count);
+			for (int artifactRuleRefIndex = 0; artifactRuleRefIndex < artifactRuleRefs.Count; ++artifactRuleRefIndex)
+			{
+				string currentRuleId = artifactRuleRefs[artifactRuleRefIndex].RuleID;
+				if (!artifactRuleIdToIndexMap.TryGetValue(currentRuleId, out uint foundArtifactRuleIndex))
+					throw new InvalidOperationException($"Encountered an invalid artifact rule ID: {currentRuleId}");
+
+				artifactRuleIndexes.Add(foundArtifactRuleIndex);
+			}
+
+			if (sortIndexes)
+			{
+				artifactRuleIndexes.Sort();
+			}
+
+			foreach (uint artifactRuleIndex in CollectionsMarshal.AsSpan(artifactRuleIndexes))
+			{
+				BodyWriter.Write(artifactRuleIndex);
+			}
+		}
+		else
+		{
+			BodyWriter.Write(0U);
+		}
+	}
+
+	/// <summary>
+	/// Writes app settings as binary.
+	/// </summary>
+	private static void WriteStringSetAppSetting(AppSetting? setting, BinaryWriter BodyWriter)
+	{
+		const byte Tag = 4;
+
+		BodyWriter.Write(Tag);
+
+		List<string> values = setting switch
+		{
+			{ Value: List<string> list } => list,
+			{ Value: null } => [],
+			null => []
+		};
+
+		BodyWriter.Write((uint)values.Count);
+
+		foreach (string rawValue in CollectionsMarshal.AsSpan(values))
+		{
+			WriteOptionalStringValue(rawValue, BodyWriter);
+		}
+	}
+
+	private static void WriteBooleanAppSetting(AppSetting? setting, BinaryWriter BodyWriter)
+	{
+		const byte Tag = 0;
+
+		BodyWriter.Write(Tag);
+
+		byte valueByte = setting switch
+		{
+			null => Tag,
+			{ Value: [string rawValue] } => bool.Parse(rawValue) ? (byte)1 : (byte)0,
+			_ => throw new InvalidOperationException(
+				Atlas.GetStr("BoolAppSettingMultipleValuesError"))
+		};
+
+		BodyWriter.Write(valueByte);
+	}
+
+	private static void WriteStringAppSetting(AppSetting? setting, BinaryWriter BodyWriter)
+	{
+		const byte Tag = 3;
+
+		BodyWriter.Write(Tag);
+
+		string? rawValue = setting switch
+		{
+			null => null,
+			{ Value: [string single] } => single,
+			_ => throw new InvalidOperationException(
+				Atlas.GetStr("StringAppSettingMultipleValuesError"))
+		};
+
+		WriteOptionalStringValue(rawValue, BodyWriter);
+	}
+
+	/// <summary>
+	/// Writes application settings region to binary.
+	/// </summary>
+	private static void WriteAppSettings(AppSettingRegion? appSettingsRegion, BinaryWriter BodyWriter)
+	{
+		if (appSettingsRegion is not { App.Count: > 0 })
+		{
+			BodyWriter.Write(0U);
+			return;
+		}
+
+		BodyWriter.Write((uint)appSettingsRegion.App.Count);
+
+		foreach (AppRoot appRootItem in CollectionsMarshal.AsSpan(appSettingsRegion.App))
+		{
+			AppManifest applicationManifest = Helper.RetrieveApplicationManifest(new(appRootItem.Manifest));
+
+			if (appRootItem.Setting is not null)
+			{
+				List<AppSetting> missingSettings = appRootItem.Setting.Where(appSetting =>
+					!applicationManifest.SettingDefinition
+					.Any(def => string.Equals(def.Name, appSetting.Name, StringComparison.OrdinalIgnoreCase)))
+					.ToList();
+
+				if (missingSettings.Count > 0)
+				{
+					string missingDefinitions = string.Join(',', missingSettings.Select(s => s.Name));
+
+					throw new InvalidOperationException(
+						string.Format(
+							Atlas.GetStr("AppSettingsMissingDefinitionsMessage"),
+							missingDefinitions));
+				}
+			}
+
+			WriteOptionalStringValue(applicationManifest.Id, BodyWriter);
+
+			BodyWriter.Write((uint)applicationManifest.SettingDefinition.Count);
+
+			foreach (SettingDefinition currentDefinitionInLoop in CollectionsMarshal.AsSpan(applicationManifest.SettingDefinition))
+			{
+				AppSetting? foundSetting = appRootItem.Setting?
+					.FirstOrDefault(policySetting =>
+						string.Equals(policySetting.Name, currentDefinitionInLoop.Name, StringComparison.OrdinalIgnoreCase));
+
+				WriteOptionalStringValue(currentDefinitionInLoop.Name, BodyWriter);
+
+				switch (currentDefinitionInLoop.Type)
+				{
+					case SettingType.Bool:
+						WriteBooleanAppSetting(foundSetting, BodyWriter);
+						break;
+					case SettingType.StringList:
+						WriteStringAppSetting(foundSetting, BodyWriter);
+						break;
+					case SettingType.StringSet:
+						WriteStringSetAppSetting(foundSetting, BodyWriter);
+						break;
+					default:
+						throw new InvalidOperationException(
+							string.Format(
+								Atlas.GetStr("AppSettingsUnknownSettingTypeMessage"),
+								currentDefinitionInLoop.Type));
+				}
+
+				uint auditFlag = 0;
+				if (currentDefinitionInLoop.IgnoreAuditPolicies)
+				{
+					auditFlag |= 1U;
+				}
+
+				BodyWriter.Write(auditFlag);
+			}
+		}
+	}
+
+	/// <summary>
+	/// Writes HotPatch (Allow rule relationships) to binary.
+	/// </summary>
+	private static void WriteHotpatchSettings(Dictionary<string, uint> fileRuleIdToIndexMap, List<object>? fileRules, BinaryWriter BodyWriter)
+	{
+		if (fileRules is null || fileRules.Count == 0)
+		{
+			BodyWriter.Write(0U);
+			return;
+		}
+
+		// Collect hotpatch relationships
+		// (BaseImageAllowID, HotpatchImageAllowID, MinSequenceNumber, MaxSequenceNumber)
+		List<(uint BaseIdx, uint TargetIdx, uint Min, uint Max)> requiredAllowRules = [];
+
+		for (int baseIndex = 0; baseIndex < fileRules.Count; baseIndex++)
+		{
+			if (fileRules[baseIndex] is Allow baseAllow && !string.IsNullOrEmpty(baseAllow.RequireHotpatchID))
+			{
+				// Must resolve the ID of the hotpatch base rule
+				if (!fileRuleIdToIndexMap.TryGetValue(baseAllow.RequireHotpatchID, out uint targetIndex))
+				{
+					throw new InvalidOperationException(
+						$"RequireHotpatchID '{baseAllow.RequireHotpatchID}' referenced by Allow rule '{baseAllow.ID}' was not found.");
+				}
+
+				// The target must also be an Allow rule
+				if (fileRules[(int)targetIndex] is not Allow targetAllow)
+				{
+					throw new InvalidOperationException(
+						$"RequireHotpatchID '{baseAllow.RequireHotpatchID}' must reference an Allow rule.");
+				}
+
+				// Self reference check
+				if (baseIndex == targetIndex)
+				{
+					throw new InvalidOperationException(
+						$"Allow rule '{baseAllow.ID}' cannot reference itself in RequireHotpatchID.");
+				}
+
+				// Chain check: The target cannot itself require a hotpatch
+				if (!string.IsNullOrEmpty(targetAllow.RequireHotpatchID))
+				{
+					throw new InvalidOperationException(
+						$"RequireHotpatchID chain detected. The allow rule {baseAllow.ID} references rule {targetAllow.ID} which itself references rule {targetAllow.RequireHotpatchID}.");
+				}
+
+				uint minSeq = targetAllow.MinimumHotpatchSequence ?? 0;
+				uint maxSeq = targetAllow.MaximumHotpatchSequence ?? uint.MaxValue;
+
+				requiredAllowRules.Add(((uint)baseIndex, targetIndex, minSeq, maxSeq));
+			}
+		}
+
+		BodyWriter.Write((uint)requiredAllowRules.Count);
+
+		foreach ((uint BaseIdx, uint TargetIdx, uint Min, uint Max) in CollectionsMarshal.AsSpan(requiredAllowRules))
+		{
+			BodyWriter.Write(BaseIdx);
+			BodyWriter.Write(TargetIdx);
+			BodyWriter.Write(Min);
+			BodyWriter.Write(Max);
+		}
+	}
+
+	internal static void ConvertPolicyToBinary(SiPolicy policyData, Stream outputStream)
+	{
+		// Create a list to hold secure settings that will be written to the policy body
+		List<Setting> secureSettingsList = [];
+
+		// Create a list to hold CI signers projected from Signers when none are provided explicitly
+		List<CiSigner> convertedCiSignerList = [];
+
+		// Use Unicode (UTF-16 little endian) encoding without a byte order mark
+		UnicodeEncoding encoding = new(false, false);
+
+		// Allocate a memory stream for writing the policy body before prepending header data
+		using MemoryStream bodyMemoryStream = new();
+
+		// Initialize writers: BodyWriter writes to the memory stream, HeaderWriter writes to the output stream
+		using BinaryWriter BodyWriter = new(bodyMemoryStream, encoding);
+		using BinaryWriter HeaderWriter = new(outputStream, encoding, true);
+
+		try
+		{
+			// Prepare dictionaries to map object IDs to their index positions in arrays
+			Dictionary<string, uint> ekuIdToIndexMap = [];
+			Dictionary<string, uint> fileRuleIdToIndexMap = [];
+			Dictionary<string, uint> signerIdToIndexMap = [];
+			Dictionary<string, uint> scenarioIdToIndexMap = [];
+			Dictionary<string, uint> artifactRuleIdToIndexMap = [];
+			Dictionary<string, string> macroIdToValueMap = [];
+
+			// Write a fixed header version (11)
+			// This is the version of the binary/policy
+			HeaderWriter.Write(11U);
+
+			// Ensure PolicyTypeID matches BasePolicyID for binary serialization
+			policyData.PolicyTypeID = policyData.BasePolicyID;
+
+			// Write the policy type GUID
+			Guid policyTypeGuidValue = new(policyData.PolicyTypeID);
+			{
+				// Get a consistent 16-byte representation on all endians
+				ReadOnlySpan<byte> span = policyTypeGuidValue.ToByteArray();
+				HeaderWriter.Write(span);
+			}
+
+			// Write the platform GUID, or an empty GUID if none specified
+			Guid platformGuidValue = !string.IsNullOrEmpty(policyData.PlatformID)
+				? new Guid(policyData.PlatformID)
+				: new Guid();
+			{
+				// Get a consistent 16-byte representation on all endians
+				ReadOnlySpan<byte> span = platformGuidValue.ToByteArray();
+				HeaderWriter.Write(span);
+			}
+
+			// Compute base option flags based on policyData properties
+			uint policyOptionFlags = Helper.ComputeOptionFlags(policyData);
+
+			// If this is an AppID tagging policy, add default secure setting and specific flags
+			if (policyData.PolicyType is PolicyType.AppIDTaggingPolicy)
+			{
+				secureSettingsList.Add(new Setting
+				(
+					provider: "WDACAppId",
+					key: "TaggingSettings",
+					valueName: "DefaultPolicy",
+					value: new SettingValueType(item: true)
+				));
+
+				policyOptionFlags |= (uint)OptionType.EnabledAuditMode;
+				policyOptionFlags |= (uint)OptionType.EnabledUMCI;
+				policyOptionFlags |= (uint)OptionType.RequiredEnforceStoreApplications;
+				policyOptionFlags |= (uint)OptionType.EnabledAdvancedBootOptionsMenu;
+				policyOptionFlags |= (uint)OptionType.DisabledScriptEnforcement;
+			}
+
+			// Always set the high-order bit to indicate a signed policy
+			policyOptionFlags |= 0x80000000;
+
+			// If supplemental, set the supplemental-policy flag bit
+			if (policyData.PolicyType is PolicyType.SupplementalPolicy)
+			{
+				policyOptionFlags |= 0x40000000;
+			}
+
+			// Direct SiPolicy callers can bypass XML deserialization, so enforce the same policy-level constraints here before writing binary.
+			bool unsignedPolicy = (policyOptionFlags & (uint)OptionType.EnabledUnsignedSystemIntegrityPolicy) != 0;
+			bool allowSupplementalPolicies = policyData.Rules.Any(static rule => rule.Item == OptionType.EnabledAllowSupplementalPolicies);
+			if (!unsignedPolicy && (policyData.UpdatePolicySigners is null || policyData.UpdatePolicySigners.Count == 0))
+			{
+				throw new InvalidOperationException(string.Format(Atlas.GetStr("PolicyNeedsSigningButNoUpdateSigner"), OptionType.EnabledUnsignedSystemIntegrityPolicy));
+			}
+			if (policyData.PolicyType is PolicyType.SupplementalPolicy)
+			{
+				if (allowSupplementalPolicies)
+				{
+					throw new InvalidOperationException(string.Format(Atlas.GetStr("SupplementalPolicyWithInvalidRuleOption"), PolicyType.SupplementalPolicy, OptionType.EnabledAllowSupplementalPolicies, PolicyType.BasePolicy));
+				}
+				if (policyData.SupplementalPolicySigners is { Count: > 0 })
+				{
+					throw new InvalidOperationException(string.Format(Atlas.GetStr("SupplementalPolicyWithSupplementalSigners"), PolicyType.SupplementalPolicy));
+				}
+			}
+			if (policyData.PolicyType is PolicyType.BasePolicy && !unsignedPolicy && allowSupplementalPolicies && (policyData.SupplementalPolicySigners is null || policyData.SupplementalPolicySigners.Count == 0) && !string.Equals(policyData.PolicyID, "{5951A96A-E0B5-4D3D-8FB8-3E5B61030784}", StringComparison.OrdinalIgnoreCase))
+			{
+				throw new InvalidOperationException(Atlas.GetStr("MissingSupPolSignersValidationError"));
+			}
+			// Write the compiled option flags
+			HeaderWriter.Write(policyOptionFlags);
+
+			// Write counts of lists (0 if null)
+			HeaderWriter.Write((uint)(policyData.EKUs?.Count ?? 0));
+			HeaderWriter.Write((uint)(policyData.FileRules?.Count ?? 0));
+			HeaderWriter.Write((uint)(policyData.Signers?.Count ?? 0));
+			HeaderWriter.Write((uint)(policyData.SigningScenarios?.Count ?? 0));
+
+			// Collect macros into a lookup for later use in substitutions
+			foreach (MacrosMacro macro in CollectionsMarshal.AsSpan(policyData.Macros))
+			{
+				macroIdToValueMap.Add(macro.Id, macro.Value);
+			}
+
+			// Convert the string version to a 64-bit number, then split into two 32-bit parts
+			ulong parsedVersionNumber = Helper.ConvertStringVersionToUInt64(policyData.VersionEx);
+			HeaderWriter.Write((uint)(parsedVersionNumber & uint.MaxValue));    // low 32 bits
+			HeaderWriter.Write((uint)(parsedVersionNumber >> 32));              // high 32 bits
+
+			// Record where the native writer places the policy body offset field.
+			// The offset field is physically stored as the first DWORD of the body region.
+			int headerPosition = (int)HeaderWriter.BaseStream.Position;
+
+			// Reserve the first DWORD of the body region. It is temporarily used for body size while composing,
+			// and is overwritten with the body offset after the body is appended to the output stream.
+			BodyWriter.Write(0U);
+
+			// Pre-calculate scenario values if scenarios exist
+			if (policyData.SigningScenarios is not null)
+			{
+				uint[] scenarioIndexToValue = new uint[policyData.SigningScenarios.Count];
+				Helper.CalculateScenarioValueArray(policyData, ref scenarioIndexToValue);
+			}
+
+			// Process each EKU: map its ID to an index, then write its byte value blob
+			if (policyData.EKUs is not null)
+			{
+				for (uint ruleIndex = 0; ruleIndex < policyData.EKUs.Count; ++ruleIndex)
+				{
+					ekuIdToIndexMap.Add(policyData.EKUs[(int)ruleIndex].ID, ruleIndex);
+				}
+				foreach (EKU eku in CollectionsMarshal.AsSpan(policyData.EKUs))
+				{
+					WritePaddedCountedBytes(eku.Value, BodyWriter);
+				}
+			}
+
+			// Process file rules: adapt generic rules, sort them, map IDs, then serialize each
+			if (policyData.FileRules is not null)
+			{
+				for (uint ruleIndex = 0; ruleIndex < policyData.FileRules.Count; ++ruleIndex)
+				{
+					if (policyData.FileRules[(int)ruleIndex] is FileRule genericFileRule)
+					{
+						policyData.FileRules[(int)ruleIndex] = Helper.AdaptGenericFileRule(genericFileRule);
+					}
+				}
+				policyData.FileRules.Sort(Helper.CompareFileRuleObjects);
+				for (uint ruleIndex = 0; ruleIndex < policyData.FileRules.Count; ++ruleIndex)
+				{
+					ConvertFileRuleToBinary(ref fileRuleIdToIndexMap, policyData.FileRules[(int)ruleIndex], ruleIndex, BodyWriter);
+				}
+			}
+
+			// Map signer IDs to indices for later reference
+			if (policyData.Signers is not null)
+			{
+				for (uint ruleIndex = 0; ruleIndex < policyData.Signers.Count; ++ruleIndex)
+				{
+					signerIdToIndexMap.Add(policyData.Signers[(int)ruleIndex].ID, ruleIndex);
+				}
+			}
+
+			// Map scenario IDs to indices
+			if (policyData.SigningScenarios is not null)
+			{
+				for (uint ruleIndex = 0; ruleIndex < policyData.SigningScenarios.Count; ++ruleIndex)
+				{
+					scenarioIdToIndexMap.Add(policyData.SigningScenarios[(int)ruleIndex].ID, ruleIndex);
+				}
+			}
+
+			if (policyData.ArtifactRules is not null)
+			{
+				// Sorting artifact rules before assigning binary indexes.
+				// The binary format stores references as numeric indexes, so the ordering must be deterministic.
+				policyData.ArtifactRules.Sort(static (left, right) =>
+				{
+					int result = left.Action.CompareTo(right.Action);
+					if (result != 0) return result;
+					result = left.ArtifactType.CompareTo(right.ArtifactType);
+					if (result != 0) return result;
+					result = string.Compare(left.ArtifactName, right.ArtifactName, StringComparison.OrdinalIgnoreCase);
+					if (result != 0) return result;
+					result = string.Compare(left.ArtifactDescription, right.ArtifactDescription, StringComparison.OrdinalIgnoreCase);
+					if (result != 0) return result;
+					result = string.Compare(left.MinimumVersion, right.MinimumVersion, StringComparison.OrdinalIgnoreCase);
+					if (result != 0) return result;
+					result = string.Compare(left.MaximumVersion, right.MaximumVersion, StringComparison.OrdinalIgnoreCase);
+					if (result != 0) return result;
+
+					digestType? leftHash = left.ArtifactHash?.Hash;
+					digestType? rightHash = right.ArtifactHash?.Hash;
+					if (leftHash is null && rightHash is null) return 0;
+					if (leftHash is null) return -1;
+					if (rightHash is null) return 1;
+					result = leftHash.ItemElementName.CompareTo(rightHash.ItemElementName);
+					if (result != 0) return result;
+					return leftHash.Item.Span.SequenceCompareTo(rightHash.Item.Span);
+				});
+				for (uint ruleIndex = 0; ruleIndex < policyData.ArtifactRules.Count; ++ruleIndex)
+				{
+					artifactRuleIdToIndexMap.Add(policyData.ArtifactRules[(int)ruleIndex].ID, ruleIndex);
+				}
+			}
+
+			// Serialize each signer, projecting CI signers if needed for AppID policies
+			if (policyData.Signers is not null)
+			{
+				foreach (Signer signer in CollectionsMarshal.AsSpan(policyData.Signers))
+				{
+					ConvertSignerToBinary(signer, ekuIdToIndexMap, fileRuleIdToIndexMap, policyData.FileRules, BodyWriter);
+					if (policyData.PolicyType is PolicyType.AppIDTaggingPolicy
+						&& (policyData.CiSigners is null || policyData.CiSigners.Count == 0))
+					{
+						convertedCiSignerList.Add(new CiSigner(signerID: signer.ID));
+					}
+				}
+			}
+
+			// Write UpdatePolicySigners count and each reference, or zero if none
+			if (policyData.UpdatePolicySigners is not null && policyData.UpdatePolicySigners.Count != 0)
+			{
+				BodyWriter.Write((uint)policyData.UpdatePolicySigners.Count);
+				foreach (UpdatePolicySigner updateSignerRef in CollectionsMarshal.AsSpan(policyData.UpdatePolicySigners))
+				{
+					if (!signerIdToIndexMap.TryGetValue(updateSignerRef.SignerId, out uint signerIndex))
+					{
+						throw new InvalidOperationException($"Encountered an invalid signer ID {updateSignerRef.SignerId}.");
+					}
+
+					BodyWriter.Write(signerIndex);
+				}
+			}
+			else
+			{
+				BodyWriter.Write(0U);
+			}
+
+			// Write CI signers: explicit list if provided; otherwise use projected list; otherwise zero
+			if (policyData.CiSigners is not null && policyData.CiSigners.Count != 0)
+			{
+				BodyWriter.Write((uint)policyData.CiSigners.Count);
+				foreach (CiSigner ciSignerRef in CollectionsMarshal.AsSpan(policyData.CiSigners))
+				{
+					if (!signerIdToIndexMap.TryGetValue(ciSignerRef.SignerId, out uint signerIndex))
+					{
+						throw new InvalidOperationException($"Encountered an invalid signer ID {ciSignerRef.SignerId}.");
+					}
+
+					BodyWriter.Write(signerIndex);
+				}
+			}
+			else if (convertedCiSignerList.Count != 0)
+			{
+				BodyWriter.Write((uint)convertedCiSignerList.Count);
+				foreach (CiSigner ciSigner in CollectionsMarshal.AsSpan(convertedCiSignerList))
+				{
+					if (!signerIdToIndexMap.TryGetValue(ciSigner.SignerId, out uint signerIndex))
+					{
+						throw new InvalidOperationException($"Encountered an invalid signer ID {ciSigner.SignerId}.");
+					}
+
+					BodyWriter.Write(signerIndex);
+				}
+			}
+			else
+			{
+				BodyWriter.Write(0U);
+			}
+
+			// Serialize each signing scenario along with allowed/denied signers and file rules
+			if (policyData.SigningScenarios is not null)
+			{
+				foreach (SigningScenario scenario in CollectionsMarshal.AsSpan(policyData.SigningScenarios))
+				{
+					if (policyData.PolicyType is PolicyType.AppIDTaggingPolicy)
+					{
+						// AppID tagging policies are UMCI-only.
+						// They must also carry AppIDTags in that UMCI scenario so the tags can be emitted as secure settings.
+						if (scenario.Value != 12)
+						{
+							throw new InvalidOperationException(string.Format(Atlas.GetStr("AppIDTaggingPolicyInvalidSigningScenarioID"), PolicyType.AppIDTaggingPolicy, scenario.Value));
+						}
+						if (scenario.AppIDTags?.AppIDTag is not { Count: > 0 })
+						{
+							throw new InvalidOperationException(string.Format(Atlas.GetStr("AppIDTaggingPolicyMissingAppIDTags"), PolicyType.AppIDTaggingPolicy));
+						}
+					}
+
+					ConvertScenarioToBinary(scenario, scenarioIdToIndexMap, BodyWriter);
+
+					// ProductSigners: allowed, denied, required file rules (or zeros if null)
+					ConvertAllowedSignersToBinary(scenario.ProductSigners.AllowedSigners, signerIdToIndexMap, fileRuleIdToIndexMap, policyData.FileRules, BodyWriter);
+					ConvertDeniedSignersToBinary(scenario.ProductSigners.DeniedSigners, signerIdToIndexMap, fileRuleIdToIndexMap, policyData.FileRules, BodyWriter);
+					ConvertRequiredFileRulesToBinary(scenario.ProductSigners.FileRulesRef, fileRuleIdToIndexMap, BodyWriter);
+
+					// TestSigners: allowed, denied, required file rules (or zeros if null)
+					if (scenario.TestSigners is null)
+					{
+						BodyWriter.Write(0U);
+						BodyWriter.Write(0U);
+						BodyWriter.Write(0U);
+					}
+					else
+					{
+						ConvertAllowedSignersToBinary(scenario.TestSigners.AllowedSigners, signerIdToIndexMap, fileRuleIdToIndexMap, policyData.FileRules, BodyWriter);
+						ConvertDeniedSignersToBinary(scenario.TestSigners.DeniedSigners, signerIdToIndexMap, fileRuleIdToIndexMap, policyData.FileRules, BodyWriter);
+						ConvertRequiredFileRulesToBinary(scenario.TestSigners.FileRulesRef, fileRuleIdToIndexMap, BodyWriter);
+					}
+
+					// TestSigningSigners: allowed, denied, required file rules (or zeros if null)
+					if (scenario.TestSigningSigners is null)
+					{
+						BodyWriter.Write(0U);
+						BodyWriter.Write(0U);
+						BodyWriter.Write(0U);
+					}
+					else
+					{
+						ConvertAllowedSignersToBinary(scenario.TestSigningSigners.AllowedSigners, signerIdToIndexMap, fileRuleIdToIndexMap, policyData.FileRules, BodyWriter);
+						ConvertDeniedSignersToBinary(scenario.TestSigningSigners.DeniedSigners, signerIdToIndexMap, fileRuleIdToIndexMap, policyData.FileRules, BodyWriter);
+						ConvertRequiredFileRulesToBinary(scenario.TestSigningSigners.FileRulesRef, fileRuleIdToIndexMap, BodyWriter);
+					}
+
+					// Map AppID tags to secure settings
+					if (scenario.AppIDTags is not null)
+					{
+						secureSettingsList.AddRange(Helper.MapAppIdTagsToSecureSettings(scenario.AppIDTags));
+					}
+				}
+			}
+
+			// Write Hypervisor Code Integrity options flags
+			BodyWriter.Write(policyData.HvciOptions ?? 0);
+
+			// Append explicit policy settings to secureSettingsList
+			if (policyData.Settings is not null && policyData.Settings.Count != 0)
+			{
+				secureSettingsList.AddRange(policyData.Settings);
+			}
+
+			// Append settings derived from rules
+			Helper.AppendSettingFromRule(secureSettingsList, policyData);
+
+			// Convert all secure settings to binary and write them
+			ConvertSecureSettingsToBinary(secureSettingsList.ToArray(), BodyWriter);
+
+			// Section marker 3: write App IDs and max file version metadata
+			BodyWriter.Write(3U);
+			if (policyData.FileRules is not null)
+			{
+				foreach (object fileRule in CollectionsMarshal.AsSpan(policyData.FileRules))
+				{
+					WriteAppIdsAndMaxFileVersion(ref macroIdToValueMap, fileRule, BodyWriter);
+				}
+			}
+
+			// Write signing timestamps (or zero if not set)
+			if (policyData.Signers is not null)
+			{
+				foreach (Signer signer in CollectionsMarshal.AsSpan(policyData.Signers))
+				{
+					if (signer.SignTimeAfter is { } dt && dt != DateTime.MinValue)
+					{
+						BodyWriter.Write(dt.ToFileTime());
+					}
+					else
+					{
+						BodyWriter.Write(0L);
+					}
+				}
+			}
+
+			// Section marker 4: write file metadata for each rule
+			BodyWriter.Write(4U);
+			if (policyData.FileRules is not null)
+			{
+				foreach (object fileRule in CollectionsMarshal.AsSpan(policyData.FileRules))
+				{
+					WriteFileMetadata(fileRule, BodyWriter);
+				}
+			}
+
+			// Section marker 5: write package information for each file rule
+			BodyWriter.Write(5U);
+			if (policyData.FileRules is not null)
+			{
+				foreach (object fileRule in CollectionsMarshal.AsSpan(policyData.FileRules))
+				{
+					WritePackageInfo(fileRule, BodyWriter);
+				}
+			}
+
+			// Section marker 6: write the policy and base policy GUIDs
+			BodyWriter.Write(6U);
+
+			Guid policyIdGuid = new(policyData.PolicyID);
+			{
+				// Get a consistent 16-byte representation on all endians
+				ReadOnlySpan<byte> span = policyIdGuid.ToByteArray();
+				BodyWriter.Write(span);
+			}
+
+			Guid basePolicyIdGuid = new(policyData.BasePolicyID);
+			{
+				// Get a consistent 16-byte representation on all endians
+				ReadOnlySpan<byte> span = basePolicyIdGuid.ToByteArray();
+				BodyWriter.Write(span);
+			}
+
+			// Supplemental policy signers: write count and indices or zero if none
+			if (policyData.SupplementalPolicySigners is not null && policyData.SupplementalPolicySigners.Count != 0)
+			{
+				BodyWriter.Write((uint)policyData.SupplementalPolicySigners.Count);
+				foreach (SupplementalPolicySigner supSignerRef in CollectionsMarshal.AsSpan(policyData.SupplementalPolicySigners))
+				{
+					if (!signerIdToIndexMap.TryGetValue(supSignerRef.SignerId, out uint signerIndex))
+					{
+						throw new InvalidOperationException($"Encountered an invalid signer ID {supSignerRef.SignerId}.");
+					}
+
+					BodyWriter.Write(signerIndex);
+				}
+			}
+			else
+			{
+				BodyWriter.Write(0U);
+			}
+
+			// Section marker 7: write file paths for each rule
+			BodyWriter.Write(7U);
+			if (policyData.FileRules is not null)
+			{
+				foreach (object fileRule in CollectionsMarshal.AsSpan(policyData.FileRules))
+				{
+					WriteFilePath(fileRule, BodyWriter);
+				}
+			}
+
+			// Section marker 8: write application-specific settings
+			BodyWriter.Write(8U);
+			WriteAppSettings(policyData.AppSettings, BodyWriter);
+
+			// Section marker 9: write Hotpatch settings
+			BodyWriter.Write(9U);
+			WriteHotpatchSettings(fileRuleIdToIndexMap, policyData.FileRules, BodyWriter);
+
+			// Section marker 10: write artifact rules, signer artifact references and scenario artifact signers.
+			BodyWriter.Write(10U);
+			BodyWriter.Write((uint)(policyData.ArtifactRules?.Count ?? 0));
+			if (policyData.ArtifactRules is not null)
+			{
+				foreach (ArtifactRule artifactRule in CollectionsMarshal.AsSpan(policyData.ArtifactRules))
+				{
+					if (string.IsNullOrEmpty(artifactRule.ID))
+					{
+						throw new InvalidOperationException("The ArtifactRule has an empty ID, making it invalid.");
+					}
+					ulong minimumVersionNumber = Helper.ConvertStringVersionToUInt64(artifactRule.MinimumVersion);
+					ulong maximumVersionNumber = artifactRule.MaximumVersion is not null
+						? Helper.ConvertStringVersionToUInt64(artifactRule.MaximumVersion)
+						: Helper.ConvertStringVersionToUInt64(Atlas.DefaultMaxVersion);
+					if (maximumVersionNumber < minimumVersionNumber)
+					{
+						throw new InvalidOperationException($"For artifact rule {artifactRule.ID}, the minimum version {artifactRule.MinimumVersion} is greater than the maximum version {artifactRule.MaximumVersion}.");
+					}
+					if (artifactRule.ArtifactHash is not null && (artifactRule.ArtifactHash.Hash is null || artifactRule.ArtifactHash.Hash.Item.IsEmpty))
+					{
+						// A present ArtifactHash container must contain a real hash. Otherwise it would serialize as an invalid empty hash block.
+						throw new InvalidOperationException($"The ArtifactRule with the ID {artifactRule.ID} has an empty ArtifactHash.");
+					}
+
+					BodyWriter.Write((uint)artifactRule.ArtifactType);
+					BodyWriter.Write((uint)artifactRule.Action);
+					WriteOptionalStringValue(artifactRule.ArtifactName, BodyWriter);
+					WriteOptionalStringValue(artifactRule.ArtifactDescription, BodyWriter);
+					BodyWriter.Write(minimumVersionNumber);
+					BodyWriter.Write(maximumVersionNumber);
+					WritePaddedCountedBytes(artifactRule.ArtifactHash?.Hash.Item ?? ReadOnlyMemory<byte>.Empty, BodyWriter);
+				}
+			}
+
+			uint artifactSignerReferenceCount = 0;
+			if (policyData.Signers is not null)
+			{
+				foreach (Signer signer in CollectionsMarshal.AsSpan(policyData.Signers))
+				{
+					if (signer.ArtifactRuleRef is { Count: > 0 })
+						artifactSignerReferenceCount++;
+				}
+			}
+			BodyWriter.Write(artifactSignerReferenceCount);
+			if (policyData.Signers is not null)
+			{
+				for (uint signerIndex = 0; signerIndex < policyData.Signers.Count; ++signerIndex)
+				{
+					Signer signer = policyData.Signers[(int)signerIndex];
+					if (signer.ArtifactRuleRef is { Count: > 0 })
+					{
+						BodyWriter.Write(signerIndex);
+						WriteArtifactRuleIndexes(signer.ArtifactRuleRef, artifactRuleIdToIndexMap, BodyWriter, sortIndexes: false);
+					}
+				}
+			}
+
+			if (policyData.SigningScenarios is not null)
+			{
+				foreach (SigningScenario scenario in CollectionsMarshal.AsSpan(policyData.SigningScenarios))
+				{
+					ConvertAllowedSignersToBinary(scenario.ArtifactSigners?.AllowedSigners, signerIdToIndexMap, fileRuleIdToIndexMap, policyData.FileRules, BodyWriter);
+					ConvertDeniedSignersToBinary(scenario.ArtifactSigners?.DeniedSigners, signerIdToIndexMap, fileRuleIdToIndexMap, policyData.FileRules, BodyWriter);
+					WriteArtifactRuleIndexes(scenario.ArtifactSigners?.ArtifactRulesRef?.ArtifactRuleRef, artifactRuleIdToIndexMap, BodyWriter, sortIndexes: true);
+				}
+			}
+
+			// Section marker 11: write CertEKU conditions.
+			BodyWriter.Write(11U);
+			uint signerCertEkuConditionCount = 0;
+			if (policyData.Signers is not null)
+			{
+				foreach (Signer signer in CollectionsMarshal.AsSpan(policyData.Signers))
+				{
+					if (signer.CertEKU is not null)
+					{
+						foreach (CertEKU certEKU in CollectionsMarshal.AsSpan(signer.CertEKU))
+						{
+							if (certEKU.Condition is not null)
+							{
+								signerCertEkuConditionCount++;
+								break;
+							}
+						}
+					}
+				}
+			}
+			BodyWriter.Write(signerCertEkuConditionCount);
+			if (policyData.Signers is not null)
+			{
+				for (uint signerIndex = 0; signerIndex < policyData.Signers.Count; ++signerIndex)
+				{
+					Signer signer = policyData.Signers[(int)signerIndex];
+					if (signer.CertEKU is null)
+						continue;
+
+					uint conditionedEkuCount = 0;
+					foreach (CertEKU certEKU in CollectionsMarshal.AsSpan(signer.CertEKU))
+					{
+						if (certEKU.Condition is not null)
+							conditionedEkuCount++;
+					}
+					if (conditionedEkuCount == 0)
+						continue;
+
+					BodyWriter.Write(signerIndex);
+					BodyWriter.Write(conditionedEkuCount);
+					foreach (CertEKU certEKU in CollectionsMarshal.AsSpan(signer.CertEKU))
+					{
+						if (certEKU.Condition is null)
+							continue;
+						if (certEKU.Condition is not CertEKUConditionType.Except)
+							throw new InvalidOperationException($"Unsupported CertEKU condition: {certEKU.Condition}");
+						if (!ekuIdToIndexMap.TryGetValue(certEKU.ID, out uint foundEkuIndex))
+							throw new InvalidOperationException(string.Format(Atlas.GetStr("SignerCertEkuReferenceError"), signer.ID, certEKU.ID));
+						BodyWriter.Write(foundEkuIndex);
+					}
+				}
+			}
+
+			// Section marker 12: end of sections
+			BodyWriter.Write(12U);
+
+			// Calculate and write the body data size while the body is still in memory.
+			uint bodyDataSize = (uint)bodyMemoryStream.Position - 4U;
+			_ = bodyMemoryStream.Seek(0L, SeekOrigin.Begin);
+			BodyWriter.Write(bodyDataSize);
+
+			// Write the body data to the output stream and record its offset.
+			long currentHeaderPosition = HeaderWriter.BaseStream.Position;
+			if (currentHeaderPosition > ushort.MaxValue)
+			{
+				throw new InvalidOperationException("The policy header offset exceeded the maximum value representable by the WDAC binary header.");
+			}
+			uint bodyDataOffset = (ushort)currentHeaderPosition;
+			bodyMemoryStream.WriteTo(outputStream);
+
+			// Go back to the offset field location and overwrite the first body DWORD with the body offset.
+			_ = HeaderWriter.BaseStream.Seek(headerPosition, SeekOrigin.Begin);
+			HeaderWriter.Write(bodyDataOffset);
+
+			// Move the header stream to its end to finalize the write
+			_ = HeaderWriter.BaseStream.Seek(0, SeekOrigin.End);
+		}
+		finally
+		{
+			// Ensure all streams and writers are properly closed
+			BodyWriter.Close();
+			HeaderWriter.Close();
+		}
+	}
+
+}
