@@ -9,12 +9,12 @@ study timing → calendar and check-ins → location and SMS.
 | # | Item | Status |
 |---|---|---|
 | A1 | Session/schedule core (DST, overrides, emergency, protection status, clock changes) | Done — 35 tests, Linux |
-| A2 | Cream & Ink tokens (light, dark, system) shared by all clients | In progress |
-| A3 | Wordmark with lock "o", padlock timer, paper and library assets as scalable SVG | In progress |
-| A4 | Web app shell: masthead, Focus, Schedule, Profiles, Devices, Settings | In progress |
-| A5 | Main flow configure → start → focus → break → resume → finish (web, local timing only) | In progress |
-| A6 | Rust ↔ TypeScript parity vectors for session timing (R13 fallback) | In progress |
-| A7 | Windows app shell in chosen stack (U11) with tray and close ≠ end | Next — needs U11 |
+| A2 | Cream & Ink tokens (light, dark, system) shared by all clients | Done (web); Android Compose theme next |
+| A3 | Wordmark with lock "o", padlock timer, paper and library assets, app/tray icon | Done |
+| A4 | Web app shell: masthead, Focus, Schedule, Profiles, Devices, Settings | Done (Chromium-tested) |
+| A5 | Main flow configure → start → focus → break → resume → finish (web, local timing only) | Done (Chromium-tested) |
+| A6 | Rust ↔ TypeScript parity vectors for session timing (R13 fallback) | Done (CI-enforced) |
+| A7 | Windows app: native shell + shared UI (R31) — title bar, tray menu, close-to-tray, single instance, offline bundled UI, bridge | In progress — implemented; CI build/launch test |
 | A8 | Android app shell (Compose) with bottom nav, insets, large fonts | Next |
 
 ## B. Enforcement and trust (M1 continues in parallel)
@@ -25,7 +25,7 @@ study timing → calendar and check-ins → location and SMS.
 | B3 | App Control compiler: match Microsoft's header version; VM deploy test | Next |
 | B4 | Windows privileged service + agent (ADR-0007), U1 | Later (after B2/B3) |
 | B5 | Website restriction per browser (extension approach) | Later |
-| B6 | Pairing, relay, heartbeats, offline execution (M5); web app connection (U12) | Next — needs U12 |
+| B6 | Pairing, relay, heartbeats, offline execution (M5); browser pairs like a device, no accounts (R32, ADR-0010) | Next — relay hosting needs owner approval of provider/spend |
 | B7 | Installers, updates, uninstall, settings restoration | Later (M7) |
 
 ## C. Study features

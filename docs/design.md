@@ -46,9 +46,10 @@ Protected, Not yet applied, Degraded, Not enforcing, Unknown.
 ## Screens
 | Screen | Web | Windows | Android |
 |---|---|---|---|
-| Focus setup (intention, length, break, periods, profile, devices, next) | Implemented | Mockup (reference) | Mockup (reference) |
-| Active focus / break / unlock countdown / emergency / recap | Implemented | — | — |
-| Schedule (list, editor, overlap error, empty) | Implemented | — | — |
+| Focus setup (intention, length, break, periods, profile, devices, next) | Implemented | Implemented (desktop layout, shared components) — not yet seen on a real PC | Mockup (reference) |
+| Active focus / break / unlock countdown / emergency / recap | Implemented | Implemented (shared) | — |
+| Schedule (list, editor, overlap error, empty) | Implemented | Implemented (shared) | — |
+| Native chrome: title bar, tray icon + menu, close-to-tray notice | — | Implemented; CI launch test | — |
 | Profiles, Devices, Settings | Implemented (local) | — | — |
 | Block screen, onboarding/permissions, pairing, presets, study timing | — | — | — |
 
