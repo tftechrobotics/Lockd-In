@@ -208,6 +208,8 @@ jobs:
           dotnet publish apps/windows/LockdIn.Desktop -c Release -r ${{ matrix.rid }} -p:Platform=${{ matrix.platform }} -o out/lockdin-windows-${{ matrix.rid }}
           Get-ChildItem out/lockdin-windows-${{ matrix.rid }} -Recurse -Filter *.pdb | Remove-Item
           if (-not (Test-Path out/lockdin-windows-${{ matrix.rid }}/ui/index.html)) { Write-Host "::error::Bundled interface missing"; exit 1 }
+          $res = (Get-ChildItem out/lockdin-windows-${{ matrix.rid }} -Recurse -Include *.pri, *.xbf | ForEach-Object { $_.Name }) -join ', '
+          Write-Host "::notice title=XAML resources (${{ matrix.rid }})::$res"
       - name: Azure sign-in (OIDC)
         if: env.SIGN == 'true'
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
@@ -262,7 +264,7 @@ jobs:
           $p = Start-Process "out/lockdin-windows-win-x64/LockdIn.exe" -PassThru
           if (-not $p.WaitForExit(90000)) { Stop-Process -Id $p.Id -Force; $code = 'timeout' } else { $code = $p.ExitCode }
           $log = Join-Path $env:LOCALAPPDATA 'LockdIn/logs/shell.log'
-          $tail = if (Test-Path $log) { (Get-Content $log -Tail 12) -join '%0A' } else { 'no shell.log' }
+          $tail = if (Test-Path $log) { (Get-Content $log -Tail 30) -join '%0A' } else { 'no shell.log' }
           Write-Host "::notice title=Windows app launch test::exit=$code%0A$tail"
           if ($code -ne 0) {
             $ev = Get-WinEvent -LogName Application -MaxEvents 30 -ErrorAction SilentlyContinue |
