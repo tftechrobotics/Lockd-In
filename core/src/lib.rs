@@ -14,7 +14,11 @@
 //! * Durations are elapsed real time. Wall-clock (local) times are used only to
 //!   anchor the start of an occurrence, resolved with RFC 5545 rules across
 //!   daylight-saving transitions.
+//! * A running session advances by the device's monotonic clock
+//!   ([`clock::SessionClock`]), so changing the system clock neither shortens
+//!   nor extends it while the device stays up.
 
+pub mod clock;
 pub mod conflicts;
 pub mod error;
 pub mod plan;
