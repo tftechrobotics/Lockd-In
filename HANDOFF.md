@@ -1,7 +1,7 @@
 # Handoff — read this first
 
 **Last session:** 2026-10-29 (third session) · **Milestone:** 1 — **OPEN**
-**Single blocker to CI:** an owner-created GitHub repository attached with push access.
+**Repository:** github.com/tftechrobotics/Lockd-In (private). **CI:** green as of run 40836172393. **Next:** owner runs the two smoke tests.
 
 ## Status by evidence level
 
