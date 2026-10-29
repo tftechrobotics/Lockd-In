@@ -10,6 +10,7 @@ import { clockTime, countdown, dayLabel, minutesLabel } from './format';
 import { Icon } from './Icon';
 import { LockTimer } from './LockTimer';
 import { message } from './messages';
+import { layout, useHost } from '../platform';
 
 /** Re-render every second while something is counting; never the source of truth. */
 function useNow(active: boolean): number {
@@ -66,12 +67,9 @@ function Setup() {
 
   const totalMin = segments.reduce((a, s) => a + s.minutes, 0);
 
-  return (
-    <div className="page focus">
-      <h1 className="display">Ready when you are.</h1>
-      <div className="focus__grid">
-        <LockTimer remainingMs={focus * 60_000} caption="Focus time" locked={false} />
-        <form className="setup" onSubmit={(e) => { e.preventDefault(); start(); }} noValidate>
+  const lock = <LockTimer remainingMs={focus * 60_000} caption="Focus time" locked={false} />;
+  const form = (lockInside: boolean) => (
+    <form className="setup" onSubmit={(e) => { e.preventDefault(); start(); }} noValidate>
           <div className="field">
             <label htmlFor={ids.intent}>What are you working on? <span className="optional">Optional</span></label>
             <input id={ids.intent} className="input" value={intention} maxLength={120} list={ids.list}
@@ -80,6 +78,7 @@ function Setup() {
             <datalist id={ids.list}>{recent.map((r) => <option key={r.text} value={r.text} />)}</datalist>
           </div>
 
+          {lockInside && <div className="setup__lock">{lock}</div>}
           <fieldset className="field">
             <legend id={ids.len}>Focus time</legend>
             <div className="chips" role="radiogroup" aria-labelledby={ids.len}>
@@ -135,6 +134,25 @@ function Setup() {
             Lock in <Icon name="arrow" />
           </button>
         </form>
+  );
+
+  if (layout === 'desktop') {
+    return (
+      <div className="page focus focus--desktop">
+        <h1 className="display">What’s the move?</h1>
+        {form(true)}
+        <DeviceStrip compact />
+        <NextRow upcoming={upcoming} card />
+      </div>
+    );
+  }
+
+  return (
+    <div className="page focus">
+      <h1 className="display">Ready when you are.</h1>
+      <div className="focus__grid">
+        {lock}
+        {form(false)}
       </div>
 
       <DeviceStrip />
@@ -144,7 +162,19 @@ function Setup() {
   );
 }
 
-function NextRow({ upcoming }: { upcoming: ReturnType<typeof nextUp> }) {
+function NextRow({ upcoming, card = false }: { upcoming: ReturnType<typeof nextUp>; card?: boolean }) {
+  if (card) {
+    return (
+      <a className="next-card" href="#/schedule">
+        <Icon name="calendar" size={22} />
+        <span className="next-card__text">
+          <span className="next-card__label">{upcoming ? 'Next up' : 'Schedule'}</span>
+          <span>{upcoming ? `${upcoming.session.title} · ${dayLabel(upcoming.start)} ${clockTime(upcoming.start)}` : 'Nothing planned yet'}</span>
+        </span>
+        <Icon name="chevron" size={20} />
+      </a>
+    );
+  }
   return (
     <div className="next">
       <Icon name="calendar" size={22} />
@@ -210,15 +240,29 @@ function SessionView({ session }: { session: ActiveSession }) {
               Unlocked until {clockTime((snap.overrideState as { until: number }).until)}. Later focus periods lock again.
             </p>
           )}
-          <p className="honesty">
-            <Icon name="info" size={18} />
-            <span>Nothing is blocked from this browser. Pair the Windows or Android app to restrict apps during focus.</span>
-          </p>
+          <HonestyNote />
           <OverridePanel session={session} snap={snap} now={now} />
         </div>
       </div>
       <DeviceStrip compact />
     </div>
+  );
+}
+
+function HonestyNote() {
+  const host = useHost();
+  const text = layout === 'web'
+    ? 'Nothing is blocked from this browser. Pair the Windows or Android app to restrict apps during focus.'
+    : !host || host.agent === 'unknown'
+      ? 'Checking whether the blocking service is running on this PC. The timer and schedule work either way.'
+      : host.agent === 'running'
+        ? 'The blocking service is running. Its protection status appears under Devices once it reports in.'
+        : 'Nothing is blocked yet: the blocking service isn’t set up on this PC. The timer and schedule still work.';
+  return (
+    <p className="honesty">
+      <Icon name="info" size={18} />
+      <span>{text}</span>
+    </p>
   );
 }
 

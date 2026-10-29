@@ -153,3 +153,13 @@ if (typeof window !== 'undefined') {
 
 export const newId = () =>
   (typeof crypto !== 'undefined' && 'randomUUID' in crypto) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
+
+/** Tray "Start a 10-minute focus": the quick start from the brief. Does nothing if a session is running. */
+export function startQuick(now = Date.now()): boolean {
+  if (state.active) return false;
+  update((s) => ({
+    ...s,
+    active: { id: newId(), start: now, segments: [{ kind: 'focus', minutes: 10 }], intention: null, profileId: s.last.profileId, controls: { overrides: [] } },
+  }));
+  return true;
+}

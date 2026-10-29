@@ -6,6 +6,10 @@ import { FocusPage } from './ui/FocusPage';
 import { SchedulePage } from './ui/SchedulePage';
 import { DevicesPage, ProfilesPage, SettingsPage } from './ui/OtherPages';
 import { Icon } from './ui/Icon';
+import { DesktopBar } from './ui/DesktopBar';
+import { initBridge, layout, onHostCommand, sendToHost } from './platform';
+import { occurrenceFrom } from './engine/session';
+import { startQuick, useStore as useStoreSel } from './state/store';
 
 const ROUTES = {
   focus: { label: 'Focus', page: FocusPage },
@@ -28,6 +32,7 @@ function useTheme() {
     const apply = () => {
       const dark = theme === 'dark' || (theme === 'system' && mq.matches);
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      sendToHost({ type: 'ui.theme', dark });
       try { localStorage.setItem('lockdin.theme', theme); } catch { /* storage unavailable */ }
     };
     apply();
@@ -46,7 +51,32 @@ export function App() {
     return () => window.removeEventListener('hashchange', on);
   }, []);
   useEffect(() => { document.title = `${ROUTES[route].label} · Lockd In`; }, [route]);
+  useEffect(() => {
+    document.documentElement.dataset.layout = layout;
+    initBridge();
+    return onHostCommand(() => { startQuick(); location.hash = '#/focus'; });
+  }, []);
+  const session = useStoreSel((s) => s.active);
+  useEffect(() => {
+    sendToHost(session
+      ? { type: 'ui.session_state', active: true, endsAt: occurrenceFrom(session.start, session.segments).end, label: session.intention?.text ?? '' }
+      : { type: 'ui.session_state', active: false, endsAt: null, label: '' });
+  }, [session]);
   const Page = ROUTES[route].page;
+
+  if (layout === 'desktop') {
+    return (
+      <>
+        <a className="skip" href="#main">Skip to content</a>
+        <div className="edge edge--left" aria-hidden="true" dangerouslySetInnerHTML={{ __html: libraryEdge }} />
+        <div className="edge edge--right" aria-hidden="true" dangerouslySetInnerHTML={{ __html: libraryEdge }} />
+        <DesktopBar route={route} sessionRunning={active} />
+        <main id="main" tabIndex={-1}>
+          <Page />
+        </main>
+      </>
+    );
+  }
 
   return (
     <>

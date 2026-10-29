@@ -39,6 +39,8 @@ Three kinds of entry, kept apart on purpose:
 | R28 | Calendar free/busy suggestions need acceptance; accountability check-ins in-app/push first; SMS is a later evaluation; no paid AI or SMS needed for blocking. | Owner 2026-10-29 PM |
 | R29 | Home answers only: what, how long, what's available, which devices are ready, how to start. Concise recap; no streaks, guilt or engagement loops. | Owner 2026-10-29 PM |
 | R30 | Build order: design → main flow → enforcement/pairing/scheduling/recovery → presets/study timing → calendar/check-ins → location/SMS. | Owner 2026-10-29 PM |
+| R31 | **Windows UI = native shell + shared UI** (answers U11). A WinUI 3 window with a minimal native title bar, native window controls, system tray and native menus hosts the shared interface components in a desktop-specific layout (not identical to the web). The interface is bundled and works offline. Blocking runs in a separate service/agent that works whether or not the window is open. | Owner 2026-10-29 PM |
+| R32 | **Web ↔ devices = paired browser, no accounts** (answers U12). The browser pairs by QR code like a device; a small hosted relay forwards only end-to-end encrypted messages. Hosting cost (~$5–10/month, estimate) is accepted in principle; the actual provider and spend need owner approval before deployment. | Owner 2026-10-29 PM |
 | R11 | Everything else in `Focus_Project_Brief.md` (allowlist profiles per device, no force-closing or lost work, no hidden processes, no indefinite lockouts, offline execution, privacy minimums, etc.). | Brief v1.0 |
 
 ## Engineering recommendations (not approved)
@@ -74,8 +76,8 @@ Three kinds of entry, kept apart on purpose:
 | U8 | Android: offer an accessibility mode (Play review risk), or require it if usage access proves insufficient? | After Android probe |
 | U9 | Support Windows 10? | M3 |
 | U10 | Android: request notification access to hide restricted apps' notifications during focus? | M4 |
-| U11 | Windows UI stack: native WinUI 3 (ADR-0002) or a native host (WinUI/WPF window, tray, titlebar) rendering the shared web UI in WebView2? | Windows app shell (A7) |
-| U12 | How the web app reaches devices: (a) accounts + hosted relay (cost, privacy, sign-in), (b) paired browser via the same relay without accounts, or (c) web app is local-only and shows no live device status | Web device status, B6 |
+| ~~U11~~ | Answered → R31 | — |
+| ~~U12~~ | Answered → R32 | — |
 
 ## Withdrawn
 

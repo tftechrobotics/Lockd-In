@@ -258,3 +258,54 @@ select.input { appearance: none; padding-right: 40px; cursor: pointer;
   .lock__caption { font-size: 0.95rem; }
   .focus__grid { gap: 20px; }
 }
+
+/* ---------- Desktop layout (Windows shell, ADR-0009) ---------- */
+:root[data-layout="desktop"] body { user-select: none; -webkit-user-select: none; }
+:root[data-layout="desktop"] input, :root[data-layout="desktop"] .lede, :root[data-layout="desktop"] .intention { user-select: text; -webkit-user-select: text; }
+.deskbar {
+  position: relative; z-index: 2; max-width: 640px; margin: 0 auto; padding: 16px 24px 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.switch { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--taupe-soft); border: 1px solid var(--line); }
+.switch__item {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 0 20px; border-radius: 999px;
+  text-decoration: none; font-weight: 500; color: var(--ink);
+}
+.switch__item[aria-current="page"] { background: var(--ink); color: var(--on-ink); }
+.switch__item[aria-current="page"] .nav__live { background: var(--on-ink); }
+.deskbar__menu { position: relative; }
+.deskbar__button { min-height: 40px; padding: 0 14px; font-weight: 500; }
+.menu {
+  position: absolute; right: 0; top: calc(100% + 6px); min-width: 200px; list-style: none; margin: 0; padding: 6px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; z-index: 5;
+  box-shadow: 0 12px 28px -12px rgba(48, 42, 37, 0.35);
+}
+.menu a { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 12px; border-radius: 8px; text-decoration: none; }
+.menu a:hover, .menu a:focus-visible { background: var(--taupe-soft); outline-offset: -2px; }
+.menu a[aria-current="page"] { font-weight: 600; }
+
+:root[data-layout="desktop"] .page { max-width: 640px; padding: 20px 24px 40px; }
+:root[data-layout="desktop"] .display { font-size: 2.2rem; text-align: center; margin-bottom: 20px; }
+:root[data-layout="desktop"] .display--page { text-align: left; }
+.focus--desktop .setup { gap: 18px; }
+.focus--desktop .setup .field:first-child { align-items: stretch; }
+.setup__lock { display: flex; justify-content: center; padding: 4px 0 2px; }
+.focus--desktop .lock { max-width: 200px; }
+.focus--desktop .lock__time { font-size: 3rem; }
+
+
+.focus--desktop .summary { text-align: center; }
+:root[data-layout="desktop"] .focus__grid { grid-template-columns: 1fr; gap: 24px; justify-items: center; }
+:root[data-layout="desktop"] .focus__grid > .session { width: 100%; }
+:root[data-layout="desktop"] .intention { text-align: center; margin-bottom: 20px; }
+:root[data-layout="desktop"] .devices { display: flex; justify-content: center; }
+:root[data-layout="desktop"] .devices__list { justify-content: center; }
+.next-card {
+  display: flex; align-items: center; gap: 14px; margin-top: 20px; padding: 14px 18px; min-height: 64px;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--surface); text-decoration: none;
+}
+.next-card__text { flex: 1; display: flex; flex-direction: column; }
+.next-card__label { font-size: 0.85rem; color: var(--ink-muted); }
+.next-card:hover { border-color: var(--control-line); }
+@media (max-width: 1100px) { :root[data-layout="desktop"] .edge { display: none; } }
+@media (min-width: 1101px) { :root[data-layout="desktop"] .edge { display: block; top: 40px; width: 180px; } }

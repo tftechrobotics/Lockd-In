@@ -167,6 +167,105 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Report '--recover failed' }
           Write-Host "Sanity run passed."
 
+  # The Windows app: native shell + bundled shared interface (ADR-0009).
+  # The launch test proves the window starts, WebView2 loads the bundled UI
+  # offline and the bridge answers. It does not prove any blocking.
+  windows-app:
+    name: Windows app (${{ matrix.rid }})
+    runs-on: windows-2025
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SIGN: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT != '' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+    strategy:
+      matrix:
+        include:
+          - { rid: win-x64, platform: x64 }
+          - { rid: win-arm64, platform: ARM64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Build the shared interface
+        working-directory: apps/web
+        run: |
+          npm ci
+          npm run build
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: apps/windows/global.json
+      - name: Bridge contract tests
+        if: matrix.rid == 'win-x64'
+        run: dotnet run -c Release --project apps/windows/LockdIn.Desktop.Tests
+      - name: Publish (self-contained, unpackaged)
+        shell: pwsh
+        run: |
+          dotnet publish apps/windows/LockdIn.Desktop -c Release -r ${{ matrix.rid }} -p:Platform=${{ matrix.platform }} -o out/lockdin-windows-${{ matrix.rid }}
+          Get-ChildItem out/lockdin-windows-${{ matrix.rid }} -Recurse -Filter *.pdb | Remove-Item
+          if (-not (Test-Path out/lockdin-windows-${{ matrix.rid }}/ui/index.html)) { Write-Host "::error::Bundled interface missing"; exit 1 }
+      - name: Azure sign-in (OIDC)
+        if: env.SIGN == 'true'
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Sign with Azure Artifact Signing
+        if: env.SIGN == 'true'
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
+        with:
+          endpoint: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
+          files-folder: out/lockdin-windows-${{ matrix.rid }}
+          files-folder-filter: exe,dll
+          files-folder-recurse: true
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          description: Lockd In
+          exclude-environment-credential: true
+          exclude-workload-identity-credential: true
+          exclude-managed-identity-credential: true
+          exclude-shared-token-cache-credential: true
+          exclude-visual-studio-credential: true
+          exclude-visual-studio-code-credential: true
+          exclude-azure-cli-credential: false
+          exclude-azure-powershell-credential: true
+          exclude-azure-developer-cli-credential: true
+          exclude-interactive-browser-credential: true
+      - name: Record signing status
+        shell: pwsh
+        run: |
+          $out = "out/lockdin-windows-${{ matrix.rid }}"
+          $sig = Get-AuthenticodeSignature "$out/LockdIn.exe"
+          $unsigned = (Get-ChildItem $out -Recurse -Include *.exe, *.dll | Where-Object { (Get-AuthenticodeSignature $_.FullName).Status -ne 'Valid' }).Count
+          $head = if ($env:SIGN -eq 'true') { "SIGNED. LockdIn.exe: $($sig.Status). Files not validly signed: $unsigned." } else { "UNSIGNED. LockdIn.exe: $($sig.Status). Smart App Control will block it; see docs/windows-signing.md." }
+          Set-Content "$out/SIGNING.txt" $head
+          Write-Host "::notice title=Windows app signing (${{ matrix.rid }})::$head"
+          if ($env:SIGN -eq 'true' -and $sig.Status -ne 'Valid') { exit 1 }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lockdin-windows-${{ matrix.rid }}
+          path: out/lockdin-windows-${{ matrix.rid }}
+          retention-days: 30
+      - name: Launch test (x64)
+        if: matrix.rid == 'win-x64'
+        shell: pwsh
+        run: |
+          $env:LOCKDIN_SMOKE = '1'
+          $p = Start-Process "out/lockdin-windows-win-x64/LockdIn.exe" -PassThru
+          if (-not $p.WaitForExit(90000)) { Stop-Process -Id $p.Id -Force; $code = 'timeout' } else { $code = $p.ExitCode }
+          $log = Join-Path $env:LOCALAPPDATA 'LockdIn/logs/shell.log'
+          $tail = if (Test-Path $log) { (Get-Content $log -Tail 12) -join '%0A' } else { 'no shell.log' }
+          Write-Host "::notice title=Windows app launch test::exit=$code%0A$tail"
+          if ($code -ne 0) { Write-Host "::error title=Windows app launch test::exit $code"; exit 1 }
+          if (-not (Select-String -Path $log -SimpleMatch 'ui.ready' -Quiet)) { Write-Host "::error::Interface never reported ready"; exit 1 }
+
   # SPIKE (risk R6b): does our in-app App Control compiler produce the same
   # binary as Microsoft's ConvertFrom-CIPolicy? Builds files only. Nothing is
   # deployed: no CiTool call exists in the spike or in this job.

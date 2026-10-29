@@ -10,5 +10,5 @@ export default defineConfig({
   resolve: { alias: { '@design': design } },
   server: { fs: { allow: ['.', design] } },
   build: { sourcemap: true },
-  test: { include: ['src/**/*.test.ts'] },
+  test: { include: ['src/**/*.test.ts'], environment: 'node' },
 });

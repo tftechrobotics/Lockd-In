@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Lockd In for Windows: native shell (window, title bar, tray, menus) that hosts
+       the shared interface from apps/web in WebView2 (ADR-0009). Unpackaged,
+       self-contained. Blocking is NOT done here; it belongs to the separate
+       agent/service (ADR-0007), which keeps working when this window is closed. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>LockdIn.Desktop</RootNamespace>
+    <AssemblyName>LockdIn</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\lockdin.ico</ApplicationIcon>
+    <Platforms>x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <Version>0.1.0</Version>
+    <Product>Lockd In</Product>
+    <Company>TF Tech Robotics</Company>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Assets\**" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The shared interface, built by `npm run build` in apps/web. Bundled so the app works offline. -->
+    <Content Include="..\..\web\dist\**" Link="ui\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\..\web\dist\index.html')" />
+  </ItemGroup>
+  <Target Name="RequireWebUi" BeforeTargets="Build" Condition="!Exists('..\..\web\dist\index.html')">
+    <Error Text="Build the shared interface first: cd apps/web &amp;&amp; npm ci &amp;&amp; npm run build" />
+  </Target>
+</Project>

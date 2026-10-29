@@ -1,6 +1,6 @@
 # ADR-0002: Native client frameworks
 
-**Status:** Engineering recommendation (2026-10-29) — reversible; not yet exercised in code
+**Status:** Windows part **superseded by ADR-0009** (owner decision R31, 2026-10-29). Android part unchanged.
 
 ## Decision
 - **Windows:** WinUI 3 (Windows App SDK) on .NET 10, C#. Native Fluent
