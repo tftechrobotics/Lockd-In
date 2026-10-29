@@ -3,9 +3,10 @@
 **Last session:** 2026-10-29 (fifth session) · **Milestone:** 1 — **OPEN**; M2 (design + main flow) **in progress**
 **Read first:** `docs/product-spec.md` (v2, owner direction) and `docs/backlog.md`.
 **Repository:** github.com/tftechrobotics/Lockd-In (private).
-**Next:** owner answers U11 (Windows UI stack) and U12 (how the web app
-reaches devices); owner sets up Google Play and Azure Artifact Signing so the
-probes can run on real devices (R18: protections stay on).
+**Next:** owner sets up Azure Artifact Signing (Windows app + probe) and
+Google Play (Android probe) so builds can run on real devices (R18). Developer:
+Android Compose shell in Cream & Ink, then presets/resources (C2–C3), then the
+Windows blocking agent (B4) and pairing relay (B6, needs hosting approval).
 
 ## Status by evidence level
 
@@ -13,6 +14,7 @@ probes can run on real devices (R18: protections stay on).
 |---|---|---|---|---|
 | `lockdin-core` | Yes, incl. `clock`; `examples/parity_vectors.rs` | 35 tests (3 property tests), fmt, clippy — Ubuntu 24.04, Rust 1.97.0 | n/a (pure logic) | Heartbeat transport (M5); native clock sources (M3/M4) |
 | **Web app** (`apps/web`) | Yes: Cream & Ink; Focus (setup → focus → break → resume → recap, unlock countdown, emergency), Schedule, Profiles, Devices, Settings; local storage only | 19 unit tests incl. 773 Rust parity samples; 23 Playwright tests (flow on a simulated clock, axe A/AA × 2 themes × all pages, keyboard, 200% text, 320/390 px) — Chromium, Linux | n/a (blocks nothing, by design) | Pairing/relay (U12), presets, study timing, nudges UI beyond tone |
+| **Windows app** (`apps/windows`) | Yes: WinUI 3 shell (Windows App SDK 2.5.1, .NET 10) hosting the shared UI in WebView2 (desktop layout); title bar, tray menu, close-to-tray, single instance, min size, offline bundle, validated bridge | Builds x64 + ARM64 in CI; 19 bridge tests (Linux + CI); **launch test passes on windows-2025** (window, tray, WebView2 loads bundled UI, handshake, clean quit) | **Not on a person's PC** (unsigned → Smart App Control) | Blocking agent (B4); launch at sign-in setting; installer (B7) |
 | Cream & Ink design system | `design/tokens.json` + contrast check; wordmark, lock mark, library edge SVGs | Contrast check passes (24 pairs + control borders) | — | Windows (XAML) and Android (Compose) token outputs |
 | Windows probe + target + guardian | Yes | CI x64/ARM64 builds; headless runner sanity run passes | **No** — Smart App Control blocks unsigned build on owner PC | — |
 | Windows signing in CI | Yes (Azure Artifact Signing via OIDC, gated on repo variables, verifies every signature) | actionlint clean; unsigned path runs green | n/a | Needs owner's Azure account |
@@ -26,6 +28,17 @@ probes can run on real devices (R18: protections stay on).
 `tools/sandbox-checks.sh` reruns every Linux-side check (core, .NET builds,
 spike self-test, Kotlin type-check with an R stand-in, VM script lint,
 actionlint).
+
+## What changed this session (fifth, continued)
+- Owner answered U11 → R31 (native shell + shared UI, desktop-specific
+  layout, offline, blocking independent of the window; ADR-0009) and U12 → R32
+  (paired browser, no accounts, encrypted relay; ADR-0010).
+- Shared UI: desktop layout (Focus/Schedule switch + keyboard menu), honest
+  "This PC" status from the host, tray quick-start command, session/theme
+  reports to the shell; 30 Playwright tests incl. a WebView2 bridge stand-in.
+- Windows shell implemented; CI job `windows-app`. Lessons: unpackaged WinUI 3
+  needs `EnableMsixTooling=true` or XAML fails to load (PRI missing); the
+  lambda in `Application.Start` must not be named `_`.
 
 ## What changed this session (fifth)
 1. Owner's v2 direction recorded: `docs/product-spec.md`, `docs/backlog.md`,
