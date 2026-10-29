@@ -23,8 +23,9 @@ internal static class Guardian
             var exe = Environment.ProcessPath!;
             var args = new List<string>();
             // Under `dotnet run`/`dotnet LockdInProbe.dll` the host is dotnet.exe; pass the DLL too.
+            // (Assembly.Location is empty in single-file builds, so build the path from the app directory.)
             if (Path.GetFileNameWithoutExtension(exe).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
-                args.Add(typeof(Guardian).Assembly.Location);
+                args.Add(Path.Combine(AppContext.BaseDirectory, "LockdInProbe.dll"));
             args.Add("--guardian");
             args.Add(self.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
             args.Add(self.StartTime.ToUniversalTime().Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture));
