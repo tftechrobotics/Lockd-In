@@ -1,6 +1,7 @@
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.Web.WebView2.Core;
@@ -17,6 +18,7 @@ public sealed partial class MainWindow : Window
     private static readonly bool Smoke = Environment.GetEnvironmentVariable("LOCKDIN_SMOKE") == "1";
 
     private readonly Tray tray;
+    private WebView2? View;
     private readonly ShellSettings settings = ShellSettings.Load();
     private bool quitting;
     private UiMessage.SessionState? session;
@@ -24,6 +26,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Log.Write("window xaml loaded");
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBarArea);
         string assets = Path.Combine(AppContext.BaseDirectory, "Assets");
@@ -38,7 +41,17 @@ public sealed partial class MainWindow : Window
 
         nint hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
         tray = new Tray(hwnd, Path.Combine(assets, "lockdin.ico"), ShowFromTray, StartQuickFromTray, Quit);
-        _ = InitWebViewAsync();
+        try
+        {
+            View = new WebView2();
+            ViewHost.Child = View;
+            View.DefaultBackgroundColor = ((SolidColorBrush)Root.Background).Color;
+            _ = InitWebViewAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowLoadError(ex);
+        }
         if (Smoke) _ = SmokeTimeoutAsync();
 
         // Keep the tray text honest after a session's end time passes, even with the window hidden.
@@ -72,7 +85,7 @@ public sealed partial class MainWindow : Window
     private void StartQuickFromTray()
     {
         ShowFromTray();
-        View.CoreWebView2?.PostWebMessageAsJson(Bridge.Command("start_quick"));
+        View?.CoreWebView2?.PostWebMessageAsJson(Bridge.Command("start_quick"));
     }
 
     private void Quit()
@@ -91,19 +104,15 @@ public sealed partial class MainWindow : Window
         {
             string data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LockdIn", "WebView2");
             var env = await CoreWebView2Environment.CreateWithOptionsAsync(null, data, new CoreWebView2EnvironmentOptions());
-            await View.EnsureCoreWebView2Async(env);
+            await View!.EnsureCoreWebView2Async(env);
         }
         catch (Exception ex)
         {
-            Log.Write($"webview2 unavailable: {ex.GetType().Name}: {ex.Message}");
-            LoadErrorText.Text = "This app needs the Microsoft Edge WebView2 Runtime, which normally comes with Windows 11. Install it, then open Lockd In again.";
-            View.Visibility = Visibility.Collapsed;
-            LoadError.Visibility = Visibility.Visible;
-            if (Smoke) Environment.Exit(4);
+            ShowLoadError(ex);
             return;
         }
 
-        var core = View.CoreWebView2;
+        var core = View!.CoreWebView2;
         string ui = Path.Combine(AppContext.BaseDirectory, "ui");
         core.SetVirtualHostNameToFolderMapping(Host, ui, CoreWebView2HostResourceAccessKind.Deny);
 
@@ -131,6 +140,15 @@ public sealed partial class MainWindow : Window
             if (e.ProcessFailedKind == CoreWebView2ProcessFailedKind.RenderProcessExited) core.Reload();
         };
         core.Navigate($"https://{Host}/index.html");
+    }
+
+    private void ShowLoadError(Exception ex)
+    {
+        Log.Write($"webview2 unavailable: {ex}");
+        LoadErrorText.Text = "This app needs the Microsoft Edge WebView2 Runtime, which normally comes with Windows 11. Install it, then open Lockd In again.";
+        ViewHost.Visibility = Visibility.Collapsed;
+        LoadError.Visibility = Visibility.Visible;
+        if (Smoke) Environment.Exit(4);
     }
 
     private static bool IsAppUri(string uri) =>
@@ -185,7 +203,7 @@ public sealed partial class MainWindow : Window
         Color hover = dark ? Rgb(0x322B24) : Rgb(0xEBE2D4);
         Root.Background = new SolidColorBrush(ground);
         TitleText.Foreground = new SolidColorBrush(ink);
-        View.DefaultBackgroundColor = ground; // no white flash before the page paints
+        if (View is not null) View.DefaultBackgroundColor = ground; // no white flash before the page paints
         var tb = AppWindow.TitleBar;
         tb.ButtonBackgroundColor = Colors.Transparent;
         tb.ButtonInactiveBackgroundColor = Colors.Transparent;
