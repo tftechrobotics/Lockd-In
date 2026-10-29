@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The window paints the Cream & Ink ground before Compose draws: no white flash. -->
+    <style name="Theme.LockdIn" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/ground</item>
+        <item name="android:colorBackground">@color/ground</item>
+    </style>
+    <color name="ground">#F5F0E6</color>
+    <color name="ink">#302A25</color>
+</resources>
