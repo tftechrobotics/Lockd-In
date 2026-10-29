@@ -11,6 +11,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -60,6 +61,12 @@ class AppTest {
         return store
     }
 
+    /** Menus open in a popup; wait until the item exists before tapping it. */
+    private fun pickMenuItem(text: String) {
+        rule.waitUntil(5_000) { rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText(text).performClick()
+    }
+
     /** Time only moves when the test says. */
     @Suppress("UNUSED_PARAMETER")
     private fun tick(store: Store) { rule.waitForIdle() }
@@ -70,7 +77,7 @@ class AppTest {
         rule.onNode(hasText("What are you working on? (optional)")).performTextInput("TAM 212 · Practice problems")
         rule.onNodeWithText("25 min").performClick()
         rule.onNodeWithContentDescription("Break: No break. Change", substring = true).performScrollTo().performClick()
-        rule.onNodeWithText("5 min").performClick()
+        pickMenuItem("5 min")
         rule.onNodeWithText("Lock in").performScrollTo().performClick()
         rule.onNodeWithText("Locked in.").assertIsDisplayed()
         rule.onNodeWithContentDescription("Focus 1 of 2: 25 minutes left").assertIsDisplayed()
@@ -149,7 +156,7 @@ class AppTest {
         val store = launch(AppState(theme = ThemeChoice.DARK), dark = true)
         rule.onNodeWithText("25 min").performClick()
         rule.onNodeWithContentDescription("Break: No break. Change", substring = true).performScrollTo().performClick()
-        rule.onNodeWithText("5 min").performClick()
+        pickMenuItem("5 min")
         rule.onNodeWithText("Lock in").performScrollTo().performClick()
         clock.advanceMinutes(27); tick(store)
         shot("06-break-dark")
