@@ -28,7 +28,7 @@ Each row records evidence separately: **implemented** (code exists),
 | **5. Battery (Android)** | Detection vs baseline, same conditions, 60 min each; µAh where available | Baseline mode implemented | **Not tested** |
 | **Clock changes** (brief §14) | Changing the system clock neither shortens nor extends a running session | `core::clock::SessionClock` + 14 tests incl. 2 property tests (Ubuntu 24.04, Rust 1.97.0). Native clock sources not yet wired | Logic **met**; on-device M3/M4 |
 | **6. Cross-device status accuracy** | Never "protected" without fresh verified report; expired heartbeat → Unknown | Core logic tested (Linux) | Logic **met**; heartbeat transport is M5 |
-| **2b′. App Control authoring without ConfigCI (Home)** | Our compiler's .cip matches `ConvertFrom-CIPolicy` | Spike built; 20 self-tests pass (Linux); Windows CI comparison job added — see HANDOFF for result | **In progress** |
+| **2b′. App Control authoring without ConfigCI (Home)** | Our compiler's .cip matches `ConvertFrom-CIPolicy` | Spike built; 20 self-tests pass (Linux). Windows CI (windows-2025, commit 871aa94): Microsoft's `ConvertFrom-CIPolicy` accepted our XML; **parsed content identical** (options, allow/deny rules, scenarios, IDs); **bytes differ** — ours 1080 B, Microsoft 1036 B, first difference at byte 0 (header format version: ours writes 11). Not deployed anywhere. | **In progress** |
 | **CI** | All jobs green; downloadable artifacts | Run 40836172393 (2026-10-29, commit 330537a): core tests, Android APK build, Windows x64/ARM64 self-contained builds, headless Windows sanity run (start → guardian → timed release → `--recover`), VM script lint — all green | **Met** |
 
 ### Go / no-go

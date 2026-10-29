@@ -15,7 +15,7 @@ channels (R18: device protections stay on).
 | Windows signing in CI | Yes (Azure Artifact Signing via OIDC, gated on repo variables, verifies every signature) | actionlint clean; unsigned path runs green | n/a | Needs owner's Azure account |
 | Android probe + target | Yes. Play (release) build omits accessibility detector | Debug APKs + signed-bundle job in CI | **Emulator only** (API 35, CI): notification, block screen, release all pass. **Not on a phone** — Auto Blocker blocks sideload | — |
 | Play submission kit | `docs/play/` (guide, form answers, privacy policy page) | — | — | Needs Play account, privacy-policy URL, contact email |
-| App Control compiler spike | `probes/windows/AppControlSpike` (no deployment) | 20 self-tests (Linux); Windows CI byte-comparison with `ConvertFrom-CIPolicy` | **No** enforcement test (VM only) | — |
+| App Control compiler spike | `probes/windows/AppControlSpike` (no deployment) | 20 self-tests (Linux); Windows CI: same parsed content as `ConvertFrom-CIPolicy`, bytes differ (header version) | **No** enforcement test (VM only) | — |
 | VM policy scripts | Yes | Parse + PSScriptAnalyzer clean | **No** | — |
 | M2 design | Canvas: foundations + 6 screens × light/dark; `docs/design.md` | — | Not checked with screen reader/keyboard/scaling | Remaining flows |
 | Windows service, product UI, pairing, calendar | No | — | — | ADR-0007, M2–M6 |
@@ -46,9 +46,13 @@ actionlint).
 2. **Owner — Windows:** Azure Artifact Signing per `docs/windows-signing.md`
    (validation 1–20 business days). Developer then: confirm `SIGNING.txt`
    shows Valid, owner runs the Windows smoke test.
-3. **Developer:** read the App Control spike CI result (job "App Control
-   compiler spike"); if bytes differ, use the reported first-difference offset
-   to fix; then add hash and package-family rules.
+3. **Developer — App Control spike result (CI, windows-2025):** Microsoft's
+   compiler accepted our XML and both binaries parse to identical content,
+   but the bytes differ from byte 0: our compiler writes header format
+   version 11 (44 bytes of newer sections), Microsoft's wrote an older
+   version. Next: emit the lowest format version the policy needs (or
+   confirm `CiTool` accepts v11 in the VM, test 11), aim for byte equality,
+   then add hash and package-family rules.
 4. **Developer, independent:** remaining M2 flows (onboarding/permissions,
    block screen, app profiles, pairing, settings, diagnostics); bump
    deprecated actions (checkout/setup-java v4 → v5); wire native clock
