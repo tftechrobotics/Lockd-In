@@ -1,0 +1,597 @@
+<title>Lockd In Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap">
+<style>
+/* Layout: a slim review toolbar, then one live prototype (web page or Android phone) driven by one shared state. */
+:root {
+  --ground: #F5F0E6; --surface: #FBF8F2; --taupe: #D7C8B4; --taupe-soft: #EBE2D4; --line: #D3C5B1;
+  --control-line: #8F8270; --ink: #302A25; --ink-muted: #5C5249; --on-ink: #FBF8F2; --dot: #8C6E57;
+  --danger: #8E2F25; --danger-soft: #F3DED8; --drawing: rgba(48,42,37,.11); --grain: .05;
+  --stage: #E9E2D6; --frame: #2B2520;
+  --display: 'Outfit', 'Figtree', system-ui, sans-serif; --text: 'Figtree', system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --ground: #1C1814; --surface: #25201B; --taupe: #4B4137; --taupe-soft: #322B24; --line: #4B4137;
+  --control-line: #8F8170; --ink: #F0E8DB; --ink-muted: #C3B6A4; --on-ink: #221C17; --dot: #C9A98D;
+  --danger: #EBA597; --danger-soft: #3E2420; --drawing: rgba(240,232,219,.075); --grain: .07;
+  --stage: #141210; --frame: #0C0A09; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --ground: #1C1814; --surface: #25201B; --taupe: #4B4137; --taupe-soft: #322B24; --line: #4B4137;
+  --control-line: #8F8170; --ink: #F0E8DB; --ink-muted: #C3B6A4; --on-ink: #221C17; --dot: #C9A98D;
+  --danger: #EBA597; --danger-soft: #3E2420; --drawing: rgba(240,232,219,.075); --grain: .07;
+  --stage: #141210; --frame: #0C0A09; color-scheme: dark; }
+/* The prototype's own theme setting (Settings → Appearance) overrides the viewer's theme inside the mock. */
+.mock.light { --ground: #F5F0E6; --surface: #FBF8F2; --taupe: #D7C8B4; --taupe-soft: #EBE2D4; --line: #D3C5B1;
+  --control-line: #8F8270; --ink: #302A25; --ink-muted: #5C5249; --on-ink: #FBF8F2; --dot: #8C6E57;
+  --danger: #8E2F25; --danger-soft: #F3DED8; --drawing: rgba(48,42,37,.11); --grain: .05; color-scheme: light; }
+.mock.dark { --ground: #1C1814; --surface: #25201B; --taupe: #4B4137; --taupe-soft: #322B24; --line: #4B4137;
+  --control-line: #8F8170; --ink: #F0E8DB; --ink-muted: #C3B6A4; --on-ink: #221C17; --dot: #C9A98D;
+  --danger: #EBA597; --danger-soft: #3E2420; --drawing: rgba(240,232,219,.075); --grain: .07; color-scheme: dark; }
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body { margin: 0; background: var(--stage); color: var(--ink); font: 400 15px/1.5 var(--text); }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; border-radius: 6px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+svg.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+
+/* Review toolbar (outside the prototype) */
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding-block: 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  border-bottom: 1px solid var(--line); background: var(--ground); }
+.bar__name { font: 600 15px/1 var(--display); margin-right: auto; display: flex; align-items: center; gap: 10px; }
+.bar__tag { font: 500 12px/1 var(--text); color: var(--ink-muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 9px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; background: var(--taupe-soft); padding: 2px; }
+.seg button { border: 0; background: none; border-radius: 999px; min-height: 32px; padding: 0 14px; cursor: pointer; font-weight: 500; font-size: 14px; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+.bar label { font-size: 13px; color: var(--ink-muted); display: inline-flex; gap: 8px; align-items: center; }
+.note { max-width: 980px; margin: 14px auto 0; padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); font-size: 13px; color: var(--ink-muted); }
+.stage > #app { width: 100%; display: flex; justify-content: center; min-width: 0; }
+.stage { display: flex; justify-content: center; padding-block: 18px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* ---------- Shared prototype pieces ---------- */
+.mock { position: relative; background: var(--ground); color: var(--ink); overflow: hidden; isolation: isolate; }
+.mock::before { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0; opacity: var(--grain);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.19 0 0 0 0 0.16 0 0 0 0 0.14 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.mock.dark::before { mix-blend-mode: screen; }
+.mock > * { position: relative; z-index: 1; }
+.edge { position: absolute; top: 96px; width: 210px; color: var(--drawing); pointer-events: none; z-index: 0 !important; }
+.edge svg { width: 100%; height: auto; display: block; }
+.edge--l { left: -20px; } .edge--r { right: -20px; transform: scaleX(-1); }
+
+.lock { position: relative; width: 100%; aspect-ratio: 240 / 260; margin: 0 auto; container-type: inline-size; }
+.lock > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.lock .sh { fill: none; stroke: color-mix(in srgb, var(--taupe) 85%, var(--ground)); stroke-width: 22; stroke-linecap: round; transition: d .18s; }
+.lock .bd { fill: var(--taupe); }
+.lock.on .bd, .lock.on .sh { fill: color-mix(in srgb, var(--taupe) 82%, var(--ink)); }
+.lock.on .sh { fill: none; stroke: color-mix(in srgb, var(--taupe) 82%, var(--ink)); }
+.lock__face { position: absolute; left: 6%; right: 6%; top: 41%; bottom: 4%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
+.lock__clock { width: 26cqi; height: 26cqi; }
+.lock__clock circle { fill: var(--ink); }
+.lock__clock path { fill: none; stroke: var(--taupe); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.lock.on .lock__clock path { stroke: color-mix(in srgb, var(--taupe) 82%, var(--ink)); }
+.lock__time { font: 800 28cqi/1 var(--display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.lock__cap { font: 700 max(11px, 9.5cqi)/1.2 var(--text); text-align: center; }
+
+.pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill { flex: 1 1 auto; min-height: 40px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--taupe-soft); cursor: pointer; font-weight: 500; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pill[aria-checked="true"] { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+.pill:hover:not([aria-checked="true"]) { border-color: var(--control-line); }
+.sel { position: relative; display: flex; align-items: center; min-width: 0; }
+.sel > svg:first-child { position: absolute; left: 12px; pointer-events: none; }
+.sel > svg:last-child { position: absolute; right: 12px; width: 16px; height: 16px; pointer-events: none; }
+.sel select { appearance: none; width: 100%; min-height: 44px; padding: 0 36px 0 42px; background: var(--surface); border: 1px solid var(--control-line); border-radius: 10px; cursor: pointer; }
+.input { width: 100%; min-height: 44px; padding: 0 14px; background: var(--surface); border: 1px solid var(--control-line); border-radius: 10px; }
+.input::placeholder, .tasktitle::placeholder { color: var(--ink-muted); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--control-line); background: var(--surface); cursor: pointer; font-weight: 600; text-decoration: none; }
+.btn--primary { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+.btn--lockin { width: 100%; min-height: 52px; font: 600 21px/1 var(--display); border-radius: 14px; }
+.btn--lockin svg.i { width: 22px; height: 22px; }
+.btn--quiet { background: none; border-color: transparent; text-decoration: underline; text-underline-offset: 3px; }
+.btn--danger { color: var(--danger); }
+.btn--danger-solid { background: var(--danger); color: var(--surface); border-color: var(--danger); }
+.lbl { font-weight: 500; font-size: 15px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sel--quiet select { min-height: 32px; padding: 0 30px 0 10px; font-size: 14px; border-color: var(--line); background: transparent; }
+.sel--quiet > svg:last-child { right: 8px; }
+.err { margin: 0; color: var(--danger); background: var(--danger-soft); padding: 10px 14px; border-radius: 10px; font-weight: 500; }
+
+.devices { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; row-gap: 8px; }
+.device { display: inline-flex; align-items: center; gap: 9px; padding: 0 18px; min-height: 26px; font-size: 15px; }
+.device:first-child { padding-left: 0; }
+.device + .device { border-left: 1px solid var(--line); }
+.dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--dot); }
+.dot.ok { background: var(--dot); }
+.facts { display: flex; flex-wrap: wrap; gap: 10px 28px; margin: 0; }
+.facts dt { color: var(--ink-muted); font-size: 13px; }
+.facts dd { margin: 2px 0 0; font: 600 21px/1.2 var(--display); font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-muted); }
+.out { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+.out__end { margin-left: auto; }
+.choices { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; flex: 1 1 100%; }
+.choices legend { padding: 0; color: var(--ink-muted); margin-bottom: 4px; }
+.radio { display: flex; align-items: center; gap: 10px; min-height: 38px; cursor: pointer; }
+.radio input { width: 18px; height: 18px; margin: 0; accent-color: var(--ink); }
+.confirm { border: 1px solid var(--line); background: var(--surface); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; flex: 1 1 100%; }
+.confirm h3 { margin: 0; font: 600 18px/1.2 var(--display); }
+.confirm p { margin: 0; color: var(--ink-muted); }
+.honesty { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { min-height: 38px; min-width: 48px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--taupe-soft); cursor: pointer; font-weight: 500; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+.list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.list > li { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.empty { display: flex; gap: 12px; align-items: center; padding: 18px; border: 1px dashed var(--control-line); border-radius: 14px; color: var(--ink-muted); }
+.apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 14px; margin: 8px 0 0; }
+.check { display: flex; align-items: center; gap: 10px; min-height: 36px; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 0; accent-color: var(--ink); }
+.ptitle { font: 700 30px/1.15 var(--display); letter-spacing: -.015em; margin: 0 0 6px; }
+h2.sub { font: 600 19px/1.2 var(--display); margin: 22px 0 8px; }
+
+/* ---------- Web skin ---------- */
+.web { width: min(1100px, 100%); min-height: 720px; border: 1px solid var(--line); border-radius: 12px; }
+.web .mast { background: var(--taupe); border-bottom: 1px solid var(--line); }
+.web .mast__in { max-width: 1000px; margin: 0 auto; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.web .wm { width: 190px; color: var(--ink); line-height: 0; background: none; border: 0; padding: 0; cursor: pointer; }
+.web .wm svg { width: 100%; height: auto; }
+.web nav { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.web nav button { position: relative; min-height: 42px; padding: 0 10px; border: 0; background: none; cursor: pointer; font-weight: 500; font-size: 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; }
+.web nav button[aria-current="page"]::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 4px; height: 2px; background: var(--ink); border-radius: 1px; }
+.web nav button.gear[aria-current="page"]::after { display: none; }
+.web nav button.gear[aria-current="page"] { background: color-mix(in srgb, var(--ink) 9%, transparent); }
+.web nav button:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.live { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); }
+.web .page { max-width: 780px; margin: 0 auto; padding: 40px 36px 48px; }
+.web .display { font: 700 40px/1.1 var(--display); letter-spacing: -.02em; margin: 0; }
+.web .subtitle { margin: 4px 0 0; font-size: 19px; }
+.web .stage2 { display: grid; grid-template-columns: minmax(160px, 220px) minmax(0, 380px); gap: 44px; align-items: center; margin-top: 26px; }
+.web .ctl { display: flex; flex-direction: column; gap: 15px; min-width: 0; }
+.web .field { display: flex; flex-direction: column; gap: 8px; }
+.web .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.web .foot { margin-top: 34px; }
+.web .next { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+.web .next p { margin: 0; flex: 1 1 220px; }
+.linkbtn { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; padding: 0; min-height: 40px; font-weight: 600; cursor: pointer; }
+.linkbtn:hover { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 760px) {
+  .web .stage2 { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .web .stage2 .lock { max-width: 170px; }
+  .web .page { padding: 26px 18px 40px; }
+  .web .display { font-size: 30px; }
+  .web .mast__in { padding: 12px 18px; }
+  .web .wm { width: 136px; }
+  .web .edge { display: none; }
+}
+@media (max-width: 440px) { .web .two { grid-template-columns: minmax(0, 1fr); } .web .devices { flex-direction: column; align-items: flex-start; } .web .device { padding: 0; } .web .device + .device { border-left: 0; } .web nav button { padding: 0 7px; } }
+
+/* ---------- Android skin ---------- */
+.phone { width: 392px; max-width: 100%; height: 820px; border-radius: 46px; border: 10px solid var(--frame); box-shadow: 0 24px 60px -30px rgba(0,0,0,.5); display: flex; flex-direction: column; }
+.phone .status { height: 34px; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font: 600 13px/1 var(--text); flex-shrink: 0; }
+.phone .cam { width: 12px; height: 12px; border-radius: 50%; background: var(--frame); }
+.phone .appbar { height: 58px; display: flex; align-items: center; justify-content: center; position: relative; flex-shrink: 0; }
+.phone .appbar .wm { height: 28px; color: var(--ink); line-height: 0; }
+.phone .appbar .wm svg { height: 100%; width: auto; }
+.iconbtn { position: absolute; width: 44px; height: 44px; border-radius: 50%; border: 0; background: none; display: grid; place-items: center; cursor: pointer; }
+.iconbtn:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.iconbtn.end { right: 8px; } .iconbtn.start { left: 8px; }
+.phone .scroll { flex: 1; overflow-y: auto; padding: 6px 20px 20px; scrollbar-width: thin; }
+.phone .col { display: flex; flex-direction: column; gap: 14px; align-items: stretch; }
+.phone .center { text-align: center; }
+.phone .tasktitle { width: 100%; border: 0; background: none; text-align: center; font: 600 22px/1.25 var(--display); padding: 6px 4px; border-bottom: 1px solid transparent; }
+.phone .tasktitle:focus-visible { outline: none; border-bottom: 2px solid var(--ink); }
+.phone .lock { max-width: 190px; }
+.phone .pill { min-height: 44px; flex: 1 1 0; }
+.phone .sel select { min-height: 52px; border-radius: 12px; font-size: 16px; padding-left: 46px; }
+.phone .sel > svg:first-child { left: 14px; width: 22px; height: 22px; }
+.phone .btn--lockin { border-radius: 999px; min-height: 54px; font-size: 20px; }
+.phone .devices { justify-content: center; }
+.phone .device { font-size: 14px; padding: 0 10px; }
+.phone .display { font: 700 28px/1.2 var(--display); margin: 0; letter-spacing: -.02em; }
+.phone .ptitle { font-size: 26px; margin-top: 4px; }
+.phone .navbar { flex-shrink: 0; display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); padding: 8px 6px 14px; background: var(--ground); }
+.phone .navbar button { border: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; font-size: 12.5px; color: var(--ink-muted); padding: 0; min-height: 56px; }
+.phone .navbar .ind { width: 60px; height: 30px; border-radius: 999px; display: grid; place-items: center; }
+.phone .navbar button[aria-current="page"] { color: var(--ink); font-weight: 600; }
+.phone .navbar button[aria-current="page"] .ind { background: var(--taupe-soft); }
+.phone .handle { width: 110px; height: 4px; border-radius: 2px; background: var(--ink); opacity: .5; margin: 0 auto 8px; flex-shrink: 0; }
+.phone .out { justify-content: space-between; }
+@media (max-width: 420px) { .phone { border-width: 6px; border-radius: 34px; height: 760px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="bar" role="toolbar" aria-label="Prototype controls">
+  <div class="bar__name">Lockd In <span class="bar__tag">Prototype · blocks nothing</span></div>
+  <div class="seg" aria-label="Platform">
+    <button type="button" id="v-web" aria-pressed="true">Web</button>
+    <button type="button" id="v-android" aria-pressed="false">Android</button>
+  </div>
+  <label for="speed">Clock
+    <span class="seg" id="speed" role="group" aria-label="Clock speed">
+      <button type="button" data-speed="1" aria-pressed="false">Real time</button>
+      <button type="button" data-speed="60" aria-pressed="true">1 min = 1 s</button>
+    </span>
+  </label>
+  <button type="button" class="btn" id="reset" style="min-height:36px">Reset</button>
+</div>
+<p class="note">A clickable mock of the approved Cream &amp; Ink design. Both views share one session, so you can start on the web and watch it on the phone. Example data (the Physics review session, sample apps) is made up for testing. Nothing here restricts apps, and nothing is sent anywhere.</p>
+<div class="stage"><div id="app"></div></div>
+
+<script>
+const WORDMARK = `{{WORDMARK}}`;
+const EDGE = `{{EDGE}}`;
+const P = {
+  laptop: 'M4 6.5h16v9.5H4zM2 18.5h20', phone: 'M7.5 2.5h9v19h-9zM11 18.5h2',
+  browser: 'M3 4.5h18v15H3zM3 8.5h18M6 6.5h.01M8.5 6.5h.01', calendar: 'M4 5.5h16v15H4zM4 10h16M8.5 3v4M15.5 3v4',
+  coffee: 'M4 9h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM16 10.5h1.5a2.5 2.5 0 0 1 0 5H16M8 3.5c0 1.2 1 1.6 1 2.8M12 3.5c0 1.2 1 1.6 1 2.8',
+  book: 'M4 5.5c2.5-1.3 5.5-1.3 8 0v14c-2.5-1.3-5.5-1.3-8 0zM12 5.5c2.5-1.3 5.5-1.3 8 0v14c-2.5-1.3-5.5-1.3-8 0z',
+  gear: 'M18.97 10.21 L21.27 10.47 L21.27 13.53 L18.97 13.79 L18.20 15.67 L19.64 17.48 L17.48 19.64 L15.67 18.20 L13.79 18.97 L13.53 21.27 L10.47 21.27 L10.21 18.97 L8.33 18.20 L6.52 19.64 L4.36 17.48 L5.80 15.67 L5.03 13.79 L2.73 13.53 L2.73 10.47 L5.03 10.21 L5.80 8.33 L4.36 6.52 L6.52 4.36 L8.33 5.80 L10.21 5.03 L10.47 2.73 L13.53 2.73 L13.79 5.03 L15.67 5.80 L17.48 4.36 L19.64 6.52 L18.20 8.33Z M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 1 0 0-6.8',
+  chevron: 'M9 6l6 6-6 6', down: 'M6 9l6 6 6-6', back: 'M15 6l-6 6 6 6', arrow: 'M4.5 12h15M13.5 6l6 6-6 6',
+  focus: 'M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18M12 7.5V12l3 2', info: 'M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18M12 11v5.5M12 7.5h.01',
+  plus: 'M12 5v14M5 12h14', lock: 'M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z', devices: 'M2 4h10v7H2zM5 14h4M7 11v3M13 6h3v9h-3z',
+};
+const ic = (n, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${P[n]}"/></svg>`;
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/* ---------- Simulated clock ---------- */
+const clock = { speed: 60, realBase: Date.now(), simBase: Date.now() };
+const now = () => clock.simBase + (Date.now() - clock.realBase) * clock.speed;
+function setSpeed(s) { clock.simBase = now(); clock.realBase = Date.now(); clock.speed = s; }
+
+/* ---------- State ---------- */
+const PROFILES = [
+  { id: 'study', name: 'Study', about: 'Course apps, notes, PDFs and a calculator' },
+  { id: 'writing', name: 'Writing', about: 'A word processor and your sources' },
+  { id: 'coding', name: 'Coding', about: 'Editor, terminal and documentation' },
+];
+const SAMPLE_APPS = {
+  pc: ['Word', 'OneNote', 'Acrobat Reader', 'Calculator', 'Visual Studio Code', 'Windows Terminal', 'Edge', 'Spotify', 'Discord', 'Steam'],
+  phone: ['Notes', 'Calculator', 'Google Docs', 'Drive', 'Camera', 'Messages', 'Instagram', 'TikTok', 'YouTube', 'Spotify'],
+};
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+function fresh() {
+  return {
+    view: 'web', route: 'focus', theme: 'system', tone: 'calm',
+    task: '', len: 40, custom: false, brk: 10, periods: 2, profile: 'study', error: null,
+    session: null, out: 'closed', scope: 'period', confirmEnd: false,
+    schedule: [{ id: 's1', title: 'Physics review', days: [1, 2, 3, 4], time: '19:00', len: 40, periods: 2, brk: 10, example: true }],
+    editing: null, openProfile: null,
+    allowed: { study: { pc: ['Word', 'OneNote', 'Acrobat Reader', 'Calculator'], phone: ['Notes', 'Calculator', 'Drive'] }, writing: { pc: ['Word', 'Edge'], phone: ['Google Docs'] }, coding: { pc: ['Visual Studio Code', 'Windows Terminal', 'Edge'], phone: [] } },
+  };
+}
+let S = fresh();
+const set = (patch) => { Object.assign(S, typeof patch === 'function' ? patch(S) : patch); render(); };
+
+/* ---------- Session engine (mirrors the app's rules) ---------- */
+const DELAY = 90_000;
+function plan() { const segs = []; const n = S.brk > 0 ? S.periods : 1; for (let i = 0; i < n; i++) { segs.push({ kind: 'focus', min: S.len }); if (S.brk > 0 && i < n - 1) segs.push({ kind: 'break', min: S.brk }); } return segs; }
+function phases(sess) { let t = sess.start; return sess.segs.map((s, i) => { const p = { ...s, i, start: t, end: t + s.min * 60_000 }; t = p.end; return p; }); }
+function evaluate(sess, t) {
+  const ph = phases(sess); const end = ph[ph.length - 1].end;
+  if (sess.endedAt && sess.endedAt <= t) return { status: sess.endReason, ph, end: sess.endedAt };
+  const ov = sess.unlock;
+  if (ov && !ov.cancelled && ov.scope === 'rest' && ov.at + DELAY <= t) return { status: 'override', ph, end: ov.at + DELAY };
+  if (t >= end) return { status: 'completed', ph, end };
+  const cur = ph.find((p) => t >= p.start && t < p.end);
+  let lifted = false, pending = null;
+  if (ov && !ov.cancelled) {
+    if (ov.at + DELAY > t) pending = ov;
+    else if (ov.scope === 'period' && ov.phase === cur.i) lifted = true;
+  }
+  return { status: 'active', ph, cur, end, lifted, pending, restricting: cur.kind === 'focus' && !lifted };
+}
+function start() {
+  if (!(S.len >= 1 && S.len <= 240)) { set({ error: 'Focus periods are 1–240 minutes.' }); return; }
+  set({ session: { start: now(), segs: plan(), task: S.task.trim(), profile: S.profile, unlock: null }, error: null, out: 'closed', confirmEnd: false, route: 'focus' });
+}
+const fmtClock = (t) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const countdown = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
+const spoken = (ms) => { const m = Math.max(0, Math.ceil(ms / 60000)); return `${m} minute${m === 1 ? '' : 's'} left`; };
+const MSG = {
+  calm: { focus: () => 'Start with one small step.', brk: (t) => `Break until ${t}. Step away for a bit.`, done: 'That’s the session. Take a breath before the next thing.' },
+  direct: { focus: (k) => (k ? `You planned ${k}. Go.` : 'Locked in. Go.'), brk: (t) => `Break. Back at ${t}.`, done: 'Done.' },
+  playful: { focus: () => 'The feed will still be there after this.', brk: (t) => `Break unlocked until ${t}. Stretch, snack, hydrate.`, done: 'Session cleared. The lock says hi.' },
+};
+function nextUp() {
+  const t = new Date(now()); let best = null;
+  for (const s of S.schedule) for (let d = 0; d < 8; d++) {
+    const day = new Date(t); day.setDate(t.getDate() + d);
+    if (!s.days.includes(day.getDay())) continue;
+    const [h, m] = s.time.split(':').map(Number); day.setHours(h, m, 0, 0);
+    if (day.getTime() > t.getTime() && (!best || day < best.at)) { best = { s, at: day }; break; }
+  }
+  if (!best) return null;
+  const today = new Date(now()); const diff = Math.round((new Date(best.at).setHours(0, 0, 0, 0) - today.setHours(0, 0, 0, 0)) / 864e5);
+  const day = diff === 0 ? 'Today' : diff === 1 ? 'Tomorrow' : DAYS[best.at.getDay()];
+  return `${best.s.title} · ${day} ${fmtClock(best.at)}`;
+}
+
+/* ---------- Pieces ---------- */
+function lockSvg(ms, cap, on) {
+  const d = on ? 'M75.5 136 V108 A44.5 44.5 0 0 1 164.5 108 V136' : 'M75.5 136 V94 A44.5 44.5 0 0 1 163.8 86.3';
+  return `<figure class="lock ${on ? 'on' : ''}" role="img" aria-label="${esc(cap)}: ${spoken(ms)}" style="margin:0 auto">
+    <svg viewBox="0 36 240 260" aria-hidden="true"><path class="sh" d="${d}"/><rect class="bd" x="14" y="120" width="212" height="172" rx="22"/></svg>
+    <div class="lock__face" aria-hidden="true"><svg class="lock__clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11"/><path d="M12 6.5V12.5H16.5"/></svg>
+    <span class="lock__time" data-tick>${countdown(ms)}</span><span class="lock__cap">${esc(cap)}</span></div></figure>`;
+}
+function select(id, icon, label, value, opts, quiet = false) {
+  return `<span class="sel ${quiet ? 'sel--quiet' : ''}">${quiet ? '' : ic(icon)}<select id="${id}" aria-label="${label}">${opts.map(([v, t]) => `<option value="${v}" ${String(v) === String(value) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>${ic('down')}</span>`;
+}
+function pills() {
+  return `<div class="pills" role="radiogroup" aria-label="Focus time">${[25, 40, 60].map((m) => `<button type="button" class="pill" role="radio" aria-checked="${!S.custom && S.len === m}" data-len="${m}">${m} min</button>`).join('')}<button type="button" class="pill" role="radio" aria-checked="${S.custom}" data-len="custom">Custom</button></div>
+  ${S.custom ? `<div class="row" style="justify-content:flex-start"><label for="custom" class="muted">Minutes</label><input id="custom" class="input" style="width:110px" type="number" min="1" max="240" value="${S.len}" inputmode="numeric"></div>` : ''}`;
+}
+const breakOpts = () => [[0, 'No break'], ...[5, 10, 15, 20].map((b) => [b, `Break · ${b} min`])];
+const profileOpts = () => PROFILES.map((p) => [p.id, `${p.name} profile`]);
+function devices(view) {
+  const rows = view === 'web'
+    ? [['laptop', 'PC not paired', 0], ['phone', 'Phone not paired', 0], ['browser', 'Browser timer only', 1]]
+    : [['phone', 'Phone blocking off', 0], ['laptop', 'PC not paired', 0]];
+  return `<ul class="devices" aria-label="Devices">${rows.map(([i, t, ok]) => `<li class="device">${ic(i)}<span class="dot ${ok ? 'ok' : ''}"></span><span>${t}</span></li>`).join('')}</ul>`;
+}
+function outPanel(ev) {
+  const inFocus = ev.cur.kind === 'focus' && !ev.lifted;
+  let body;
+  if (S.confirmEnd) {
+    body = `<div class="confirm" role="alertdialog" aria-labelledby="ce-t"><h3 id="ce-t">End the session now?</h3><p>Emergency recovery ends it immediately, with no countdown.</p>
+      <div class="row" style="justify-content:flex-start"><button type="button" class="btn btn--danger-solid" data-act="end-yes">End session now</button><button type="button" class="btn" data-act="end-no" data-safe>Keep going</button></div></div>`;
+    return `<div class="out">${body}</div>`;
+  }
+  if (ev.pending) {
+    body = `<p style="margin:0" role="status"><strong>Unlocking in <span data-pending>${countdown(ev.pending.at + DELAY - now())}</span></strong> · ${ev.pending.scope === 'period' ? 'this focus period' : 'ends the session'}</p><button type="button" class="btn" data-act="cancel-unlock">Cancel unlock</button>`;
+  } else if (S.out === 'open') {
+    body = `<fieldset class="choices"><legend>Unlock after a 90-second wait</legend>
+      ${inFocus ? `<label class="radio"><input type="radio" name="scope" value="period" ${S.scope === 'period' ? 'checked' : ''}> This focus period</label>` : ''}
+      <label class="radio"><input type="radio" name="scope" value="rest" ${!inFocus || S.scope === 'rest' ? 'checked' : ''}> Rest of this session</label>
+      <div class="row" style="justify-content:flex-start;margin-top:4px"><button type="button" class="btn" data-act="start-unlock">Start unlock</button><button type="button" class="btn btn--quiet" data-act="close-out">Cancel</button></div></fieldset>`;
+  } else {
+    body = `<button type="button" class="btn" data-act="need-out">Need out?</button>`;
+  }
+  return `<div class="out">${body}<button type="button" class="btn btn--quiet btn--danger out__end" data-act="end-now">End now</button></div>`;
+}
+function sessionBits(ev) {
+  const sess = S.session, cur = ev.cur, rem = cur.end - now();
+  const fc = sess.segs.filter((s) => s.kind === 'focus').length, fi = sess.segs.slice(0, cur.i + 1).filter((s) => s.kind === 'focus').length;
+  const next = ev.ph[cur.i + 1];
+  const status = ev.lifted ? 'Unlocked for now.' : ev.restricting ? 'Locked in.' : 'On a break.';
+  const cap = cur.kind === 'focus' ? (fc > 1 ? `Focus ${fi} of ${fc}` : 'Focus time') : 'Break';
+  const tone = MSG[S.tone];
+  const nudge = S.tone === 'quiet' ? null : cur.kind === 'break' ? tone.brk(fmtClock(cur.end)) : ev.lifted ? `Unlocked until ${fmtClock(cur.end)}. Later focus periods lock again.` : tone.focus(sess.task);
+  const facts = [[cur.kind === 'focus' ? (next ? 'Break at' : 'Ends at') : 'Focus resumes', fmtClock(cur.end)], ...(next ? [['Session ends', fmtClock(ev.end)]] : []), ['Profile', PROFILES.find((p) => p.id === sess.profile).name]];
+  return { rem, status, cap, nudge, facts };
+}
+function recapBits(ev) {
+  const sess = S.session; const endedAt = ev.end;
+  const focused = Math.round(ev.ph.filter((p) => p.kind === 'focus').reduce((a, p) => a + Math.max(0, Math.min(p.end, endedAt) - p.start), 0) / 60000);
+  const how = ev.status === 'completed' ? 'Finished as planned.' : ev.status === 'override' ? 'Ended early with an unlock.' : 'Ended with emergency recovery.';
+  return { focused, how, time: `${fmtClock(sess.start)}–${fmtClock(endedAt)}`, note: ev.status === 'completed' && S.tone !== 'quiet' ? MSG[S.tone].done : null };
+}
+
+/* ---------- Secondary pages (shared markup, styled per skin) ---------- */
+function schedulePage() {
+  const e = S.editing;
+  const editor = e ? `<form class="col" id="editor" style="display:flex;flex-direction:column;gap:14px;border:1px solid var(--line);background:var(--surface);border-radius:16px;padding:20px;margin:12px 0 20px" novalidate>
+    <h2 class="sub" style="margin:0">Plan a session</h2>
+    <label class="lbl" for="e-title">Name</label><input id="e-title" class="input" value="${esc(e.title)}" placeholder="e.g. Physics review" style="margin-top:-8px">
+    <div><div class="lbl" style="margin-bottom:8px">Days</div><div class="chips">${DAYS.map((d, i) => `<button type="button" class="chip" aria-pressed="${e.days.includes(i)}" data-day="${i}">${d}</button>`).join('')}</div></div>
+    <div class="row" style="flex-wrap:wrap;justify-content:flex-start;align-items:flex-end">
+      <label class="lbl" style="display:flex;flex-direction:column;gap:6px">Starts<input id="e-time" class="input" type="time" value="${e.time}" style="width:150px"></label>
+      <label class="lbl" style="display:flex;flex-direction:column;gap:6px">Focus (min)<input id="e-len" class="input" type="number" min="1" max="240" value="${e.len}" style="width:110px"></label>
+    </div>
+    ${e.err ? `<p class="err" role="alert">${esc(e.err)}</p>` : ''}
+    <div class="row" style="justify-content:flex-start"><button type="submit" class="btn btn--primary">Save session</button><button type="button" class="btn" data-act="cancel-edit">Cancel</button></div></form>` : '';
+  const list = S.schedule.length ? `<ul class="list">${S.schedule.map((s) => `<li class="row"><div><div style="font:600 19px/1.2 var(--display)">${fmtClock(new Date(2000, 0, 1, ...s.time.split(':').map(Number)).getTime())}</div></div><div style="flex:1;min-width:0"><strong>${esc(s.title)}</strong>${s.example ? ' <span class="muted" style="font-size:13px">(example)</span>' : ''}<div class="muted">${s.days.map((d) => DAYS[d]).join(', ')} · ${s.len} min</div></div><button type="button" class="btn btn--quiet" data-del="${s.id}" aria-label="Delete ${esc(s.title)}">Delete</button></li>`).join('')}</ul>`
+    : `<div class="empty">${ic('calendar')}<span>No sessions planned.</span></div>`;
+  return `<div class="row" style="flex-wrap:wrap"><h1 class="ptitle">Schedule</h1>${e ? '' : `<button type="button" class="btn btn--primary" data-act="new-session">${ic('plus')} Plan a session</button>`}</div>${editor}${list}`;
+}
+function profilesPage() {
+  const open = S.openProfile;
+  return `<h1 class="ptitle">Profiles</h1><p class="muted" style="margin:0 0 16px">Apps that stay available during focus. Each device keeps its own list.</p>
+  <ul class="list">${PROFILES.map((p) => {
+    const a = S.allowed[p.id];
+    return `<li><button type="button" class="row" data-prof="${p.id}" aria-expanded="${open === p.id}" style="width:100%;border:0;background:none;padding:0;text-align:left;cursor:pointer;min-height:44px">
+      <span><strong style="font:600 19px/1.2 var(--display)">${p.name}</strong><br><span class="muted">${p.about}</span></span>
+      <span class="muted" style="white-space:nowrap;font-size:14px">PC ${a.pc.length} · Phone ${a.phone.length} ${ic(open === p.id ? 'down' : 'chevron')}</span></button>
+      ${open === p.id ? ['pc', 'phone'].map((dev) => `<fieldset style="border:0;padding:0;margin:12px 0 0"><legend style="padding:0;font-weight:600;display:flex;gap:8px;align-items:center">${ic(dev === 'pc' ? 'laptop' : 'phone')} ${dev === 'pc' ? 'PC' : 'Phone'} <span class="muted" style="font-weight:400;font-size:13px">sample installed apps</span></legend>
+        <div class="apps">${SAMPLE_APPS[dev].map((app) => `<label class="check"><input type="checkbox" data-app="${p.id}|${dev}|${esc(app)}" ${a[dev].includes(app) ? 'checked' : ''}> ${esc(app)}</label>`).join('')}</div></fieldset>`).join('') : ''}
+    </li>`; }).join('')}</ul>`;
+}
+function devicesPage(view) {
+  return `<h1 class="ptitle">Devices</h1><div style="margin:8px 0 18px">${devices(view)}</div>
+  <ul class="list">${[['Windows app', 'Restricts apps outside your profile during focus.'], ['Android app', 'Covers restricted apps with a block screen during focus.'], ['Browser', 'Plans and times sessions. Browsers can’t restrict other apps.']].map(([k, v]) => `<li><strong>${k}</strong><div class="muted">${v}</div></li>`).join('')}</ul>
+  <p class="muted" style="font-size:14px">Pairing isn’t available yet. Paired devices will share session timing and keep working offline.</p>`;
+}
+function settingsPage() {
+  const radios = (name, cur, opts) => opts.map(([v, l]) => `<label class="radio" style="display:inline-flex;margin-right:18px"><input type="radio" name="${name}" value="${v}" ${cur === v ? 'checked' : ''}> ${l}</label>`).join('');
+  const sample = S.tone === 'quiet' ? 'No messages.' : MSG[S.tone].brk('6:30 PM');
+  return `<h1 class="ptitle">Settings</h1>
+  <fieldset style="border:0;padding:0;margin:0 0 8px"><legend><h2 class="sub">Appearance</h2></legend>${radios('theme', S.theme, [['system', 'Match system'], ['light', 'Light'], ['dark', 'Dark']])}</fieldset>
+  <fieldset style="border:0;padding:0;margin:0 0 8px"><legend><h2 class="sub">Messages</h2></legend>${radios('tone', S.tone, [['calm', 'Calm'], ['direct', 'Direct'], ['playful', 'Playful'], ['quiet', 'Quiet']])}<p class="muted" style="margin:8px 0 0">${sample}</p></fieldset>`;
+}
+
+/* ---------- Web skin ---------- */
+function webFocus() {
+  const ev = S.session ? evaluate(S.session, now()) : null;
+  const next = nextUp();
+  if (!ev) {
+    return `<h1 class="display">Ready when you are.</h1>
+    <form class="stage2" id="setup" novalidate>
+      <div>${lockSvg(S.len * 60000, 'Focus time', false)}</div>
+      <div class="ctl">
+        <div class="field"><label class="lbl" for="task">What are you working on?</label><input id="task" class="input" value="${esc(S.task)}" placeholder="e.g. TAM 212 · Practice problems" autocomplete="off"></div>
+        <div class="field"><div class="row" style="min-height:32px"><span class="lbl">Focus time</span>${S.brk > 0 ? select('periods', 'focus', 'Focus periods', S.periods, [2, 3, 4, 5, 6].map((n) => [n, `${n} periods`]), true) : ''}</div>${pills()}</div>
+        <div class="two">${select('brk', 'coffee', 'Break', S.brk, breakOpts())}${select('prof', 'book', 'Profile', S.profile, profileOpts())}</div>
+        ${S.error ? `<p class="err" role="alert">${S.error}</p>` : ''}
+        <button type="submit" class="btn btn--primary btn--lockin">Lock in ${ic('arrow')}</button>
+      </div>
+    </form>
+    <div class="foot">${devices('web')}<div class="next">${ic('calendar')}<p><strong>Next:</strong> ${next ? esc(next) : 'nothing planned'}</p><button type="button" class="linkbtn" data-go="schedule">${next ? 'View schedule' : 'Plan a session'} ${ic('arrow')}</button></div></div>`;
+  }
+  if (ev.status !== 'active') {
+    const r = recapBits(ev);
+    return `<h1 class="display">Session complete.</h1>${S.session.task ? `<p class="subtitle">${esc(S.session.task)}</p>` : ''}
+    <div class="stage2"><div>${lockSvg(0, 'Done', false)}</div><div class="ctl">
+      <dl class="facts"><div><dt>Focused</dt><dd>${r.focused} min</dd></div><div><dt>Time</dt><dd>${r.time}</dd></div></dl>
+      <p class="muted" style="margin:0">${r.how}${r.note ? ' ' + r.note : ''}</p>
+      <div class="row" style="justify-content:flex-start"><button type="button" class="btn btn--primary btn--lockin" style="width:auto;flex:1" data-act="again">Same again</button><button type="button" class="btn" data-act="done">Done</button></div>
+    </div></div>`;
+  }
+  const b = sessionBits(ev);
+  return `<h1 class="display" aria-live="polite">${b.status}</h1>${S.session.task ? `<p class="subtitle">${esc(S.session.task)}</p>` : ''}
+  <div class="stage2"><div>${lockSvg(b.rem, b.cap, ev.restricting)}</div><div class="ctl">
+    <dl class="facts">${b.facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+    ${b.nudge ? `<p class="muted" style="margin:0">${esc(b.nudge)}</p>` : ''}${outPanel(ev)}
+  </div></div>
+  <div class="foot"><p class="honesty" style="margin:0 0 12px">${ic('info')} Not blocking: browsers can’t restrict apps</p>${devices('web')}</div>`;
+}
+function webView() {
+  const live = S.session && evaluate(S.session, now()).status === 'active';
+  const nav = [['focus', 'Focus'], ['schedule', 'Schedule'], ['profiles', 'Profiles'], ['devices', 'Devices']];
+  const body = S.route === 'focus' ? webFocus() : S.route === 'schedule' ? schedulePage() : S.route === 'profiles' ? profilesPage() : S.route === 'devices' ? devicesPage('web') : settingsPage();
+  return `<div class="mock web ${themeClass()}">
+    <div class="edge edge--l" aria-hidden="true">${EDGE}</div><div class="edge edge--r" aria-hidden="true">${EDGE}</div>
+    <header class="mast"><div class="mast__in"><button type="button" class="wm" data-go="focus" aria-label="Lockd In, Focus">${WORDMARK}</button>
+      <nav aria-label="Main">${nav.map(([r, l]) => `<button type="button" data-go="${r}" ${S.route === r ? 'aria-current="page"' : ''}>${l}${r === 'focus' && live ? '<span class="live" aria-label="session running"></span>' : ''}</button>`).join('')}
+      <button type="button" class="gear" data-go="settings" aria-label="Settings" ${S.route === 'settings' ? 'aria-current="page"' : ''}>${ic('gear', 'big')}</button></nav></div></header>
+    <main class="page">${body}</main></div>`;
+}
+
+/* ---------- Android skin ---------- */
+function androidFocus() {
+  const ev = S.session ? evaluate(S.session, now()) : null;
+  const next = nextUp();
+  if (!ev) {
+    return `<form class="col" id="setup" novalidate>
+      <h1 class="sr">Start a focus session</h1>
+      <input id="task" class="tasktitle" value="${esc(S.task)}" placeholder="What are you working on?" aria-label="What are you working on?" autocomplete="off">
+      ${lockSvg(S.len * 60000, 'Focus time', false)}
+      ${pills()}
+      ${S.brk > 0 ? `<div style="display:grid;grid-template-columns:1.35fr 1fr;gap:10px">${select('brk', 'coffee', 'Break', S.brk, breakOpts())}${select('periods', 'focus', 'Focus periods', S.periods, [2, 3, 4, 5, 6].map((n) => [n, `× ${n}`]))}</div>` : select('brk', 'coffee', 'Break', S.brk, breakOpts())}
+      ${select('prof', 'book', 'Profile', S.profile, profileOpts())}
+      ${S.error ? `<p class="err" role="alert">${S.error}</p>` : ''}
+      <button type="submit" class="btn btn--primary btn--lockin">Lock in ${ic('arrow')}</button>
+      ${devices('android')}
+      ${next ? `<button type="button" class="linkbtn" data-go="schedule" style="justify-content:center;font-weight:500;font-size:14px">${ic('calendar')} Next: ${esc(next)}</button>` : ''}
+    </form>`;
+  }
+  if (ev.status !== 'active') {
+    const r = recapBits(ev);
+    return `<div class="col center"><div><h1 class="display">Session complete.</h1>${S.session.task ? `<div style="font-size:18px">${esc(S.session.task)}</div>` : ''}</div>
+      <div style="width:170px;margin:0 auto">${lockSvg(0, 'Done', false)}</div>
+      <p class="muted" style="margin:0">${r.focused} min focused · ${r.time}</p><p style="margin:0;font-weight:600">${r.how}</p>${r.note ? `<p class="muted" style="margin:0">${r.note}</p>` : ''}
+      <button type="button" class="btn btn--primary btn--lockin" data-act="again">Same again</button><button type="button" class="btn btn--quiet" data-act="done">Done</button></div>`;
+  }
+  const b = sessionBits(ev);
+  return `<div class="col center"><div><h1 class="display" aria-live="polite">${b.status}</h1>${S.session.task ? `<div style="font-size:18px">${esc(S.session.task)}</div>` : ''}</div>
+    ${lockSvg(b.rem, b.cap, ev.restricting)}
+    <p class="muted" style="margin:0;font-size:14px">${b.facts.map(([k, v]) => k === 'Profile' ? `${esc(v)} profile` : `${k} ${esc(v)}`).join(' · ')}</p>
+    ${b.nudge ? `<p class="muted" style="margin:0">${esc(b.nudge)}</p>` : ''}
+    <div style="text-align:left">${outPanel(ev)}</div>
+    <p class="honesty" style="justify-content:center;margin:0">${ic('info')} Not blocking on this phone</p></div>`;
+}
+function androidView() {
+  const top = ['focus', 'schedule', 'profiles'];
+  const tab = top.includes(S.route) ? S.route : S.lastTab || 'focus';
+  const body = S.route === 'focus' ? androidFocus() : S.route === 'schedule' ? schedulePage() : S.route === 'profiles' ? profilesPage() : S.route === 'devices' ? devicesPage('android') : settingsPage();
+  const t = new Date(now());
+  return `<div class="mock phone ${themeClass()}" aria-label="Android phone prototype">
+    <div class="status"><span>${t.getHours() % 12 || 12}:${String(t.getMinutes()).padStart(2, '0')}</span><span class="cam"></span><span aria-hidden="true">▂▄▆ ▮</span></div>
+    <div class="appbar">${top.includes(S.route) ? '' : `<button type="button" class="iconbtn start" data-go="${tab}" aria-label="Back">${ic('back')}</button>`}
+      <span class="wm" role="img" aria-label="Lockd In">${WORDMARK}</span>
+      <button type="button" class="iconbtn end" data-go="settings" aria-label="Settings">${ic('gear')}</button></div>
+    <div class="scroll">${body}</div>
+    <nav class="navbar" aria-label="Main">${[['focus', 'Focus', 'lock'], ['schedule', 'Schedule', 'calendar'], ['profiles', 'Profiles', 'book']].map(([r, l, i]) => `<button type="button" data-go="${r}" ${tab === r ? 'aria-current="page"' : ''}><span class="ind">${ic(i)}</span>${l}</button>`).join('')}</nav>
+    <div class="handle"></div></div>`;
+}
+
+/* ---------- Render + events ---------- */
+function themeClass() {
+  if (S.theme === 'light') return 'light';
+  if (S.theme === 'dark') return 'dark';
+  return '';
+}
+const app = document.getElementById('app');
+let lastKey = '';
+function render() {
+  const keep = document.activeElement && document.activeElement.id;
+  app.innerHTML = S.view === 'web' ? webView() : androidView();
+  document.getElementById('v-web').setAttribute('aria-pressed', S.view === 'web');
+  document.getElementById('v-android').setAttribute('aria-pressed', S.view === 'android');
+  document.querySelectorAll('[data-speed]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.speed) === clock.speed)));
+  if (keep) { const el = document.getElementById(keep); if (el) { el.focus(); if (el.setSelectionRange && el.type === 'text') el.setSelectionRange(el.value.length, el.value.length); } }
+  if (S.confirmEnd) app.querySelector('[data-safe]')?.focus();
+  lastKey = phaseKey();
+}
+function phaseKey() {
+  if (!S.session) return 'none';
+  const ev = evaluate(S.session, now());
+  return `${ev.status}|${ev.cur?.i}|${ev.lifted}|${!!ev.pending}`;
+}
+setInterval(() => {
+  if (phaseKey() !== lastKey) { render(); return; }
+  if (!S.session) { const st = app.querySelector('.status span'); if (st) { const t = new Date(now()); st.textContent = `${t.getHours() % 12 || 12}:${String(t.getMinutes()).padStart(2, '0')}`; } return; }
+  const ev = evaluate(S.session, now());
+  if (ev.status !== 'active') return;
+  const tick = app.querySelector('[data-tick]'); if (tick) tick.textContent = countdown(ev.cur.end - now());
+  const fig = app.querySelector('figure.lock'); if (fig) fig.setAttribute('aria-label', `${fig.getAttribute('aria-label').split(':')[0]}: ${spoken(ev.cur.end - now())}`);
+  const pend = app.querySelector('[data-pending]'); if (pend && ev.pending) pend.textContent = countdown(ev.pending.at + DELAY - now());
+  const st = app.querySelector('.status span'); if (st) { const t = new Date(now()); st.textContent = `${t.getHours() % 12 || 12}:${String(t.getMinutes()).padStart(2, '0')}`; }
+}, 250);
+
+app.addEventListener('click', (e) => {
+  const t = e.target.closest('button, [data-go]'); if (!t) return;
+  if (t.dataset.go) { const r = t.dataset.go; set((s) => ({ route: r, lastTab: ['focus', 'schedule', 'profiles'].includes(r) ? r : s.lastTab, editing: r === 'schedule' && !S.schedule.length && t.closest('.next, .linkbtn') ? { title: '', days: [1, 2, 3, 4, 5], time: '18:00', len: 40 } : s.editing })); app.querySelector('.scroll')?.scrollTo(0, 0); return; }
+  if (t.dataset.len) { if (t.dataset.len === 'custom') set({ custom: true }); else set({ custom: false, len: Number(t.dataset.len), error: null }); return; }
+  if (t.dataset.day) { const d = Number(t.dataset.day); const days = S.editing.days.includes(d) ? S.editing.days.filter((x) => x !== d) : [...S.editing.days, d].sort(); set({ editing: { ...S.editing, days } }); return; }
+  if (t.dataset.del) { set({ schedule: S.schedule.filter((s) => s.id !== t.dataset.del) }); return; }
+  if (t.dataset.prof) { set({ openProfile: S.openProfile === t.dataset.prof ? null : t.dataset.prof }); return; }
+  const a = t.dataset.act; const sess = S.session;
+  if (a === 'need-out') set({ out: 'open' });
+  else if (a === 'close-out') set({ out: 'closed' });
+  else if (a === 'start-unlock') { const ev = evaluate(sess, now()); const inFocus = ev.cur.kind === 'focus' && !ev.lifted; set({ session: { ...sess, unlock: { at: now(), scope: inFocus ? S.scope : 'rest', phase: ev.cur.i } }, out: 'closed' }); }
+  else if (a === 'cancel-unlock') set({ session: { ...sess, unlock: { ...sess.unlock, cancelled: true } } });
+  else if (a === 'end-now') set({ confirmEnd: true });
+  else if (a === 'end-no') set({ confirmEnd: false });
+  else if (a === 'end-yes') set({ session: { ...sess, endedAt: now(), endReason: 'emergency' }, confirmEnd: false });
+  else if (a === 'again') set({ session: { ...sess, start: now(), unlock: null, endedAt: null } });
+  else if (a === 'done') set({ session: null });
+  else if (a === 'new-session') set({ editing: { title: '', days: [1, 2, 3, 4, 5], time: '18:00', len: 40 } });
+  else if (a === 'cancel-edit') set({ editing: null });
+});
+app.addEventListener('input', (e) => {
+  const t = e.target;
+  if (t.id === 'task') S.task = t.value.slice(0, 120);
+  if (t.id === 'e-title') S.editing.title = t.value.slice(0, 60);
+  if (t.id === 'e-time') S.editing.time = t.value;
+  if (t.id === 'e-len') S.editing.len = Number(t.value);
+  if (t.id === 'custom') { S.len = Math.round(Number(t.value)) || 0; S.error = null; }
+});
+app.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.id === 'brk') set({ brk: Number(t.value), error: null });
+  else if (t.id === 'periods') set({ periods: Number(t.value) });
+  else if (t.id === 'prof') set({ profile: t.value });
+  else if (t.id === 'custom') render();
+  else if (t.name === 'scope') S.scope = t.value;
+  else if (t.name === 'theme') set({ theme: t.value });
+  else if (t.name === 'tone') set({ tone: t.value });
+  else if (t.dataset.app) { const [p, dev, name] = t.dataset.app.split('|'); const list = S.allowed[p][dev]; S.allowed[p][dev] = t.checked ? [...list, name] : list.filter((x) => x !== name); render(); }
+});
+app.addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (e.target.id === 'setup') start();
+  if (e.target.id === 'editor') {
+    const ed = S.editing;
+    if (!ed.title.trim()) { set({ editing: { ...ed, err: 'Give the session a name.' } }); return; }
+    if (!ed.days.length) { set({ editing: { ...ed, err: 'Pick at least one day.' } }); return; }
+    if (!(ed.len >= 1 && ed.len <= 240)) { set({ editing: { ...ed, err: 'Focus periods are 1–240 minutes.' } }); return; }
+    set({ schedule: [...S.schedule, { id: 's' + Date.now(), title: ed.title.trim(), days: ed.days, time: ed.time || '18:00', len: ed.len }], editing: null });
+  }
+});
+document.getElementById('v-web').onclick = () => set({ view: 'web' });
+document.getElementById('v-android').onclick = () => set({ view: 'android', lastTab: S.lastTab || 'focus' });
+document.querySelectorAll('[data-speed]').forEach((b) => (b.onclick = () => { setSpeed(Number(b.dataset.speed)); render(); }));
+document.getElementById('reset').onclick = () => { const v = S.view; S = fresh(); S.view = v; render(); };
+render();
+</script>
