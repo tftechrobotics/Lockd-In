@@ -1,6 +1,6 @@
 # ADR-0001: Shared domain logic in a Rust core
 
-**Status:** Accepted (2026-10-29) · **Implemented:** scheduling, timeline, session state, conflicts, protection
+**Status:** Engineering decision (2026-10-29), reversible per Consequences · **Implemented:** scheduling, timeline, session state, conflicts, protection
 
 ## Context
 Schedules, DST handling, override rules and "is the group protected" must give

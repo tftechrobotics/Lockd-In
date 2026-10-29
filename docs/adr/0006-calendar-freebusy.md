@@ -1,6 +1,6 @@
 # ADR-0006: Google Calendar via free/busy only
 
-**Status:** Proposed (2026-10-29)
+**Status:** Recommendation (2026-10-29) — awaiting owner decision; Milestone 6
 
 ## Decision
 Request `calendar.freebusy` and `calendar.calendarlist.readonly`. Suggest

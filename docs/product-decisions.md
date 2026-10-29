@@ -1,27 +1,60 @@
-# Product decisions log
+# Product decisions
 
-Records decisions that refine or override the brief (`Focus_Project_Brief.md`).
-Owner decisions override the brief and are marked **Owner**. Engineering
-proposals awaiting objection are marked **Proposed**.
+Three kinds of entry, kept apart on purpose:
 
-| Date | Decision | Source | Notes |
-|---|---|---|---|
-| 2026-10-29 | Local-only mode is the default; no Focus accounts; devices pair into a group | Proposed (ADR-0005) | Brief asked to evaluate local-only mode |
-| 2026-10-29 | Approved apps are an allowlist with a non-removable system baseline (shell, Settings, Task Manager, dialer/emergency, assistive tech, input methods, Focus) | Proposed | Prevents locking the user out of recovery and accessibility |
-| 2026-10-29 | Overrides: default 90 s countdown, cancellable, lifts only the current focus period; max countdown 15 min | Proposed | Implemented in core |
-| 2026-10-29 | Emergency release: immediate, ends the whole session, recorded in history | Proposed | Implemented in core |
-| 2026-10-29 | Session limits: focus 1–240 min, break 1–120 min, whole session ≤ 12 h | Proposed | Guarantees every session ends |
-| 2026-10-29 | Website restriction v1 = Chrome and Edge extension only; status says "not restricted" otherwise | Proposed | Firefox later |
-| 2026-10-29 | Supported OS at launch: Windows 11 25H2/26H2 (x64, ARM64); Android minSdk 29 pending owner's phone | Proposed | Windows 10 not supported unless owner needs it |
-| 2026-10-29 | Calendar uses free/busy only; never reads event titles | Proposed (ADR-0006) | |
-| 2026-10-29 | DST rule: nonexistent local start shifts later by the gap; repeated local start uses the first occurrence (RFC 5545) | Proposed | Implemented and tested |
+- **Requirements:** stated by the owner (or the brief). Owner statements override the brief.
+- **Engineering recommendations:** the developer's proposals. Not approved until the owner says so; silence is not approval.
+- **Unresolved decisions:** need the owner. Each notes when it blocks work.
 
-## Where the brief was challenged
+## Requirements
 
-- **"Restrict" means add friction, not prevent.** On personal devices the
-  owner can always uninstall or stop Focus. Copy will never say "impossible to
-  bypass".
-- **Perfect cross-device simultaneity** is not achievable; target is ≤ 2 s
-  with synced clocks, with a visible warning when a clock is off.
-- **Website blocking in every browser** is not realistic without invasive
-  techniques the brief forbids; scope is Chrome/Edge with honest status.
+| # | Requirement | Source |
+|---|---|---|
+| R1 | Focus is a serious, **non-VPN** focus restriction app for personal Windows and Android devices. Approved apps are chosen separately per device; focus periods and breaks are scheduled and synchronized. | Owner 2026-10-29 |
+| R2 | Meaningful enforcement and resistance to casual bypass must coexist with preserving work and safe recovery. An administrator-owner can eventually bypass it; that does **not** redefine the product as "friction, never a lock". | Owner 2026-10-29 |
+| R3 | Never call an app "paused" while its process, audio or playback continues. | Owner 2026-10-29 |
+| R4 | In an allowlist session, an unsupported browser must not silently become an unrestricted route to blocked websites. | Owner 2026-10-29 |
+| R5 | Keep scheduled breaks, delayed overrides, immediate emergency recovery and enforcement failure separate. Preserve emergency access, assistive technology and user data; never remove safety features to improve blocking. | Owner 2026-10-29 |
+| R6 | A disconnected peer is "unknown" — not protected, not stopped. Timing tolerances are targets until measured. | Owner 2026-10-29 |
+| R7 | No persistent OS-policy experiments on the owner's everyday PC; use a disposable VM first. | Owner 2026-10-29 |
+| R8 | Testing: compiled, reproducible probes with pinned toolchains; CI-built downloads with install, permission, removal and limitation notes; smoke test first; battery measured against a baseline; logs local, with a disclosure that app identifiers reveal usage. | Owner 2026-10-29 |
+| R9 | Milestone 1 stays open until restriction is demonstrated; don't build the product on an unproven enforcement assumption. | Owner 2026-10-29 |
+| R10 | Scope: Windows and Android, optional Google Calendar, native light/dark UI. No LMS integrations, tutoring, assignment tracking, decorative dashboards or VPN. | Owner + brief |
+| R11 | Everything else in `Focus_Project_Brief.md` (allowlist profiles per device, no force-closing or lost work, no hidden processes, no indefinite lockouts, offline execution, privacy minimums, etc.). | Brief v1.0 |
+
+## Engineering recommendations (not approved)
+
+| # | Recommendation | Where |
+|---|---|---|
+| E1 | Windows: privileged service plus per-user agent; no AppLocker/App Control in v1 unless VM evidence meets go criteria | ADR-0007 |
+| E2 | Android: usage access + block screen + audio focus by default; accessibility optional and evidence-dependent | ADR-0004 |
+| E3 | Defined behavior for each ordinary bypass gap | `enforcement-comparison.md` |
+| E4 | Local-first, no accounts, device-group pairing | ADR-0005 |
+| E5 | Calendar via free/busy scopes only | ADR-0006 |
+| E6 | Session limits: focus 1–240 min, break 1–120 min, session ≤ 12 h (guarantees every session ends) | Implemented in core as a safety bound; values adjustable |
+| E7 | DST: nonexistent start shifts later by the gap; repeated start uses the first occurrence (RFC 5545) | Implemented in core |
+| E8 | Supported OS at launch: Windows 11 25H2/26H2 x64+ARM64; Android minSdk 29 | Pending owner device details |
+| E9 | Rust shared core; WinUI 3; Kotlin/Compose | ADR-0001, ADR-0002 (engineering, reversible) |
+
+## Unresolved decisions (need the owner)
+
+| # | Question | Blocks |
+|---|---|---|
+| U1 | Is a Windows service running as SYSTEM, installed with admin consent, acceptable? | M3 architecture; not the current probes |
+| U2 | Unapproved apps already open when a session starts: offer to let the user close them, or minimize and mute them? Focus never closes them itself. | M2 design |
+| U3 | During focus, may Focus close a restricted app **within seconds of it being launched** (before it can hold new work)? | M3; probe W2 measures feasibility first |
+| U4 | Emergency recovery is immediate. Should it also require a typed confirmation and notify paired devices? | M2 design |
+| U5 | Override countdown length (recommended 90 s) and whether "end whole session" has a longer delay | M2 design |
+| U6 | No accounts / device-group pairing (ADR-0005) vs accounts | M5 |
+| U7 | Service mode may set browser policies that make Chrome/Edge show "managed by your organization". Acceptable? | After VM test 30 |
+| U8 | Android: offer an accessibility mode (Play review risk), or require it if usage access proves insufficient? | After Android probe |
+| U9 | Support Windows 10? | M3 |
+| U10 | Android: request notification access to hide restricted apps' notifications during focus? | M4 |
+
+## Withdrawn
+
+| Date | Statement | Why |
+|---|---|---|
+| 2026-10-29 | "Focus is friction, never a lock" | Owner did not approve; replaced by R2 |
+| 2026-10-29 | "Proposed decisions stand unless you object" | Silence is not approval (owner) |
+| 2026-10-29 | Probe messages saying a covered or minimized app is "paused" | Inaccurate (R3) |

@@ -1,86 +1,38 @@
 # Enforcement probes (Milestone 1 experiments)
 
-These are **experiments, not product code**. Each answers one high-risk
-question on a real device. Nothing here is part of the shipped app, and none
-of it should be described as "working blocking" until the results below are
-filled in from a real device.
+**Experiments, not product code.** Each answers one high-risk question with
+evidence from a real device or a disposable VM. Nothing here may be described
+as "working blocking" until its results are recorded in `docs/milestones.md`.
 
-Both probes:
+| Folder | What | Build status (2026-10-29) | Run status |
+|---|---|---|---|
+| `windows/` | `FocusProbe.exe` (per-user: minimize, per-app mute with crash-safe ledger, launch detection; terminate-at-launch only for the harmless target) and `FocusTarget.exe` (harmless app that logs its own exposure and mute state) | Compiles with .NET SDK 10.0.113, warnings as errors, on Linux. Self-contained Windows executables are built by CI. | Not run |
+| `android/` | `focus-probe.apk` (usage-access or accessibility detector; block screen, overlay or home cover; audio-focus option; battery baseline mode; reboot/swipe/permission logging) and `focus-probe-target.apk` (harmless app: tone, picture-in-picture, self-measured exposure) | **Not compiled yet**: this sandbox can't reach Google's Maven repository. Syntax-checked with Gradle's bundled Kotlin compiler. CI compiles it. | Not run |
+| `windows-vm/` | PowerShell experiments for App Control, AppLocker, browser policies and firewall, plus cleanup. **Refuse to run unless the machine is a VM and `-ConfirmDisposableVM` is passed.** | Written; not executed or syntax-checked (no PowerShell here) | Not run |
 
-- never terminate apps or discard data — they only move a restricted app out
-  of the way (Windows: minimize; Android: cover with an overlay);
-- stop themselves after a fixed time (max 60 min) and have an immediate stop;
-- log only app identifiers, timings and outcomes — never titles or content.
+## Safety rules all probes follow
 
----
+- Never terminate the user's apps. The only exception is `--terminate-new-launches`, which is restricted to the harmless `FocusTarget.exe`.
+- Never discard data.
+- Never require disabling Smart App Control or Advanced Protection.
+- Stop by themselves (≤ 60 min).
+- Have an immediate stop.
+- Undo every change they make, including after a crash (Windows mute ledger, `--recover`).
+- Log only app identifiers, timings and outcomes, locally. App identifiers can still reveal personal usage, and the testers' instructions say so.
 
-## Windows probe — `probes/windows`
+## Pinned toolchains
 
-**Question:** Can an unelevated per-user process detect a restricted app's
-window and minimize it fast enough, across Win32, Store (UWP) and browser apps,
-multiple monitors and sleep/resume — and where does it fail?
+| Part | Pin |
+|---|---|
+| Rust core | `rust-toolchain.toml` → 1.97.0 |
+| Windows | `windows/global.json` → .NET SDK 10.0.1xx (latest patch) |
+| Android | Gradle wrapper 8.14.3; `android/gradle/libs.versions.toml` → AGP 8.13.0, Kotlin 2.2.20; compile/target SDK 36; JDK 17 |
 
-**Status:** Implemented. Compiled on Linux with .NET 10 SDK (0 warnings,
-warnings-as-errors). **Not yet run on Windows.**
+The Gradle wrapper was generated offline. Its distribution checksum
+(`distributionSha256Sum`) is not yet set; CI validates the wrapper JAR. Add
+the checksum from gradle.org/release-checksums the first time CI runs.
 
-### Run it (Windows 11, any edition)
+## How to test
 
-1. Install the .NET 10 SDK: `winget install Microsoft.DotNet.SDK.10`
-2. From this folder: `dotnet run -c Release -- --block notepad.exe,msedge.exe --minutes 5`
-3. Work through the checklist below while it runs. Ctrl+C ends it at any time.
-4. Send the log from `%LOCALAPPDATA%\FocusProbe\probe-*.jsonl`.
-
-### Checklist (record pass/fail + notes)
-
-| # | Scenario | Expectation to verify |
-|---|----------|-----------------------|
-| W1 | Open Notepad during the probe | Minimized within ~250 ms of becoming foreground; explanation shown; text you typed is still there after restoring |
-| W2 | Restore Notepad from the taskbar | Minimized again (`restored` trigger) |
-| W3 | Notepad on a second monitor, not focused | Minimized by `sweep` within ~2 s |
-| W4 | A Store app (e.g. add `CalculatorApp.exe`) | Identified through ApplicationFrameHost with an AUMID; minimized |
-| W5 | Notepad **run as administrator** | Expected to FAIL (UIPI). Confirm the log says `minimized:false` |
-| W6 | Edge/Chrome in full screen video (F11) | Record behavior |
-| W7 | A game in exclusive full screen (if available) | Record behavior |
-| W8 | Sleep the PC mid-probe, wake it | Probe still reacting after resume |
-| W9 | Ctrl+C | Exits cleanly; nothing left running (check Task Manager) |
-| W10 | Let `--minutes 1` expire | Exits on its own |
-
-Also record: Windows edition/version (`winver`), CPU architecture, display scaling.
-
----
-
-## Android probe — `probes/android`
-
-**Question:** On a personal (unmanaged) phone, which detector —
-UsageEvents polling or an accessibility service — detects a restricted app
-quickly and survives real-world conditions, and can a full-screen overlay
-reliably cover it?
-
-**Status:** Implemented. **Not compiled** — this session cannot reach Google's
-Maven repository or the Android SDK. Expect possible small compile fixes.
-
-### Build and install
-
-1. Open `probes/android` in Android Studio (it will create the Gradle wrapper;
-   accept any suggested AGP/Kotlin upgrade).
-2. Enable USB debugging on the phone, connect, press Run.
-
-### Checklist
-
-Run each scenario once with **usage access** and once with **accessibility**.
-
-| # | Scenario | Expectation to verify |
-|---|----------|-----------------------|
-| A1 | Open a restricted app (e.g. TikTok) | Overlay appears; note `detect_latency_ms` |
-| A2 | Tap "Go to home screen" | Home screen; app still in Recents with state intact |
-| A3 | Open it from Recents | Covered again |
-| A4 | Screen off 10 min mid-session, then on | Still enforcing |
-| A5 | Swipe Focus Probe away from Recents | Log shows `service_restarted` or enforcement continues |
-| A6 | Revoke usage access / overlay mid-session | `capabilities_changed` logged within ~5 s |
-| A7 | Reboot mid-session | Record what happens (no auto-restart is implemented yet) |
-| A8 | Let the session time out; tap "End now" in another run | Overlay removed, `session_released` logged |
-| A9 | 60-minute session with normal use | Battery % at start/end in the log |
-| A10 | Picture-in-picture / split screen with a restricted app | Record behavior |
-
-Also record: phone model, Android version, manufacturer skin (e.g. One UI),
-battery-optimization setting for the app, and whether Advanced Protection is on.
+Start with `docs/device-test-checklist.md`. Tester instructions ship inside
+each download as `TESTER.md`.

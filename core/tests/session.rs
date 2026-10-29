@@ -1,6 +1,6 @@
 mod common;
 
-use chrono::{Duration, Weekday};
+use chrono::{DateTime, Duration, Utc, Weekday};
 use common::*;
 use focus_core::conflicts::find_conflicts;
 use focus_core::plan::{PhaseKind, SessionPlan};
@@ -12,13 +12,19 @@ fn brief_occ() -> Occurrence {
     occurrence_on(&s, date(2026, 11, 3)).unwrap().unwrap()
 }
 
-fn at(h: u32, m: u32) -> chrono::DateTime<chrono::Utc> {
+fn at(h: u32, m: u32) -> DateTime<Utc> {
     chi(2026, 11, 3, h, m)
 }
 
-fn ovr(phase_index: usize, requested: chrono::DateTime<chrono::Utc>, delay: u32) -> OverrideRecord {
+fn ovr(
+    scope: OverrideScope,
+    phase_index: usize,
+    requested: DateTime<Utc>,
+    delay: u32,
+) -> OverrideRecord {
     OverrideRecord {
         id: "o1".into(),
+        scope,
         phase_index,
         requested_at: requested,
         delay_seconds: delay,
@@ -26,95 +32,162 @@ fn ovr(phase_index: usize, requested: chrono::DateTime<chrono::Utc>, delay: u32)
     }
 }
 
+fn with(overrides: Vec<OverrideRecord>) -> SessionControls {
+    SessionControls {
+        overrides,
+        emergency_recovery: None,
+    }
+}
+
+use OverrideScope::{CurrentFocusPeriod as Period, RestOfSession as Rest};
+
 #[test]
-fn lifecycle_without_controls() {
+fn lifecycle_and_release_reasons_without_controls() {
     let occ = brief_occ();
     let c = SessionControls::default();
 
     let s = evaluate(&occ, &c, at(17, 59));
     assert_eq!(
-        (s.status, s.restricting, s.next_transition),
-        (SessionStatus::Upcoming, false, Some(at(18, 0)))
+        (s.status, s.restricting, s.release_reason, s.next_transition),
+        (
+            SessionStatus::Upcoming,
+            false,
+            Some(ReleaseReason::NotStarted),
+            Some(at(18, 0))
+        )
     );
 
     let s = evaluate(&occ, &c, at(18, 0));
-    assert_eq!(s.status, SessionStatus::Active);
-    assert!(s.restricting);
+    assert_eq!(
+        (s.status, s.restricting, s.release_reason),
+        (SessionStatus::Active, true, None)
+    );
     assert_eq!(s.phase.as_ref().unwrap().kind, PhaseKind::Focus);
     assert_eq!(s.next_transition, Some(at(18, 40)));
 
     let s = evaluate(&occ, &c, at(18, 45));
-    assert!(!s.restricting, "breaks lift restrictions");
-    assert_eq!(s.phase.as_ref().unwrap().kind, PhaseKind::Break);
+    assert_eq!(
+        (s.restricting, s.release_reason),
+        (false, Some(ReleaseReason::ScheduledBreak))
+    );
     assert_eq!(s.next_transition, Some(at(18, 50)));
 
-    let s = evaluate(&occ, &c, at(18, 50));
-    assert!(s.restricting, "restrictions resume after the break");
+    assert!(
+        evaluate(&occ, &c, at(18, 50)).restricting,
+        "restrictions resume after the break"
+    );
 
     let s = evaluate(&occ, &c, at(19, 30));
     assert_eq!(
-        (s.status, s.restricting, s.next_transition),
-        (SessionStatus::Completed, false, None)
+        (s.status, s.restricting, s.release_reason, s.next_transition),
+        (
+            SessionStatus::Completed,
+            false,
+            Some(ReleaseReason::Completed),
+            None
+        )
     );
 }
 
 #[test]
-fn override_lifts_only_the_current_focus_period_after_delay() {
+fn period_override_lifts_only_the_current_focus_period_after_delay() {
     let occ = brief_occ();
-    let c = SessionControls {
-        overrides: vec![ovr(0, at(18, 10), 90)],
-        early_end: None,
-    };
+    let c = with(vec![ovr(Period, 0, at(18, 10), 90)]);
+    let eff = at(18, 10) + Duration::seconds(90);
 
     let s = evaluate(&occ, &c, at(18, 11));
     assert!(s.restricting, "still restricting during countdown");
-    let eff = at(18, 10) + Duration::seconds(90);
     assert_eq!(
         s.override_state,
-        OverrideState::Pending { effective_at: eff }
+        OverrideState::Pending {
+            scope: Period,
+            effective_at: eff
+        }
     );
     assert_eq!(s.next_transition, Some(eff));
 
     let s = evaluate(&occ, &c, eff);
-    assert!(!s.restricting);
+    assert_eq!(
+        (s.restricting, s.release_reason),
+        (false, Some(ReleaseReason::OverrideCurrentFocusPeriod))
+    );
     assert_eq!(
         s.override_state,
-        OverrideState::Active { until: at(18, 40) }
+        OverrideState::ActiveForFocusPeriod { until: at(18, 40) }
     );
 
-    // The second focus period is unaffected.
+    // Break, then the second focus period restricts again.
+    assert_eq!(
+        evaluate(&occ, &c, at(18, 45)).release_reason,
+        Some(ReleaseReason::ScheduledBreak)
+    );
     let s = evaluate(&occ, &c, at(18, 55));
     assert!(s.restricting);
     assert_eq!(s.override_state, OverrideState::None);
 }
 
 #[test]
-fn override_cancelled_during_countdown_has_no_effect() {
+fn session_override_ends_whole_session_after_delay() {
     let occ = brief_occ();
-    let mut o = ovr(0, at(18, 10), 90);
-    o.cancelled_at = Some(at(18, 10) + Duration::seconds(30));
-    let c = SessionControls {
-        overrides: vec![o],
-        early_end: None,
-    };
-    let s = evaluate(&occ, &c, at(18, 15));
+    let c = with(vec![ovr(Rest, 0, at(18, 10), 90)]);
+    let eff = at(18, 10) + Duration::seconds(90);
+    let s = evaluate(&occ, &c, at(18, 11));
     assert!(s.restricting);
-    assert_eq!(s.override_state, OverrideState::None);
+    assert_eq!(
+        s.override_state,
+        OverrideState::Pending {
+            scope: Rest,
+            effective_at: eff
+        }
+    );
+
+    let s = evaluate(&occ, &c, eff);
+    assert_eq!(
+        (s.status, s.restricting, s.release_reason, s.next_transition),
+        (
+            SessionStatus::EndedByOverride,
+            false,
+            Some(ReleaseReason::SessionEndedByOverride),
+            None
+        )
+    );
+    assert!(
+        !evaluate(&occ, &c, at(18, 55)).restricting,
+        "later focus periods do not resume"
+    );
+
+    // Requesting to end the session during a break is allowed and also delayed.
+    let c = with(vec![ovr(Rest, 1, at(18, 41), 90)]);
+    assert_eq!(evaluate(&occ, &c, at(18, 42)).status, SessionStatus::Active);
+    assert_eq!(
+        evaluate(&occ, &c, at(18, 43)).status,
+        SessionStatus::EndedByOverride
+    );
 }
 
 #[test]
-fn override_can_be_cancelled_after_it_takes_effect() {
+fn override_cancellation() {
     let occ = brief_occ();
-    let mut o = ovr(0, at(18, 10), 60);
+    // Cancelled during countdown: no effect at all.
+    let mut o = ovr(Period, 0, at(18, 10), 90);
+    o.cancelled_at = Some(at(18, 10) + Duration::seconds(30));
+    let s = evaluate(&occ, &with(vec![o]), at(18, 15));
+    assert!(s.restricting);
+    assert_eq!(s.override_state, OverrideState::None);
+
+    // Cancelled after taking effect: user chose to resume focus.
+    let mut o = ovr(Period, 0, at(18, 10), 60);
     o.cancelled_at = Some(at(18, 20));
-    let c = SessionControls {
-        overrides: vec![o],
-        early_end: None,
-    };
+    let c = with(vec![o]);
     assert!(!evaluate(&occ, &c, at(18, 15)).restricting);
-    assert!(
-        evaluate(&occ, &c, at(18, 20)).restricting,
-        "user resumed focus"
+    assert!(evaluate(&occ, &c, at(18, 20)).restricting);
+
+    // A cancelled session override never ends the session.
+    let mut o = ovr(Rest, 0, at(18, 10), 90);
+    o.cancelled_at = Some(at(18, 11));
+    assert_eq!(
+        evaluate(&occ, &with(vec![o]), at(18, 30)).status,
+        SessionStatus::Active
     );
 }
 
@@ -122,53 +195,40 @@ fn override_can_be_cancelled_after_it_takes_effect() {
 fn ineffective_or_misattributed_overrides_are_ignored() {
     let occ = brief_occ();
     // Countdown would end after the period ends.
-    let late = SessionControls {
-        overrides: vec![ovr(0, at(18, 39), 120)],
-        early_end: None,
-    };
+    let late = with(vec![ovr(Period, 0, at(18, 39), 120)]);
     assert!(evaluate(&occ, &late, at(18, 39) + Duration::seconds(50)).restricting);
-    // Requested during a break.
-    let in_break = SessionControls {
-        overrides: vec![ovr(1, at(18, 45), 0)],
-        early_end: None,
-    };
+    assert!(evaluate(&occ, &late, at(18, 55)).restricting);
+    // Period override requested during a break.
+    let in_break = with(vec![ovr(Period, 1, at(18, 45), 0)]);
     assert!(evaluate(&occ, &in_break, at(18, 55)).restricting);
     // Names phase 2 but was requested during phase 0: must not pre-authorize a later period.
-    let preauth = SessionControls {
-        overrides: vec![ovr(2, at(18, 5), 0)],
-        early_end: None,
-    };
+    let preauth = with(vec![ovr(Period, 2, at(18, 5), 0)]);
     assert!(evaluate(&occ, &preauth, at(18, 55)).restricting);
-    // An out-of-range delay is clamped to the 15-minute maximum (never longer),
-    // so garbage input cannot overflow or extend a lock.
-    let huge = SessionControls {
-        overrides: vec![ovr(0, at(18, 1), u32::MAX)],
-        early_end: None,
-    };
+    // Out-of-range delay is clamped to 15 minutes (never longer).
+    let huge = with(vec![ovr(Period, 0, at(18, 1), u32::MAX)]);
     assert!(evaluate(&occ, &huge, at(18, 15)).restricting);
     assert!(!evaluate(&occ, &huge, at(18, 16)).restricting);
 }
 
 #[test]
-fn emergency_release_is_immediate_and_final() {
+fn emergency_recovery_is_immediate_final_and_distinct() {
     let occ = brief_occ();
     let c = SessionControls {
-        overrides: vec![],
-        early_end: Some(EarlyEnd {
-            at: at(18, 5),
-            reason: EarlyEndReason::EmergencyRelease,
-        }),
+        overrides: vec![ovr(Rest, 0, at(18, 1), 900)], // a pending countdown is irrelevant
+        emergency_recovery: Some(EmergencyRecovery { at: at(18, 5) }),
     };
     assert!(evaluate(&occ, &c, at(18, 4)).restricting);
     let s = evaluate(&occ, &c, at(18, 5));
     assert_eq!(
-        (s.status, s.restricting, s.next_transition),
-        (SessionStatus::EndedEarly, false, None)
+        (s.status, s.restricting, s.release_reason, s.next_transition),
+        (
+            SessionStatus::EndedByEmergencyRecovery,
+            false,
+            Some(ReleaseReason::EmergencyRecovery),
+            None
+        )
     );
-    assert!(
-        !evaluate(&occ, &c, at(18, 55)).restricting,
-        "later focus periods do not resume"
-    );
+    assert!(!evaluate(&occ, &c, at(18, 55)).restricting);
 }
 
 #[test]

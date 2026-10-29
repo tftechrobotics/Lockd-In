@@ -1,34 +1,39 @@
 # Risk register and external prerequisites
 
-Likelihood/impact: H/M/L. Ordered by how early the risk must be retired.
+Likelihood/impact: H/M/L. Ordered by when the risk must be retired.
 
 | # | Risk | L | I | Mitigation | Retire by |
 |---|---|---|---|---|---|
-| R1 | Android detection too slow, misses apps, or is killed in background | M | H | Probe compares two detectors on the real phone before committing | M1 |
-| R2 | Windows minimize fails for important app classes (elevated, Store, fullscreen) | M | M | Probe W4–W7; honest UI wording for unsupported cases | M1 |
-| R3 | Play rejects `specialUse` foreground service or accessibility declaration | M | H | Disclosures done properly; keep app working with honest Degraded status if refused; sideload/limited distribution for the owner meanwhile | M4/M7 |
-| R4 | Advanced Protection (Android 17) disables accessibility mode | L for owner, M for public | M | Accessibility is optional, never required | M4 |
-| R5 | OEM battery management kills the service | M | H | Device testing; targeted guidance only when detected | M4 |
-| R6 | Restrictions fail to release (stuck shield) | L | H | Core invariant: no restriction outside focus phases; native release on every boundary, on crash restart and on emergency release; tests in M3/M4 | M3/M4 |
-| R7 | User perceives permissions as spyware | M | M | Minimal data, plain disclosures, nothing leaves the device except encrypted sync | M2 |
-| R8 | Three-language build complexity (Rust/C#/Kotlin) | M | M | Small JSON-shaped FFI; fallback to shared test vectors (ADR-0001) | M3 |
-| R9 | Pairing abuse / unauthorized remote changes | L | H | Physical QR + confirmation on both devices, signatures, revocation, visible notifications for remote changes | M5 |
-| R10 | Clock skew between devices | M | L | Absolute instants; skew detection and warning | M5 |
-| R11 | Google OAuth verification delay | M | L | Calendar is optional; Testing mode for development | M6 |
-| R12 | Windows 10 users excluded | M | L | Confirm ESU status; decide with owner | M3 |
-| R13 | User ends Focus via Task Manager / uninstall | H | L | Accepted: Focus is a support tool. Detect and report honestly | — |
+| R1 | Android usage-access detection too slow, misses opens, or is killed in background | M | H | Probe compares detectors; go/no-go thresholds; owner decision U8 if it fails | M1 |
+| R2 | Android block screen can't be brought to front on some phones/versions | M | H | Probe measures; fallback to home screen; accessibility global action as alternative | M1 |
+| R3 | Restricted app keeps playing audio/video under a cover, contradicting the promise | H | H | Block screen instead of overlay; audio focus; Android 17 background-audio hardening; Windows per-app mute; truthful status (R3) | M1 |
+| R4 | Windows minimize/mute unreliable for some app classes (elevated, Store, full-screen games) | M | M | Probe W3, W8, W9; service layer for elevated apps | M1/M3 |
+| R5 | Windows mute state persists after a crash (user left without sound in an app) | M | M | Ledger written before muting; restore on exit, next start and `--recover`; match by app if session recreated; tested in W5b | M1 |
+| R6 | Persistent OS policy left behind after a crash (fail-closed lock) | M | H | Not used in v1 unless VM go criteria met; reconciliation on service start; VM-only experiments | M1/M3 |
+| R7 | Privileged service adds attack surface (local privilege escalation via IPC) | M | H | Authenticated ACL'd pipe, request validation, threat model, least functionality | M3/M7 |
+| R8 | Play rejects `specialUse` foreground service or accessibility declaration | M | H | Proper disclosures; app keeps working with honest Degraded status; owner-device testing via sideload meanwhile | M4/M7 |
+| R9 | Advanced Protection blocks sideloading the probe/app or accessibility mode | M | M | Default path doesn't need accessibility; Play distribution later; never ask users to disable it | M1/M4 |
+| R10 | OEM battery management kills the Android service | M | H | Device testing; targeted guidance only when detected | M4 |
+| R11 | Smart App Control blocks unsigned Windows test builds | M | M | Recorded as a finding; code signing is an M7 prerequisite | M1 |
+| R12 | User changes the system clock to end sessions early | M | M | Monotonic tracking within running sessions (M3/M4); log clock jumps | M3/M4 |
+| R13 | Three-language build complexity (Rust/C#/Kotlin) | M | M | Small JSON-shaped FFI; fallback to shared test vectors | M3 |
+| R14 | Pairing abuse / unauthorized remote changes | L | H | Physical QR + confirmation, signatures, revocation, visible notifications | M5 |
+| R15 | Clock skew between devices | M | L | Absolute instants; skew detection and warning | M5 |
+| R16 | Google OAuth verification delay | M | L | Calendar optional; Testing mode for development | M6 |
+| R17 | Owner stops/uninstalls Focus as administrator | H | L | Accepted limit (R2): detected and reported, not prevented | — |
 
-## External prerequisites (owner involvement)
+## External prerequisites
 
-| Needed for | Item | Cost | When |
+| Needed for | Item | Cost | Status |
 |---|---|---|---|
-| M1 | Windows PC details (`winver`, CPU arch) and ~20 min to run the Windows probe | — | Now |
-| M1 | Android phone model + Android version; Android Studio on the PC; USB cable; ~30 min plus one 60-min session | — | Now |
-| Continuity | A private GitHub repository this project can push to | Free | Now (recommended) |
-| M4/M7 | Google Play developer account | One-time fee (confirm amount) | Before Play testing |
-| M5 | Relay hosting (small VM or serverless) | ~$5–10/month estimate, unverified | M5 |
-| M6 | Google Cloud project + OAuth consent screen; later a domain + privacy policy for verification | Domain ~annual fee | M6 / before public release |
-| M7 | Windows code signing (e.g. Microsoft's managed signing service) and/or Microsoft Store account | Recurring fee (confirm) | M7 |
-| M7 | Second Android phone (different manufacturer) for compatibility testing | Varies | M4–M7 |
+| M1 now | **Private GitHub repository** this session can push to (CI compiles the Android probe and publishes test downloads) | Free | **Requested** |
+| M1 now | Windows PC details (`winver`, CPU type) and ~15 min for the smoke test | — | Requested |
+| M1 now | Android phone model, Android version, Advanced Protection on/off; ~15 min for the smoke test | — | Requested |
+| M1 | A **disposable Windows 11 VM** for policy experiments. Hyper-V (Windows Pro) or VirtualBox, with Microsoft's evaluation image. Must be Pro/Enterprise to author App Control policies. | Free (evaluation) | Requested when the smoke tests pass |
+| M4/M7 | Google Play developer account | One-time fee (confirm) | Later |
+| M5 | Relay hosting | ~$5–10/month estimate, unverified | Later |
+| M6 | Google Cloud project + OAuth consent; later a domain and privacy policy | Domain fee | Later |
+| M7 | Windows code signing; optionally a Microsoft Store account | Recurring fee (confirm) | Later |
+| M4–M7 | Second Android phone (different manufacturer) | Varies | Later |
 
 Nothing here has been purchased, created or assumed to exist.

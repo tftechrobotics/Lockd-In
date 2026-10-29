@@ -1,6 +1,6 @@
 # ADR-0002: Native client frameworks
 
-**Status:** Proposed (2026-10-29)
+**Status:** Engineering recommendation (2026-10-29) — reversible; not yet exercised in code
 
 ## Decision
 - **Windows:** WinUI 3 (Windows App SDK) on .NET 10, C#. Native Fluent
@@ -18,8 +18,7 @@
   Windows conventions, and enforcement would still be native per platform.
 
 ## Open
-- Windows packaging: MSIX (clean install/update/uninstall, App Installer
-  updates, Store-ready) vs. unpackaged + MSI/installer. Leaning MSIX; confirm
-  in Milestone 3 that the enforcer and native-messaging registration work from
-  a packaged app.
+- Windows packaging (affected by ADR-0007's service): MSIX (clean install/update/uninstall, App Installer
+  updates, Store-ready) vs. unpackaged + MSI/installer. A SYSTEM service favors an
+  MSI-style installer; decide in Milestone 3 after a packaging spike.
 - Android `minSdk`: proposed 29 (Android 10) pending the owner's phone model.

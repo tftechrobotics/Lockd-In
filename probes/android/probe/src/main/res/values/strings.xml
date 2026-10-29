@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Focus Probe</string>
+    <string name="a11y_label">Focus Probe (experiment)</string>
+    <string name="a11y_description">Experiment only. Receives the package name of the app that comes to the front so the probe can compare detection methods. It cannot read what is on screen or what you type.</string>
+</resources>

@@ -4,6 +4,20 @@
 //! `evaluate` is a pure function of (occurrence, controls, now). Clients call
 //! it on every timer, wake-up, clock change and incoming sync message, and
 //! never derive state from a per-second counter.
+//!
+//! Four different things can mean "not restricting", and they are kept
+//! separate because the UI, history and paired devices must tell them apart:
+//!
+//! | Situation                 | Where it lives                          |
+//! |---------------------------|-----------------------------------------|
+//! | Scheduled break           | the plan ([`ReleaseReason::ScheduledBreak`]) |
+//! | Delayed intentional override | [`OverrideRecord`] (countdown, cancellable) |
+//! | Immediate emergency recovery | [`EmergencyRecovery`] (no countdown)  |
+//! | Enforcement failure       | *not here*: a device-level observation, see [`crate::protection`] |
+//!
+//! Enforcement failure never changes the desired state: if a device cannot
+//! enforce, the session still *wants* restriction and the device reports that
+//! it is failing to deliver it.
 
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
@@ -11,18 +25,31 @@ use serde::{Deserialize, Serialize};
 use crate::plan::PhaseKind;
 use crate::timeline::{Occurrence, Phase};
 
-/// Default countdown before an intentional override takes effect.
+/// Recommended (not yet owner-approved) countdown before an override takes effect.
 pub const DEFAULT_OVERRIDE_DELAY_SECONDS: u32 = 90;
+/// Upper bound on any countdown. Larger values are clamped down, never up,
+/// so bad input can only make release sooner, never extend a lock.
 pub const MAX_OVERRIDE_DELAY_SECONDS: u32 = 15 * 60;
 /// Default warning lead before restrictions resume after a break.
 pub const DEFAULT_RESUME_WARNING_SECONDS: i64 = 60;
 
-/// A delayed, intentional lift of restrictions for the rest of one focus period.
-/// It never affects later focus periods or later sessions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OverrideScope {
+    /// Lift restrictions for the rest of the focus period it was requested in.
+    /// Later focus periods restrict again.
+    CurrentFocusPeriod,
+    /// End the whole session.
+    RestOfSession,
+}
+
+/// A delayed, intentional, cancellable decision by the user to stop restricting.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OverrideRecord {
     pub id: String,
+    pub scope: OverrideScope,
+    /// Phase the user was in when requesting. Must contain `requested_at`.
     pub phase_index: usize,
     pub requested_at: DateTime<Utc>,
     pub delay_seconds: u32,
@@ -42,30 +69,39 @@ impl OverrideRecord {
         self.cancelled_at.is_some_and(|c| c <= t)
     }
 
-    /// Only an override requested during the focus phase it names counts.
-    fn applies_to<'a>(&self, occ: &'a Occurrence) -> Option<&'a Phase> {
+    /// The phase this override was legitimately requested in, if any. Prevents
+    /// an override from "pre-authorizing" a later focus period.
+    fn origin<'a>(&self, occ: &'a Occurrence) -> Option<&'a Phase> {
         let phase = occ.phases.get(self.phase_index)?;
-        (phase.kind == PhaseKind::Focus
-            && phase.start <= self.requested_at
-            && self.requested_at < phase.end)
-            .then_some(phase)
+        let inside = phase.start <= self.requested_at && self.requested_at < phase.end;
+        let kind_ok = match self.scope {
+            OverrideScope::CurrentFocusPeriod => phase.kind == PhaseKind::Focus,
+            OverrideScope::RestOfSession => true,
+        };
+        (inside && kind_ok).then_some(phase)
+    }
+
+    /// When this override actually lifts restrictions, if it ever does.
+    fn takes_effect(&self, occ: &Occurrence) -> Option<DateTime<Utc>> {
+        let origin = self.origin(occ)?;
+        let eff = self.effective_at();
+        let limit = match self.scope {
+            OverrideScope::CurrentFocusPeriod => origin.end,
+            OverrideScope::RestOfSession => occ.end,
+        };
+        if eff >= limit || self.cancelled_by(eff) {
+            return None;
+        }
+        Some(eff)
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum EarlyEndReason {
-    /// Immediate release for emergencies or broken enforcement. Always available.
-    EmergencyRelease,
-    /// The user ended the whole session after the override countdown.
-    EndedByUser,
-}
-
+/// Immediate release with no countdown, for real emergencies or broken
+/// enforcement. Always available; always recorded and reported to paired devices.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct EarlyEnd {
+pub struct EmergencyRecovery {
     pub at: DateTime<Utc>,
-    pub reason: EarlyEndReason,
 }
 
 /// User actions recorded against one occurrence.
@@ -75,7 +111,7 @@ pub struct SessionControls {
     #[serde(default)]
     pub overrides: Vec<OverrideRecord>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub early_end: Option<EarlyEnd>,
+    pub emergency_recovery: Option<EmergencyRecovery>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -84,19 +120,33 @@ pub enum SessionStatus {
     Upcoming,
     Active,
     Completed,
-    EndedEarly,
+    EndedByOverride,
+    EndedByEmergencyRecovery,
+}
+
+/// Why the desired state is "release". `None` when restricting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReleaseReason {
+    NotStarted,
+    ScheduledBreak,
+    OverrideCurrentFocusPeriod,
+    SessionEndedByOverride,
+    EmergencyRecovery,
+    Completed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum OverrideState {
     None,
-    /// Countdown running; restrictions lift at `effective_at` unless cancelled.
+    /// Countdown running; takes effect at `effective_at` unless cancelled.
     Pending {
+        scope: OverrideScope,
         effective_at: DateTime<Utc>,
     },
-    /// Restrictions are lifted until the end of this focus period.
-    Active {
+    /// Restrictions lifted until the end of this focus period.
+    ActiveForFocusPeriod {
         until: DateTime<Utc>,
     },
 }
@@ -107,6 +157,7 @@ pub struct Snapshot {
     pub phase: Option<Phase>,
     /// The single bit enforcement acts on.
     pub restricting: bool,
+    pub release_reason: Option<ReleaseReason>,
     pub override_state: OverrideState,
     /// Next instant at which this snapshot may change. Clients set a timer for it.
     pub next_transition: Option<DateTime<Utc>>,
@@ -114,11 +165,22 @@ pub struct Snapshot {
 
 /// Desired state of `occ` at `now`.
 pub fn evaluate(occ: &Occurrence, controls: &SessionControls, now: DateTime<Utc>) -> Snapshot {
-    let early_end = controls.early_end.as_ref().filter(|e| e.at < occ.end);
-    let ended_early = early_end.is_some_and(|e| e.at <= now);
+    let emergency_at = controls
+        .emergency_recovery
+        .as_ref()
+        .map(|e| e.at)
+        .filter(|t| *t < occ.end);
+    let session_override_at = controls
+        .overrides
+        .iter()
+        .filter(|o| o.scope == OverrideScope::RestOfSession)
+        .filter_map(|o| o.takes_effect(occ))
+        .min();
 
-    let status = if ended_early {
-        SessionStatus::EndedEarly
+    let status = if emergency_at.is_some_and(|t| t <= now) {
+        SessionStatus::EndedByEmergencyRecovery
+    } else if session_override_at.is_some_and(|t| t <= now) {
+        SessionStatus::EndedByOverride
     } else if now < occ.start {
         SessionStatus::Upcoming
     } else if now >= occ.end {
@@ -131,44 +193,65 @@ pub fn evaluate(occ: &Occurrence, controls: &SessionControls, now: DateTime<Utc>
         .then(|| occ.phase_at(now).cloned())
         .flatten();
 
+    // Override state as seen at `now` (period overrides and pending countdowns).
     let mut override_state = OverrideState::None;
-    if let Some(p) = phase.as_ref().filter(|p| p.kind == PhaseKind::Focus) {
+    if status == SessionStatus::Active {
         for o in &controls.overrides {
-            if o.applies_to(occ).map(|ph| ph.index) != Some(p.index) || o.cancelled_by(now) {
+            if o.cancelled_by(now) {
                 continue;
             }
-            let eff = o.effective_at();
-            if eff >= p.end {
-                continue; // countdown outlasts the period; nothing to lift
+            let Some(origin) = o.origin(occ) else {
+                continue;
+            };
+            let Some(eff) = o.takes_effect(occ) else {
+                continue;
+            };
+            let current = phase.as_ref().is_some_and(|p| p.index == origin.index);
+            match o.scope {
+                OverrideScope::CurrentFocusPeriod if current && eff <= now => {
+                    override_state = OverrideState::ActiveForFocusPeriod { until: origin.end };
+                    break;
+                }
+                _ if eff > now && (current || o.scope == OverrideScope::RestOfSession) => {
+                    override_state = OverrideState::Pending {
+                        scope: o.scope,
+                        effective_at: eff,
+                    };
+                }
+                _ => {}
             }
-            if eff <= now {
-                override_state = OverrideState::Active { until: p.end };
-                break;
-            }
-            override_state = OverrideState::Pending { effective_at: eff };
         }
     }
 
-    let restricting = status == SessionStatus::Active
-        && phase.as_ref().is_some_and(|p| p.kind == PhaseKind::Focus)
-        && !matches!(override_state, OverrideState::Active { .. });
+    let in_focus = phase.as_ref().is_some_and(|p| p.kind == PhaseKind::Focus);
+    let lifted = matches!(override_state, OverrideState::ActiveForFocusPeriod { .. });
+    let restricting = status == SessionStatus::Active && in_focus && !lifted;
+
+    let release_reason = if restricting {
+        None
+    } else {
+        Some(match status {
+            SessionStatus::Upcoming => ReleaseReason::NotStarted,
+            SessionStatus::Completed => ReleaseReason::Completed,
+            SessionStatus::EndedByOverride => ReleaseReason::SessionEndedByOverride,
+            SessionStatus::EndedByEmergencyRecovery => ReleaseReason::EmergencyRecovery,
+            SessionStatus::Active if lifted => ReleaseReason::OverrideCurrentFocusPeriod,
+            SessionStatus::Active => ReleaseReason::ScheduledBreak,
+        })
+    };
 
     // Candidate instants where the answer can change.
     let mut candidates: Vec<DateTime<Utc>> = vec![occ.start, occ.end];
     candidates.extend(occ.phases.iter().map(|p| p.end));
-    if let Some(e) = early_end {
-        candidates.push(e.at);
-    }
+    candidates.extend(emergency_at);
     for o in &controls.overrides {
-        if o.applies_to(occ).is_some() {
+        if o.origin(occ).is_some() {
             candidates.push(o.effective_at());
-            if let Some(c) = o.cancelled_at {
-                candidates.push(c);
-            }
+            candidates.extend(o.cancelled_at);
         }
     }
-    let next_transition = if matches!(status, SessionStatus::Completed | SessionStatus::EndedEarly)
-    {
+    let ended = !matches!(status, SessionStatus::Upcoming | SessionStatus::Active);
+    let next_transition = if ended {
         None
     } else {
         candidates
@@ -181,6 +264,7 @@ pub fn evaluate(occ: &Occurrence, controls: &SessionControls, now: DateTime<Utc>
         status,
         phase,
         restricting,
+        release_reason,
         override_state,
         next_transition,
     }

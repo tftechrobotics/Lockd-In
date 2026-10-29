@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>FocusTarget</AssemblyName>
+    <RootNamespace>FocusProbe</RootNamespace>
+    <!-- Windowed app: no console window. -->
+    <OutputType>WinExe</OutputType>
+  </PropertyGroup>
+</Project>

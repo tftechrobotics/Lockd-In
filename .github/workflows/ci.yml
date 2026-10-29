@@ -1,45 +1,84 @@
-# Not yet run: written 2026-10-29 before a GitHub repository existed.
-# Also covers what the development sandbox could not do: compile the
-# Android probe and build the Windows probe on Windows.
+# Builds and tests everything, and publishes downloadable probe test packages
+# (Actions run page -> Artifacts). Not yet run: no repository existed when written.
+#
+# Toolchains are pinned: Rust via rust-toolchain.toml, .NET via
+# probes/windows/global.json, Android via the Gradle wrapper and
+# probes/android/gradle/libs.versions.toml.
 name: ci
 
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   core:
-    runs-on: ubuntu-latest
+    name: Core (Rust)
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain || rustup toolchain install
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
 
   windows-probe:
-    runs-on: windows-latest
+    name: Windows probe (${{ matrix.rid }})
+    runs-on: windows-2025
+    strategy:
+      matrix:
+        rid: [win-x64, win-arm64]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "10.0.x"
-      - run: dotnet build probes/windows -c Release
+          global-json-file: probes/windows/global.json
+      - name: Publish self-contained single-file executables
+        shell: pwsh
+        run: |
+          $out = "out/focus-probe-windows-${{ matrix.rid }}"
+          foreach ($p in 'Probe', 'Target') {
+            dotnet publish probes/windows/$p -c Release -r ${{ matrix.rid }} --self-contained true `
+              -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o $out
+          }
+          Copy-Item probes/windows/TESTER.md $out/
+          New-Item -ItemType Directory "$out/vm-only-policy-experiments" | Out-Null
+          Copy-Item probes/windows-vm/* "$out/vm-only-policy-experiments/"
+          Get-ChildItem $out -Filter *.pdb | Remove-Item
+      - uses: actions/upload-artifact@v4
+        with:
+          name: focus-probe-windows-${{ matrix.rid }}
+          path: out/focus-probe-windows-${{ matrix.rid }}
+          retention-days: 30
 
   android-probe:
-    runs-on: ubuntu-latest
+    name: Android probe
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: probes/android
     steps:
       - uses: actions/checkout@v4
+      - uses: gradle/actions/wrapper-validation@v4
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
+      - name: Build debug APKs (probe + harmless target)
+        run: ./gradlew --no-daemon :probe:assembleDebug :target:assembleDebug
+      - name: Collect
+        run: |
+          mkdir -p ../../out/focus-probe-android
+          cp probe/build/outputs/apk/debug/probe-debug.apk ../../out/focus-probe-android/focus-probe.apk
+          cp target/build/outputs/apk/debug/target-debug.apk ../../out/focus-probe-android/focus-probe-target.apk
+          cp TESTER.md ../../out/focus-probe-android/
+      - uses: actions/upload-artifact@v4
         with:
-          gradle-version: "8.14.3"
-      - run: gradle -p probes/android assembleDebug
+          name: focus-probe-android
+          path: out/focus-probe-android
+          retention-days: 30

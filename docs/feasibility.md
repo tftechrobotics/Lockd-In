@@ -7,18 +7,22 @@ Researched 2026-10-29. Each finding is tagged:
 - **Prior knowledge** — from general knowledge, not re-checked this session.
 - **Experiment pending** — only a real-device probe can settle it (see `probes/`).
 
-## Bottom line
+## Bottom line (revised 2026-10-29)
 
-App blocking on personal Windows and Android devices is **feasible as a
-commitment tool with deliberate friction, not as a lock**. Both platforms let
-an ordinary app notice a restricted app and move it out of the way; neither
-lets a normal app make that impossible to undo for the device owner. That
-matches the brief, which forbids irreversible traps. The product must say so
-plainly.
+Both platforms give an ordinary app real levers against a restricted app.
+On Windows these are minimizing, muting, catching launches, and (with a
+privileged service) stopping launches and applying session-scoped policies.
+On Android they are detecting the foreground app, bringing a block screen to
+the front, and taking audio focus. Neither platform lets a consumer app make
+restriction impossible for an administrator-owner to undo. That is a stated
+limit, not the product definition: the goal is meaningful enforcement that
+resists casual bypass while preserving work and recovering safely (owner
+requirement R2).
 
-The two highest-risk assumptions — fast, reliable detection-and-cover on
-Windows without admin rights, and on Android without managed-device features —
-are now packaged as probes that need one run on the owner's real devices.
+The earlier framing "friction, never a lock" is **withdrawn**. The full
+option-by-option comparison and the provisional recommendation are in
+`docs/enforcement-comparison.md`. Nothing has been demonstrated on a device
+yet; Milestone 1 stays open.
 
 ---
 
@@ -36,20 +40,15 @@ Windows 10 22H2: not supported at launch; revisit only if the owner's PC needs i
 
 ### Enforcement options
 
-| Option | Verdict | Why |
-|---|---|---|
-| **Per-user window restriction** — `SetWinEventHook` foreground/restore events + 2 s sweep; minimize restricted windows and show an explanation | **Chosen, pending probe** | No admin rights, no driver, never closes apps or loses work. Win32 APIs are long-stable (Prior knowledge). |
-| App Control for Business / AppLocker launch policies | Rejected for v1 | Policies take effect on all editions (Verified (doc), [Microsoft Learn](https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/feature-availability)), but deployment is an admin-level, system-wide code-integrity change; it governs launches, not already-open windows; toggling it at every break is risky. Possible future "strict mode". |
-| Terminating processes | Rejected | Violates "do not force-close or discard unsaved work". |
-| IFEO "debugger" hijacks, kernel drivers, hidden processes | Rejected | Weakens OS security or conceals behavior — forbidden by the brief. |
-| Privileged Windows service for tamper resistance | Deferred | Adds attack surface. Only add if real use shows the per-user agent is too easy to stop. |
+Superseded by `docs/enforcement-comparison.md`, which compares:
+- a per-user agent;
+- a privileged service plus agent;
+- AppLocker and App Control for Business;
+- per-app firewall rules, browser policies, process suspension, drivers and kiosk mode.
 
-**Known limits of the chosen approach (to confirm with probe W5–W7):**
-an unelevated process cannot manipulate windows of elevated (admin) apps
-(UIPI); exclusive-fullscreen games may not minimize cleanly; the owner can
-always end Focus from Task Manager. Store apps run inside
-`ApplicationFrameHost.exe`, so identity must look through to the real process
-and its AppUserModelID (handled in the probe).
+It covers what each prevents, privileges, already-running apps, bypass routes,
+editions, conflicts, install/uninstall and crash recovery. Policy experiments
+run only in a disposable VM (`probes/windows-vm/`).
 
 ### Websites
 
@@ -58,12 +57,19 @@ and its AppUserModelID (handled in the probe).
 | A Chrome/Edge MV3 extension can talk to the desktop app through native messaging; the host is registered per-user under `HKCU\SOFTWARE\Google\Chrome\NativeMessagingHosts\` (no admin), `allowed_origins` must list the exact extension ID | Verified (doc), [Chrome native messaging](https://developer.chrome.com/docs/extensions/nativeMessaging) |
 | On a personal device the user can remove or disable the extension, and it must be explicitly allowed in Incognito/InPrivate | Prior knowledge |
 
-**Proposal:** website restriction ships as a Chrome/Edge extension that the
-desktop app detects and reports honestly ("Edge: websites restricted" vs
-"Chrome: extension not installed — websites not restricted"). If a browser is
-an approved app and has no working extension, Focus says websites are
-**not** restricted. No hosts-file edits, DNS interception, proxies or root
-certificates. Firefox: later.
+**Proposal (revised 2026-10-29):** website restriction ships as a Chrome/Edge
+extension that the desktop app verifies by heartbeat.
+- A browser can be approved "with website restriction" only while the
+  extension is installed, enabled and allowed in private windows.
+- Unsupported browsers stay restricted like any other unapproved app.
+- If the extension disappears mid-session, that browser becomes restricted
+  until it returns.
+- An unsupported browser is never silently an open route (requirement R4).
+  Approving one requires an explicit "allow without website restriction"
+  choice that is visible on Home and to paired devices.
+- No hosts-file edits, DNS interception, proxies, VPN or root certificates.
+
+Details: `docs/enforcement-comparison.md` § bypass gaps.
 
 ---
 
@@ -79,20 +85,22 @@ certificates. Firefox: later.
 | Android 15: an app may start a foreground service from the background via the overlay exemption only while it already has a **visible** overlay window | Verified (doc), same page |
 | Kiosk / device-owner features require a managed device — unavailable on a personal phone | Prior knowledge; consistent with brief |
 
-### Detection options (the probe compares both)
+### Detection and cover options
 
-| Option | Strengths | Costs and risks |
-|---|---|---|
-| **UsageEvents polling** (`PACKAGE_USAGE_STATS` special access) inside a foreground service | No Accessibility declaration; works under Advanced Protection | Polling latency and battery cost unknown (Experiment pending); needs a foreground service of type `specialUse`, which requires a Play declaration with a video and is reviewed (Verified (doc), [Play FGS requirements](https://support.google.com/googleplay/android-developer/answer/13392821)) |
-| **AccessibilityService** (window-change events only, no content) | Event-driven, likely faster and cheaper | Non-tool apps must show an in-app prominent disclosure with affirmative consent and submit a Play declaration with video; deceptive use risks suspension (Verified (doc), [Play AccessibilityService policy](https://support.google.com/googleplay/android-developer/answer/10964491)); unavailable under Advanced Protection; users find the permission alarming |
+Superseded by `docs/enforcement-comparison.md`. Key findings added on
+2026-10-29:
 
-**Cover:** a full-screen `TYPE_APPLICATION_OVERLAY` window (needs "display
-over other apps") with a "Go to home screen" action. It covers the app; it
-does not stop it or touch its data.
+- "Display over other apps" is a documented exception that lets an app start
+  an activity from the background (Doc). Focus can therefore bring a block
+  screen to the front, which moves the restricted app to the background,
+  instead of relying on an overlay.
+- An overlay leaves the app resumed and audible underneath, and apps can hide
+  overlays with `HIDE_OVERLAY_WINDOWS` on Android 12+ (Doc).
+- Android 17 background audio hardening (Doc):
+  - silences apps that have neither a visible activity nor a foreground service;
+  - refuses audio focus requests from background apps.
 
-**Proposed direction (decide after probe A1–A10):** UsageEvents as the
-default detector, accessibility as an optional faster mode with the
-disclosure. Never require accessibility.
+  Focus can take audio focus only while its block screen is visible.
 
 ### App selection
 
@@ -156,5 +164,5 @@ those disciplines are applied directly and recorded in the docs.
 |---|---|---|
 | Rust 1.97, cargo, crates.io | Yes | Shared core: built, linted, tested here |
 | .NET 10 SDK (installed from Ubuntu archive) | Yes, but no NuGet | Windows probe compiles; cannot run (Linux) |
-| Android SDK, Google Maven, Gradle distributions | **Blocked** | Android probe cannot be compiled here |
+| Android SDK, Google Maven, Gradle distributions | **Blocked** | Android probe cannot be compiled here; CI compiles it once a repository exists. Gradle's bundled Kotlin compiler was used for a syntax-only check. |
 | Windows or Android devices | No | All enforcement testing needs the owner's devices |

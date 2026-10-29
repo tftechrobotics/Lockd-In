@@ -1,0 +1,10 @@
+# Pinned toolchain for the Android probes. Do not upgrade casually: change
+# these together, then rebuild in CI and note the change in HANDOFF.md.
+#   Gradle 8.14.3 (wrapper) · JDK 17 · AGP 8.13.0 · Kotlin 2.2.20 · compileSdk/targetSdk 36
+[versions]
+agp = "8.13.0"
+kotlin = "2.2.20"
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }

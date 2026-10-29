@@ -6,7 +6,9 @@ use chrono::{Duration, NaiveDate, NaiveTime};
 use common::*;
 use focus_core::plan::{MAX_SESSION_MINUTES, PhaseKind, Segment, SessionPlan};
 use focus_core::schedule::Recurrence;
-use focus_core::session::{EarlyEnd, EarlyEndReason, OverrideRecord, SessionControls, evaluate};
+use focus_core::session::{
+    EmergencyRecovery, OverrideRecord, OverrideScope, SessionControls, evaluate,
+};
 use focus_core::timeline::occurrence_on;
 use proptest::prelude::*;
 
@@ -47,8 +49,8 @@ proptest! {
         day in 0i64..730,
         minute_of_day in 0u32..1440,
         probe_offset in -120i64..900,
-        override_at in prop::option::of((0usize..11, 0i64..300, 0u32..1200)),
-        early_end_at in prop::option::of(0i64..900),
+        override_at in prop::option::of((any::<bool>(), 0usize..11, 0i64..300, 0u32..1200)),
+        emergency_at in prop::option::of(0i64..900),
     ) {
         let d = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap() + Duration::days(day);
         let t = NaiveTime::from_hms_opt(minute_of_day / 60, minute_of_day % 60, 0).unwrap();
@@ -65,14 +67,15 @@ proptest! {
         for w in occ.phases.windows(2) { prop_assert_eq!(w[0].end, w[1].start); }
 
         let mut controls = SessionControls::default();
-        if let Some((idx, mins, delay)) = override_at {
+        if let Some((whole, idx, mins, delay)) = override_at {
             controls.overrides.push(OverrideRecord {
                 id: "o".into(), phase_index: idx,
+                scope: if whole { OverrideScope::RestOfSession } else { OverrideScope::CurrentFocusPeriod },
                 requested_at: occ.start + Duration::minutes(mins), delay_seconds: delay, cancelled_at: None,
             });
         }
-        if let Some(m) = early_end_at {
-            controls.early_end = Some(EarlyEnd { at: occ.start + Duration::minutes(m), reason: EarlyEndReason::EmergencyRelease });
+        if let Some(m) = emergency_at {
+            controls.emergency_recovery = Some(EmergencyRecovery { at: occ.start + Duration::minutes(m) });
         }
 
         let now = occ.start + Duration::minutes(probe_offset);
@@ -82,8 +85,11 @@ proptest! {
         if snap.restricting {
             prop_assert!(occ.contains(now));
             prop_assert_eq!(occ.phase_at(now).unwrap().kind, PhaseKind::Focus);
-            if let Some(e) = &controls.early_end { prop_assert!(now < e.at); }
+            if let Some(e) = &controls.emergency_recovery { prop_assert!(now < e.at); }
+            prop_assert_eq!(snap.release_reason, None);
         }
+        // Every "not restricting" answer says why.
+        if !snap.restricting { prop_assert!(snap.release_reason.is_some()); }
         // Never restricting outside the occurrence.
         if now < occ.start || now >= occ.end { prop_assert!(!snap.restricting); }
         // Timers always move forward and never past the end.
