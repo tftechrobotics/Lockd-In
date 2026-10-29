@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Lockd In</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <script>
+    // Apply the saved theme before first paint so there is no flash of the wrong theme.
+    (function () {
+      var t = 'system';
+      try { t = localStorage.getItem('lockdin.theme') || 'system'; } catch (e) {}
+      var dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    })();
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  <noscript>Lockd In needs JavaScript to run in a browser.</noscript>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

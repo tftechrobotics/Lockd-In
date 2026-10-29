@@ -13,3 +13,7 @@ local.properties
 *.p12
 *.pfx
 *.cip
+node_modules/
+dist/
+test-results/
+playwright-report/

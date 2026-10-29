@@ -85,6 +85,11 @@ fi
   \$r | Format-Table -AutoSize | Out-String | Write-Host
   if (\$r) { exit 1 } else { 'VM scripts: clean' }" || fail=1
 
+echo "== Web app (token contrast, typecheck, unit tests; e2e: cd apps/web && npx playwright test)"
+if [ -d "$ROOT/apps/web/node_modules" ]; then
+  ( cd "$ROOT/apps/web" && node ../../design/check-contrast.mjs >/dev/null && npx tsc --noEmit -p . && npx vitest run --reporter=dot >/dev/null && echo "web: clean" ) || fail=1
+else echo "web: run 'npm ci' in apps/web first"; fail=1; fi
+
 echo "== CI workflow (actionlint)"
 AL="$CACHE/actionlint"
 if [ ! -x "$AL/actionlint" ]; then

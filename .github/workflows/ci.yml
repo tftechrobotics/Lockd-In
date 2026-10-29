@@ -27,6 +27,31 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
+      - name: Web parity vectors are current
+        run: |
+          cargo run -q -p lockdin-core --example parity_vectors > /tmp/vectors.json
+          diff -u apps/web/src/engine/parity-vectors.json /tmp/vectors.json
+
+  web:
+    name: Web app (unit, build, end-to-end, accessibility)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - name: Design token contrast
+        run: node ../../design/check-contrast.mjs
+      - run: npx vitest run
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
 
   windows-probe:
     name: Windows probe (${{ matrix.rid }})

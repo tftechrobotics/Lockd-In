@@ -27,6 +27,18 @@ Three kinds of entry, kept apart on purpose:
 | R16 | An abruptly stopped component can't be relied on to report its own stop: use authenticated heartbeats and "unknown" when they expire. | Owner 2026-10-29 (review 2) |
 | R17 | The product is named **Lockd In** (was the working name "Focus"). Repository: `tftechrobotics/Lockd-In`. Trademark and store-name availability not yet checked. | Owner 2026-10-29 |
 | R18 | **Never disable device protections to test or install** (Smart App Control, Samsung Auto Blocker, Advanced Protection, Play Protect). Builds reach devices only through trusted channels: Windows binaries code-signed by a trusted CA; Android through Google Play (internal testing track). | Owner 2026-10-29 |
+| R19 | Specification v2 (`docs/product-spec.md`) is the current product definition; it overrides the brief where they differ. | Owner 2026-10-29 PM |
+| R20 | **Cream & Ink** is the approved visual direction (reference image): cream, taupe, espresso ink; paper texture; faint library drawings at edges; padlock timer with clock; lock as the "o" in "lockd in"; coordinated dark theme plus system option. No orange accents. | Owner 2026-10-29 PM |
+| R21 | Add a **web companion app** (masthead navigation). It never claims to enforce restrictions and states when the installed app is required or disconnected. | Owner 2026-10-29 PM |
+| R22 | Platform layouts: Windows = native titlebar, Focus/Schedule switch, Menu, tray, close ≠ end session; Android = bottom nav Focus/Schedule/Profiles; Web = masthead with five destinations, schedule on its own page. | Owner 2026-10-29 PM |
+| R23 | Optional session intention (subject → task), presets with linked apps/sites/documents, optional opening of resources at start, review before start. Choosing a subject never silently changes blocking rules. Blocker works without any task. **Clarification of R10:** this is self-entered intention and saved links, not assignment tracking or LMS integration (Canvas/PrairieLearn/SmartPhysics stay out of the first release). | Owner 2026-10-29 PM |
+| R24 | Optional question/task timing with explicit controls and a short recap; time is never treated as understanding or failure; restrictions are never extended automatically. | Owner 2026-10-29 PM |
+| R25 | Optional nudges and personalized block screens with tones (Calm, Direct, Playful, Custom, Quiet), frequency control, no shaming, no emotion claims. | Owner 2026-10-29 PM |
+| R26 | Optional inactivity check-ins using idle time only; cooldowns; never punitive; no keystrokes, screenshots, document contents or browsing history. | Owner 2026-10-29 PM |
+| R27 | Location routines are a later, investigated feature: reminders first, on-device evaluation, no history, never increase restriction on departure. | Owner 2026-10-29 PM |
+| R28 | Calendar free/busy suggestions need acceptance; accountability check-ins in-app/push first; SMS is a later evaluation; no paid AI or SMS needed for blocking. | Owner 2026-10-29 PM |
+| R29 | Home answers only: what, how long, what's available, which devices are ready, how to start. Concise recap; no streaks, guilt or engagement loops. | Owner 2026-10-29 PM |
+| R30 | Build order: design → main flow → enforcement/pairing/scheduling/recovery → presets/study timing → calendar/check-ins → location/SMS. | Owner 2026-10-29 PM |
 | R11 | Everything else in `Focus_Project_Brief.md` (allowlist profiles per device, no force-closing or lost work, no hidden processes, no indefinite lockouts, offline execution, privacy minimums, etc.). | Brief v1.0 |
 
 ## Engineering recommendations (not approved)
@@ -44,7 +56,9 @@ Three kinds of entry, kept apart on purpose:
 | E9 | Rust shared core; WinUI 3; Kotlin/Compose | ADR-0001, ADR-0002 (engineering, reversible) |
 | E10 | First Play release of the probe omits the optional accessibility detector (avoids its declaration, video and review risk); added later only if usage access fails M1 (U8) | `docs/play/README.md` (reversible) |
 | E11 | Clock rule: sessions advance by monotonic time; after a reboot, max(wall clock, checkpoint + uptime). Clock set forward while the device is off can end a session early and is reported, not prevented | `core/src/clock.rs` |
-| E12 | M2 visual direction "Quiet instrument" (tokens, status language) | `docs/design.md`, design canvas |
+| E12 | ~~"Quiet instrument" visual direction~~ — superseded by R20 (Cream & Ink). Status language (icon + word, five core states) is kept. | `docs/design.md` |
+| E13 | Web app stack: React + TypeScript + Vite; session timing in TypeScript checked against Rust-generated vectors (ADR-0001 fallback) until a WASM build is available | `apps/web` |
+| E14 | Typeface: Outfit (OFL) for the wordmark and display; Figtree (OFL) for interface text; both self-hosted, no font CDN | `design/tokens` |
 
 ## Unresolved decisions (need the owner)
 
@@ -60,6 +74,8 @@ Three kinds of entry, kept apart on purpose:
 | U8 | Android: offer an accessibility mode (Play review risk), or require it if usage access proves insufficient? | After Android probe |
 | U9 | Support Windows 10? | M3 |
 | U10 | Android: request notification access to hide restricted apps' notifications during focus? | M4 |
+| U11 | Windows UI stack: native WinUI 3 (ADR-0002) or a native host (WinUI/WPF window, tray, titlebar) rendering the shared web UI in WebView2? | Windows app shell (A7) |
+| U12 | How the web app reaches devices: (a) accounts + hosted relay (cost, privacy, sign-in), (b) paired browser via the same relay without accounts, or (c) web app is local-only and shows no live device status | Web device status, B6 |
 
 ## Withdrawn
 
