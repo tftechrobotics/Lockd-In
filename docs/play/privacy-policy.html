@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lockd In Probe — Privacy Policy</title>
+<style>
+  :root { --bg:#ffffff; --fg:#1b1d1f; --muted:#5b6168; --rule:#e3e5e8; --accent:#2f5d50; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#141617; --fg:#e8eaec; --muted:#a3a9b0; --rule:#2a2e31; --accent:#8cc2b0; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 44rem; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
+  h1 { font-size: 1.6rem; line-height:1.25; margin: 0 0 .25rem; }
+  h2 { font-size: 1.1rem; margin: 2rem 0 .5rem; padding-top: 1rem; border-top: 1px solid var(--rule); }
+  p, li { color: var(--fg); }
+  .meta { color: var(--muted); margin: 0 0 1.5rem; }
+  a { color: var(--accent); }
+  table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+  th, td { text-align: left; vertical-align: top; padding: .5rem .5rem .5rem 0; border-bottom: 1px solid var(--rule); }
+  th { font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+<h1>Lockd In Probe — Privacy Policy</h1>
+<p class="meta">Applies to the Android apps “Lockd In Probe” (app.lockdin.probe) and “Lockd In Probe Target” (app.lockdin.probetarget). Effective 29 October 2026.</p>
+
+<p>Lockd In Probe is a pre-release test build used to measure whether a phone can block apps the user chooses during a focus session. It is distributed only to invited testers. This policy explains what it handles and where that information goes.</p>
+
+<h2>Summary</h2>
+<p>The apps do not collect personal data, do not send anything to us or to anyone else, contain no advertising or analytics, and have no internet permission. Everything stays on your phone unless you choose to share the log yourself.</p>
+
+<h2>What the app uses on your phone</h2>
+<table>
+  <tr><th>Information</th><th>Why</th><th>Where it goes</th></tr>
+  <tr><td>Which app is in the foreground during a session (its package name), read through Android’s Usage Access</td><td>To detect when you open an app you chose to block, and show the block screen</td><td>Stays on the phone</td></tr>
+  <tr><td>A test log: session start and end times, package names of apps opened during a session, timing measurements, phone model and Android version, and whether permissions and Advanced Protection are on</td><td>To measure how reliably blocking works</td><td>Stored in the app’s private storage on the phone</td></tr>
+  <tr><td>Your session settings (apps to block, duration)</td><td>To run the session you started</td><td>Stored on the phone</td></tr>
+</table>
+<p>Package names can reveal which apps you use. The app does not read screen content, messages, what you type, contacts, location, photos, or files.</p>
+
+<h2>Sharing</h2>
+<p>Nothing is shared automatically. If you tap “Share log”, Android’s share sheet opens and you choose where the log goes (for example, an email you send yourself). After that, the receiving app’s privacy policy applies.</p>
+
+<h2>Permissions</h2>
+<ul>
+  <li><strong>Usage access</strong> — to see which app is in front during a session.</li>
+  <li><strong>Display over other apps</strong> — to show the block screen over a blocked app.</li>
+  <li><strong>Foreground service and notifications</strong> — to keep the session you started running, with a visible notification, until it ends.</li>
+  <li><strong>Run at startup</strong> — to record what happens if the phone restarts during a session.</li>
+  <li><strong>Read Advanced Protection state</strong> (Android 16 and later) — read-only, recorded in the log.</li>
+</ul>
+<p>You can revoke any of these in Android Settings at any time. Every session ends by itself, and “End now” ends it immediately.</p>
+
+<h2>Retention and deletion</h2>
+<p>The log stays until you tap “Clear log” or uninstall the app. Uninstalling removes all of the app’s data. The app turns off Android backup, so its data is not copied to your Google account.</p>
+
+<h2>Children</h2>
+<p>This test build is intended for adult testers and is not directed at children.</p>
+
+<h2>Changes and contact</h2>
+<p>If this policy changes, the effective date above will change. Questions: <a href="mailto:CONTACT_EMAIL_PLACEHOLDER">CONTACT_EMAIL_PLACEHOLDER</a>.</p>
+</main>
+</body>
+</html>

@@ -52,17 +52,21 @@ adb shell am start -W -n $P/.MainActivity
 sleep 3
 tap_text "Run smoke test"
 sleep 4
-adb shell cmd statusbar expand-notifications; sleep 4
+adb shell cmd statusbar expand-notifications; sleep 3
+adb exec-out uiautomator dump /dev/tty > "$OUT/notification-shade.xml" 2>/dev/null || true
+sleep 1
 adb shell cmd statusbar collapse; sleep 1
 adb shell am start -n app.lockdin.probetarget/.TargetActivity
 sleep 6
 adb shell screencap -p /sdcard/block.png
+adb exec-out uiautomator dump /dev/tty > "$OUT/after-target-launch.xml" 2>/dev/null || true
 adb shell am start -n $P/.MainActivity
 sleep 3
 tap_text "End now"
 sleep 4
 adb shell am start -n app.lockdin.probetarget/.TargetActivity
 sleep 5
+adb exec-out uiautomator dump /dev/tty > "$OUT/target-after-end.xml" 2>/dev/null || true
 adb shell input keyevent KEYCODE_HOME
 sleep 2
 kill -INT $REC 2>/dev/null || true
@@ -78,3 +82,18 @@ adb logcat -d > "$OUT/logcat.txt" || true
 grep -oE '(session_[a-z_]+|blocked_[a-z_]+|cover_[a-z_]+|overlay_[a-z_]+|block_screen_[a-z_]+)' "$OUT/final-main-screen.xml" | sort | uniq -c > "$OUT/events-seen.txt" || true
 cat "$OUT/events-seen.txt"
 ls -la "$OUT"
+
+# Checks, reported as annotations (artifact downloads are not always available).
+has() { grep -qi -- "$2" "$OUT/$1" 2>/dev/null; }
+check() { if "$@"; then echo "pass"; else echo "FAIL"; fi; }
+r1=$(check has notification-shade.xml "Restricted apps are blocked until")
+r2=$(check has after-target-launch.xml "is blocked until")
+r3=$(check has target-after-end.xml "LockdIn\|Lockd In Probe Target\|target")
+r4=$( (has target-after-end.xml "is blocked until" && echo FAIL) || echo pass)
+size=$(stat -c %s "$OUT/lockdin-probe-fgs-demo.mp4" 2>/dev/null || echo 0)
+echo "::notice title=Emulator demo (EMULATOR ONLY)::session notification shown=$r1; block screen over target=$r2; target opens after End now=$r3; no block screen after End now=$r4; video bytes=$size"
+echo "::notice title=Probe events seen on screen::$(tr -s ' \n' ' ' < "$OUT/events-seen.txt")"
+for f in after-target-launch.xml target-after-end.xml; do
+  echo "::notice title=Visible text in $f::$(grep -oE 'text="[^"]+"' "$OUT/$f" | head -12 | tr '\n' ' ' | cut -c1-900)"
+done
+[ "$r1$r2$r4" = passpasspass ] && [ "$size" -gt 100000 ] || { echo "::error::Emulator demo checks failed"; exit 1; }
