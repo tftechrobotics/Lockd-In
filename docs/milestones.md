@@ -69,7 +69,11 @@ Protection) results decide what the product may claim for those users.
 **M1 closes when** rows 2–5 have device/VM evidence, CI is green,
 ADR-0004 and ADR-0007 are finalized from evidence, and U1 and U3 are answered.
 
-## M2 — Design system and complete workflows
+## M2 — Design system and complete workflows · **IN PROGRESS**
+Status 2026-10-29: Cream & Ink approved (R20). Web: tokens, assets and the main
+flow implemented and verified in Chromium (see `docs/design.md`). Windows and
+Android shells wait on U11. Remaining criteria below still apply to every
+platform.
 - Tokens and components for type, spacing, color, borders, elevation, controls, dialogs, notifications and motion. Light and dark designed separately; reduced motion.
 - All 10 brief flows with empty, loading, offline, denied-permission, partially-connected, error and success states.
 - Every screen shows desired, acknowledged and observed state separately.

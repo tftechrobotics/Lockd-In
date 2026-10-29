@@ -10,7 +10,8 @@
     "test": "vitest run",
     "e2e": "playwright test",
     "assets": "node scripts/build-wordmark.mjs",
-    "tokens": "node scripts/gen-tokens.mjs"
+    "tokens": "node scripts/gen-tokens.mjs",
+    "preview-page": "node scripts/build-preview.mjs"
   },
   "dependencies": {
     "@fontsource-variable/figtree": "5.3.0",
