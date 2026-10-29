@@ -19,7 +19,7 @@ public static class Program
             return 0;
         }
         instance.Activated += (_, _) => (Application.Current as App)?.ShowMainWindow();
-        Application.Start(_ =>
+        Application.Start(init =>
         {
             SynchronizationContext.SetSynchronizationContext(new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread()));
             _ = new App();

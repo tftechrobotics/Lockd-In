@@ -179,6 +179,7 @@ jobs:
     env:
       SIGN: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT != '' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - { rid: win-x64, platform: x64 }
