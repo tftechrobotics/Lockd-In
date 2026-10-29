@@ -108,7 +108,7 @@ function Editor({ initial, onClose }: { initial: ScheduledSession; onClose: () =
         <select id={`${id}-p`} className="input" value={s.profileId} onChange={(e) => patch({ profileId: e.target.value })}>
           {profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select></div>
-      <p className="summary">Runs {minutesLabel(Math.max(0, totalMinutes(s)))} from {s.startTime || '—'}.</p>
+      <p className="summary">Runs {minutesLabel(Math.max(0, totalMinutes(s)))} from {s.startTime ? clockTime(new Date(2000, 0, 1, Number(s.startTime.slice(0, 2)), Number(s.startTime.slice(3, 5))).getTime()) : '—'}.</p>
       {error && <p className="error" role="alert">{error}</p>}
       <div className="out__actions">
         <button type="submit" className="button button--primary">Save session</button>

@@ -111,7 +111,7 @@ class AppTest {
 
     @Test fun navigationAndHonestStatus() {
         launch()
-        rule.onNodeWithText("Phone blocking not set up").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Phone blocking off").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag("tab-schedule").performClick()
         rule.onNodeWithText("No sessions planned", substring = true).assertIsDisplayed()
         rule.onNodeWithTag("tab-profiles").performClick()

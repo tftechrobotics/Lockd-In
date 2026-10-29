@@ -10,7 +10,7 @@ interface Row { icon: IconName; text: string; tone: 'ok' | 'none' }
 const AGENT_TEXT: Record<HostInfo['agent'], [string, Row['tone']]> = {
   running: ['PC blocking on', 'ok'],
   stopped: ['PC blocking off', 'none'],
-  not_installed: ['PC blocking not set up', 'none'],
+  not_installed: ['PC blocking off', 'none'],
   unknown: ['PC status unknown', 'none'],
 };
 

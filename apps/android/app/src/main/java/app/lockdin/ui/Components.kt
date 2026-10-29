@@ -97,15 +97,15 @@ fun LockTimer(remainingMs: Long, caption: String, locked: Boolean, modifier: Mod
         }
         // Digits are sized to the lock, not to the font-size setting: TalkBack reads the
         // summary, and the digits must stay inside the body.
-        val digits = with(density) { (w * 0.265f).toSp() }
-        val cap = with(density) { (w * 0.092f).toSp() }
+        val digits = with(density) { (w * 0.25f).toSp() }
+        val cap = with(density) { (w * 0.085f).toSp() }
         Column(
-            Modifier.fillMaxSize().padding(top = w * 0.43f, bottom = w * 0.04f, start = w * 0.06f, end = w * 0.06f),
+            Modifier.fillMaxSize().padding(top = w * 0.37f, bottom = w * 0.03f, start = w * 0.06f, end = w * 0.06f),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            ClockGlyph(c.ink, body, w * 0.22f)
-            Spacer(Modifier.height(w * 0.02f))
+            ClockGlyph(c.ink, body, w * 0.19f)
+            Spacer(Modifier.height(w * 0.015f))
             Text(Fmt.countdown(remainingMs), style = Type.timer.copy(fontSize = digits, lineHeight = digits * 1.05f), color = c.ink, maxLines = 1)
             Text(caption, style = Type.label.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = cap, lineHeight = cap * 1.2f), color = c.ink, textAlign = TextAlign.Center, maxLines = 2)
         }
@@ -378,7 +378,7 @@ data class DeviceRow(val icon: LIcon, val text: String, val ok: Boolean)
 
 /** Honest readiness: blocking on this phone isn't built into the app yet; nothing is paired. */
 val PHONE_DEVICE_ROWS = listOf(
-    DeviceRow(LIcon.Phone, "Phone blocking not set up", false),
+    DeviceRow(LIcon.Phone, "Phone blocking off", false),
     DeviceRow(LIcon.Laptop, "PC not paired", false),
 )
 
