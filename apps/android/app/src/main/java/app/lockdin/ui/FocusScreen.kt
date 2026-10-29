@@ -75,7 +75,7 @@ fun rememberNow(clock: AppClock, ticking: Boolean): Long {
 @Composable
 fun FocusScreen(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -> Unit, openSchedule: () -> Unit) {
     val active = store.state.active
-    if (active == null) Setup(store, clock, zone, openDevices, openSchedule) else SessionView(store, active, clock)
+    if (active == null) Setup(store, clock, zone, openDevices, openSchedule) else SessionView(store, active, clock, zone)
 }
 
 private val LENGTHS = listOf(10, 25, 40, 60)
@@ -193,7 +193,7 @@ fun fieldColors() = LocalColors.current.let { c ->
 }
 
 @Composable
-private fun SessionView(store: Store, session: ActiveSession, clock: AppClock) {
+private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, zone: ZoneId) {
     val c = LocalColors.current
     val occ = Session.occurrenceFrom(session.start, session.segments)
     val first = Session.evaluate(occ, session.controls, clock.now())
@@ -201,7 +201,7 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock) {
     val now = rememberNow(clock, running)
     val snap = Session.evaluate(occ, session.controls, now)
     if (snap.status != SessionStatus.ACTIVE && snap.status != SessionStatus.UPCOMING) {
-        Recap(store, session, snap, clock)
+        Recap(store, session, snap, clock, zone)
         return
     }
     val phase = snap.phase ?: return
@@ -217,8 +217,8 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock) {
     val caption = if (phase.kind == PhaseKind.FOCUS) (if (focusCount > 1) "Focus $focusIndex of $focusCount" else "Focus time") else "Break"
     val nudge = when {
         phase.kind == PhaseKind.BREAK && remaining <= 60_000 -> message(tone, Moment.BREAK_ENDING, task)
-        phase.kind == PhaseKind.BREAK -> message(tone, Moment.BREAK_START, time = Fmt.clock(phase.end))
-        lifted -> "Unlocked until ${Fmt.clock((snap.overrideState as OverrideState.ActiveForFocusPeriod).until)}. Later focus periods lock again."
+        phase.kind == PhaseKind.BREAK -> message(tone, Moment.BREAK_START, time = Fmt.clock(phase.end, zone))
+        lifted -> "Unlocked until ${Fmt.clock((snap.overrideState as OverrideState.ActiveForFocusPeriod).until, zone)}. Later focus periods lock again."
         else -> message(tone, Moment.FOCUS_START, task)
     }
 
@@ -227,10 +227,10 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock) {
         task?.let { Text(it, style = Type.body, color = c.inkMuted, textAlign = TextAlign.Center) }
         LockTimer(remaining, caption, locked = snap.restricting, maxWidth = 240.dp)
         Facts(
-            listOf(
-                (if (phase.kind == PhaseKind.FOCUS) (if (next != null) "Break at" else "Ends at") else "Focus resumes at") to Fmt.clock(phase.end),
-                "Session ends" to Fmt.clock(occ.end),
-            ),
+            buildList {
+                add((if (phase.kind == PhaseKind.FOCUS) (if (next != null) "Break at" else "Ends at") else "Focus resumes at") to Fmt.clock(phase.end, zone))
+                if (next != null) add("Session ends" to Fmt.clock(occ.end, zone))
+            },
         )
         nudge?.let { Text(it, style = Type.body, color = c.ink, textAlign = TextAlign.Center, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
         Note("Nothing is blocked yet: blocking isn’t set up on this phone. The timer and schedule still work.")
@@ -332,7 +332,7 @@ private fun ScopeOption(title: String, detail: String, selected: Boolean, onClic
 }
 
 @Composable
-private fun Recap(store: Store, session: ActiveSession, snap: Snapshot, clock: AppClock) {
+private fun Recap(store: Store, session: ActiveSession, snap: Snapshot, clock: AppClock, zone: ZoneId) {
     val c = LocalColors.current
     val occ = Session.occurrenceFrom(session.start, session.segments)
     val endedAt = when (snap.status) {
@@ -352,7 +352,7 @@ private fun Recap(store: Store, session: ActiveSession, snap: Snapshot, clock: A
         Heading("Session complete.")
         session.intention?.let { Text(it, style = Type.body, color = c.inkMuted) }
         LockTimer(0, "Done", locked = false, maxWidth = 180.dp)
-        Facts(listOf("Focused" to "$focusedMin min", "Time" to "${Fmt.clock(session.start)}–${Fmt.clock(endedAt)}"))
+        Facts(listOf("Focused" to "$focusedMin min", "Time" to "${Fmt.clock(session.start, zone)}–${Fmt.clock(endedAt, zone)}"))
         Text(how, style = Type.bodyStrong, color = c.ink)
         if (snap.status == SessionStatus.COMPLETED) message(store.state.tone, Moment.DONE)?.let { Text(it, style = Type.body, color = c.ink, textAlign = TextAlign.Center) }
         PrimaryButton("Same again", onClick = {

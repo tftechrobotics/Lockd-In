@@ -103,7 +103,7 @@ class AppTest {
 
     @Test fun navigationAndHonestStatus() {
         launch()
-        rule.onNodeWithText("Blocking not set up").assertIsDisplayed()
+        rule.onNodeWithText("Blocking not set up").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag("tab-schedule").performClick()
         rule.onNodeWithText("No sessions planned", substring = true).assertIsDisplayed()
         rule.onNodeWithTag("tab-profiles").performClick()
@@ -119,7 +119,7 @@ class AppTest {
         rule.onNodeWithText("Custom").performClick()
         rule.onNode(hasText("Minutes")).performTextInput("0")
         rule.onNodeWithText("Lock in").performScrollTo().performClick()
-        rule.onNodeWithText("Focus periods are 1–240 minutes.").assertIsDisplayed()
+        rule.onNodeWithText("Focus periods are 1–240 minutes.").performScrollTo().assertIsDisplayed()
     }
 
     // ---- Screenshots for design review (pulled by CI; not assertions) ----
