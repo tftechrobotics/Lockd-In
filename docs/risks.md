@@ -17,7 +17,7 @@ Likelihood/impact: H/M/L. Ordered by when the risk must be retired.
 | R8 | Play rejects `specialUse` foreground service or accessibility declaration | M | H | Proper disclosures; app keeps working with honest Degraded status; owner-device testing via sideload meanwhile | M4/M7 |
 | R9 | Advanced Protection blocks sideloading (documented) and accessibility mode (reported); effect on usage access / overlay permission / background launch unverified | M | M | Default path doesn't need accessibility; probe A10 verifies the rest; Play internal testing for such phones; never ask users to disable it | M1/M4 |
 | R10 | OEM battery management kills the Android service | M | H | Device testing; targeted guidance only when detected | M4 |
-| R11 | Smart App Control blocks unsigned Windows test builds | M | M | Recorded as a finding; code signing is an M7 prerequisite | M1 |
+| R11 | Smart App Control blocks unsigned Windows builds — **occurred** on the owner's PC 2026-10-29 | H | H | Code signing moves from M7 to M1: Azure Artifact Signing (~$9.99/month per Microsoft's docs; US individuals eligible; identity validation takes days) or an OV certificate; meanwhile test on a PC/VM without Smart App Control. Never ask users to disable it. | M1 |
 | R12 | User changes the system clock to end sessions early | M | M | Monotonic tracking within running sessions (M3/M4); log clock jumps | M3/M4 |
 | R13 | Three-language build complexity (Rust/C#/Kotlin) | M | M | Small JSON-shaped FFI; fallback to shared test vectors | M3 |
 | R14 | Pairing abuse / unauthorized remote changes | L | H | Physical QR + confirmation, signatures, revocation, visible notifications | M5 |
@@ -36,7 +36,7 @@ Likelihood/impact: H/M/L. Ordered by when the risk must be retired.
 | M4/M7 | Google Play developer account | One-time fee (confirm) | Later |
 | M5 | Relay hosting | ~$5–10/month estimate, unverified | Later |
 | M6 | Google Cloud project + OAuth consent; later a domain and privacy policy | Domain fee | Later |
-| M7 | Windows code signing; optionally a Microsoft Store account | Recurring fee (confirm) | Later |
+| **M1 now** | **Windows code signing** (Smart App Control blocks unsigned builds on the owner's PC). Azure Artifact Signing ~$9.99/month (US individuals eligible) or OV certificate $150–300/year | Paid | **Owner decision needed** |
 | M4–M7 | Second Android phone (different manufacturer) | Varies | Later |
 
 Nothing here has been purchased, created or assumed to exist.
