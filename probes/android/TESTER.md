@@ -18,6 +18,18 @@ force-stops apps, and every session ends by itself (max 60 minutes).
 2. Allow installing from your file manager when Android asks. If **Advanced Protection** is on, Android may block installing these at all — record that and stop; do not turn Advanced Protection off for this test.
 3. These are debug builds signed by the CI server. Each new download has a different signature: uninstall the old version before installing a new one.
 
+**Permissions the probe needs, and why**
+
+| Permission (Settings name) | Used for | Needed for |
+|---|---|---|
+| Usage access (`PACKAGE_USAGE_STATS`) | Learning which app just came to the front (default detector) | Usage-access sessions, smoke test |
+| Display over other apps (`SYSTEM_ALERT_WINDOW`) | Android's documented exception that lets an app bring its own screen to the front from the background. The **block screen depends on it**, even though nothing is drawn as an overlay. Also used by the overlay-only method. | Every blocking session, smoke test |
+| Notifications (`POST_NOTIFICATIONS`) | The visible "session running" notification and its "End now" button | Every session |
+| Foreground service, special use | Keeps the session running in the background | Automatic, no prompt |
+| Accessibility (optional) | Faster detector, window-change events only | Only the accessibility rows |
+| Read Advanced Protection state | Records in the log whether it is on (Android 16+) | Automatic, no prompt |
+| Start at boot | Logs what happens after a reboot mid-session | Automatic, no prompt |
+
 **Privacy:** the probe's log records the package names of apps you open during a
 session, which can reveal what you use. It stays on the phone. "Share log"
 sends it only where you choose; read it first.
@@ -54,6 +66,8 @@ Run the detection rows twice: **Usage access** and **Accessibility events**.
 | A7 | Revoke usage access, then overlay, mid-session | `capabilities_changed` within ~5 s |
 | A8 | Reboot mid-session | `boot_completed`, `resume_after_boot` started? |
 | A9 | Real app (e.g. TikTok `com.zhiliaoapp.musically`, YouTube `com.google.android.youtube`) | Same as A1–A3 |
+| A10 | **Advanced Protection on** (only if your phone already uses it, or on a second phone; don't change your own setting just for this): install, then smoke test | Could you install? Does the block screen appear? The probe's status line shows whether Advanced Protection is ON |
+| A11 | Turn off "Display over other apps" mid-session, then open the target | Expected: the block screen no longer appears; `capabilities_changed` and `background_launch_requested` with `overlay_permission:false` in the log |
 
 ## Step 3 — Battery (needs two runs; a single percentage drop means little)
 

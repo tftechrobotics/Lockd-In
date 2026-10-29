@@ -97,7 +97,8 @@ impl OverrideRecord {
 }
 
 /// Immediate release with no countdown, for real emergencies or broken
-/// enforcement. Always available; always recorded and reported to paired devices.
+/// enforcement. Always available; always recorded locally and included in the
+/// device's next status report (it cannot be delivered while offline).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EmergencyRecovery {

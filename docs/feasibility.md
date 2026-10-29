@@ -158,11 +158,13 @@ direction), artifact design/diagramming skills, document skills. There are no
 Windows/Android-native, threat-modeling, testing or CI skills available, so
 those disciplines are applied directly and recorded in the docs.
 
-## Development environment (this session)
+## Development environment (sandbox, updated 2026-10-29)
 
-| Tool | Available | Use |
+| Tool / source | Available | Use |
 |---|---|---|
-| Rust 1.97, cargo, crates.io | Yes | Shared core: built, linted, tested here |
-| .NET 10 SDK (installed from Ubuntu archive) | Yes, but no NuGet | Windows probe compiles; cannot run (Linux) |
-| Android SDK, Google Maven, Gradle distributions | **Blocked** | Android probe cannot be compiled here; CI compiles it once a repository exists. Gradle's bundled Kotlin compiler was used for a syntax-only check. |
-| Windows or Android devices | No | All enforcement testing needs the owner's devices |
+| Rust 1.97, cargo, crates.io | Yes | Core: built, linted, tested |
+| .NET 10 SDK (Ubuntu archive) | Yes; NuGet blocked | Windows probe compiles; can't publish self-contained or run (Linux) |
+| Anonymous GitHub reads (git clone of public repos, release downloads) | Yes | PowerShell 7.5.4 + PSScriptAnalyzer + actionlint for checks; AOSP API-36 framework jar for Kotlin type-checking; reading AppControl Manager source |
+| Google Maven, Android SDK/AGP, services.gradle.org, NuGet, static.rust-lang.org | **Blocked** | Full APK builds and self-contained Windows builds only in CI |
+| Pushing to GitHub / running CI | **No**: no repository; session token invalid | Needs an owner-created repository attached with push access |
+| Windows or Android devices | No | All enforcement testing needs the owner's devices or a VM |

@@ -9,53 +9,61 @@ measured**; record the measured value next to each.
 
 ### Evidence tracker
 
+Each row records evidence separately: **implemented** (code exists),
+**compiled/checked** (where), **tested on device/VM** (where), or
+**proposed**. Thresholds are targets until measured.
+
 | Area | Criterion (target) | Evidence so far | Status |
 |---|---|---|---|
-| **1. Schedule correctness** | Timelines, DST, overrides, emergency recovery, conflicts and release reasons are correct | 21 tests incl. 512-case property test pass — Ubuntu 24.04, Rust 1.97.0, 2026-10-29 | Logic: **met**. On-device timer accuracy at boundaries: **not measured** (M3/M4) |
-| **2. Restriction effectiveness — Windows** | Smoke S1–S3 pass; foreground minimize p95 ≤ 500 ms over ≥ 20 trials; off-focus window caught ≤ 2.5 s; audio muted ≤ 2 s; elevated-app failure reported, not silent | None | **Not started** — probe compiled, not run |
-| **2. Restriction effectiveness — Android** | Smoke S1–S3 pass; detection p95 ≤ 1.5 s (usage access); ≤ 1 missed detection in 50 opens; block screen shown ≥ 49/50; audio-after-cover behavior recorded per cover method; PiP and split-screen recorded | None | **Not started** — probe not yet compiled (needs CI) |
-| **3. Safe release and recovery** | Release on time 100%; emergency release immediate; sound restored after normal exit, console close, kill + `--recover`, and app restart (W4, W5, W5b); no data loss | Core invariants tested (logic only) | **Not started** on devices |
-| **4. Device lifecycle** | Windows: sleep/resume, sign-out. Android: screen-off 10 min, swipe-away, reboot, permission revocation detected ≤ 10 s | None | **Not started** |
-| **5. Battery impact (Android)** | Detection run vs baseline run, same conditions, 60 min each; overhead reported in µAh (or % if unsupported) | None | **Not started** |
-| **6. Cross-device status accuracy** | Status model never shows "protected" without a fresh verified report; silent peer = Unknown | Tested in core (logic) | Logic: **met**. End-to-end: M5 |
-| **7. Windows policy approaches** (VM only) | App Control, AppLocker, browser policies, firewall: time to apply/remove, reboot need, effect on running apps, admin bypass, Smart App Control state | None | **Not started** — scripts written, not run |
+| **1. Schedule correctness** | Timelines, DST, override scopes, emergency recovery, conflicts, release reasons | 21 tests incl. 512-case property test — Ubuntu 24.04, Rust 1.97.0 | Logic **met**. On-device boundary accuracy not measured (M3/M4) |
+| **2a. Restriction — Windows (per-user)** | Smoke S1–S3; minimize p95 ≤ 500 ms over ≥ 20 trials; off-focus window ≤ 2.5 s; mute ≤ 2 s; elevated-app failure reported | Probe implemented; compiles (SDK 10.0.113, Linux) | **Not tested** |
+| **2b. Restriction — Windows (prevention, VM)** | App Control / AppLocker block the target; time to apply/remove; running copy unaffected; Home deploy (test 11) | Scripts implemented; parse + PSScriptAnalyzer clean (PowerShell 7.5.4, Linux); manifest logic unit-tested | **Not tested** |
+| **2c. Restriction — Android** | Smoke S1–S3; detection p95 ≤ 1.5 s; ≤ 1/50 missed; block screen ≥ 49/50; audio-after-cover per method; PiP/split recorded | Probe implemented; Kotlin type-checks against AOSP android-16.0.0_r2 framework jar (Kotlin 2.0.21); **full APK build not yet done** (needs CI) | **Not tested** |
+| **3. Safe release and recovery — Windows audio** | R1, R2 immediate; R3 guardian ≤ 2 s; R4, R5 restored by `--recover`; R6 reboot behavior recorded; no data loss | Guardian + ledger implemented; compiles | **Not tested** |
+| **3. Safe release and recovery — policies (VM)** | Normal removal rebootless ≤ 5 s; `-SimulateCrash` + reboot: persistence measured; 99-Cleanup removes only owned items and reports conflicts | Implemented; ownership manifest unit-tested off Windows | **Not tested** |
+| **3. Safe release — Android** | Release on time 100%; "End now" immediate; overlay/block screen gone at end | Implemented | **Not tested** |
+| **4. Device lifecycle** | Windows sleep/resume, sign-out; Android screen-off 10 min, swipe-away, reboot, permission revocation ≤ 10 s, SAW revoked (A11), Advanced Protection (A10) | Implemented logging | **Not tested** |
+| **5. Battery (Android)** | Detection vs baseline, same conditions, 60 min each; µAh where available | Baseline mode implemented | **Not tested** |
+| **6. Cross-device status accuracy** | Never "protected" without fresh verified report; expired heartbeat → Unknown | Core logic tested (Linux) | Logic **met**; heartbeat transport is M5 |
+| **CI** | All jobs green; downloadable artifacts | Workflow passes actionlint + YAML parse | **Not run**: no repository yet |
 
-### Go / no-go for building on an enforcement approach
+### Go / no-go
 
-**Windows per-user layer — GO** if: smoke test passes; minimize p95 ≤ 500 ms;
-sweep ≤ 2.5 s; mute ≤ 2 s on FocusTarget and one real browser; recovery
-restores sound in W4, W5 and W5b; no data loss.
-**NO-GO** if minimize or mute is unreliable for ordinary apps. In that case,
-reassess before any UI work.
+**Windows per-user layer — GO** if:
+- the smoke test passes;
+- minimize p95 ≤ 500 ms, sweep ≤ 2.5 s, mute ≤ 2 s (FocusTarget and one real browser);
+- R1–R3 restore sound as specified, and R4/R5 restore it via `--recover`;
+- no data loss.
 
-**Windows service layer — GO to prototype in M3** if: W2 shows a newly
-launched restricted app can be closed within ≤ 1 s with no user-visible
-window, owner decision U1 = yes, and owner decision U3 = yes. Otherwise the
-product relies on the per-user layer plus pre-session handling, and its
-promise must say so.
+**NO-GO** → reassess before UI work.
 
-**AppLocker / App Control as "strict mode" — GO only if** in the VM:
-- apply ≤ 5 s;
-- removal without reboot ≤ 5 s;
-- no change to Smart App Control state;
-- 10/10 simulated-crash cleanups leave nothing blocked;
-- for App Control, a viable policy-authoring route on Home.
+**Windows prevention (App Control) — GO to prototype in M3** if, in the VM:
+- apply ≤ 5 s, and removal without reboot ≤ 5 s;
+- Smart App Control state unchanged;
+- after `-SimulateCrash` + reboot, the block persists, and the planned
+  scheduled cleanup design can remove it without user action (to be
+  prototyped);
+- 99-Cleanup leaves the VM's pre-existing policy intact;
+- test 11 shows deploy + enforce works on Home;
+- owner decisions U1 and U3 = yes.
 
-Otherwise NO-GO for v1.
+AppLocker is evaluated with the same criteria. If neither passes, the product
+offers **no launch prevention** on Windows, only work-preserving window/audio
+restriction, and says so.
 
-**Android default path (usage access + block screen) — GO** if:
+**Android default path — GO** if:
 - detection p95 ≤ 1.5 s and ≤ 1/50 missed;
 - block screen ≥ 49/50;
 - survives screen-off and swipe-away;
 - release on time 100%;
-- battery overhead vs baseline acceptable to the owner (target ≤ 2% of capacity per hour).
+- battery overhead vs baseline acceptable (target ≤ 2% of capacity per hour).
 
-If it fails while accessibility passes, owner decision U8 decides.
-If both fail, NO-GO: the Android promise must be redefined with the owner.
+If it fails while accessibility passes, owner decision U8 decides. If both
+fail, NO-GO: redefine the Android promise with the owner. A10 (Advanced
+Protection) results decide what the product may claim for those users.
 
-**M1 closes when:** rows 2–5 have recorded device evidence, row 7 has VM
-evidence (or the owner defers strict mode), ADR-0004 and ADR-0007 are
-finalized from that evidence, and the owner has answered U1 and U3.
+**M1 closes when** rows 2–5 have device/VM evidence, CI is green,
+ADR-0004 and ADR-0007 are finalized from evidence, and U1 and U3 are answered.
 
 ## M2 — Design system and complete workflows
 - Tokens and components for type, spacing, color, borders, elevation, controls, dialogs, notifications and motion. Light and dark designed separately; reduced motion.
@@ -70,9 +78,10 @@ finalized from that evidence, and the owner has answered U1 and U3.
 - May start before M1 closes only for flows that don't depend on the enforcement choice (onboarding shell, scheduling, settings, theme).
 
 ## M3 — Windows vertical slice (tested on Windows 11)
-- Installer installs, upgrades and uninstalls cleanly, including the service if U1 = yes.
+- Installer installs, upgrades and uninstalls cleanly, including the service if U1 = yes, and leaves no policy behind.
 - Pick approved apps; run a real scheduled session with a break; restriction applied during focus and released within 1 s (target) of each boundary.
-- Override, emergency recovery, sleep/resume, sign-out, reboot mid-session and agent or service crash each end in a correct, honestly reported state.
+- Override, emergency recovery, sleep/resume, sign-out, reboot mid-session, agent crash and service crash each end in a correct, honestly reported state, per the recovery matrix in `enforcement-comparison.md`.
+- Never terminates a real app (R12).
 - Clock-change handling: a wall-clock jump does not shorten a running session.
 
 ## M4 — Android vertical slice (≥ 2 physical phones incl. owner's)

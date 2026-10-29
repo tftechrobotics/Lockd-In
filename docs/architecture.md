@@ -15,8 +15,9 @@ device and VM evidence exists (`docs/milestones.md`).
 │   mute, explanations, tray, self-check            │   │ Cover ─ block screen + audio focus, self-check      │
 │ Browser bridge ─ native messaging, heartbeat      │   │ Scheduler ─ alarms, foreground service              │
 │ Service (SYSTEM, recommended, owner U1) ─ launch  │   │ Platform storage ─ Keystore                         │
-│   gating, agent supervision, session-scoped       │   └─────────────────────────┬───────────────────────────┘
-│   browser/firewall settings + reconciliation      │                             │ UniFFI (Kotlin)
+│   PREVENTION via session-scoped App Control policy│   └─────────────────────────┬───────────────────────────┘
+│   (if VM go), audio recovery, agent supervision,  │                             │ UniFFI (Kotlin)
+│   browser/firewall settings + reconciliation      │                             │
 └─────────────────────────┬─────────────────────────┘                             │
                           │ C ABI (C#)                                            │
                           └───────────────────────┬───────────────────────────────┘
@@ -34,7 +35,7 @@ device and VM evidence exists (`docs/milestones.md`).
 |---|---|---|
 | **focus-core** | What should happen and when; why nothing is restricted (`release_reason`); the truthful per-device status | Touch the OS, network or clock. `now` is passed in |
 | **Enforcer** (native) | Making restriction happen; reporting what it observed (`Verified` / `Degraded` / `NotEnforcing`) | Decide policy; claim success without a self-check; call an app "paused" while it runs |
-| **Windows service** (if approved) | Privileged actions only, behind an authenticated, ACL-restricted local IPC; removing anything it applied, including after a crash | Hold UI; accept unvalidated requests; leave OS settings behind |
+| **Windows service** (if approved) | Privileged actions only, behind an authenticated, ACL-restricted local IPC: launch prevention by policy, audio recovery, reconciliation of anything it applied (plus a separate scheduled cleanup task per policy) | Terminate real apps (R12); hold UI; accept unvalidated requests; leave OS settings behind |
 | **Scheduler** (native) | Waking at `next_transition`, on resume, on clock or time-zone change and on sync; then calling `evaluate` | Count seconds to keep time |
 | **UI** | Showing desired policy, acknowledgment and observed enforcement as separate facts; "Unknown" for silent peers | Show "protected" from desired policy alone |
 | **Relay** (M5) | Moving encrypted, signed, versioned documents | Read schedules, or be needed for a local session to start or end |
@@ -49,7 +50,7 @@ device and VM evidence exists (`docs/milestones.md`).
 | ADR-0004 | Android enforcement | Open — after probe |
 | ADR-0005 | No accounts, device-group pairing | Recommendation — owner decision U6 |
 | ADR-0006 | Calendar via free/busy | Recommendation |
-| ADR-0007 | Windows service + agent | Proposed — evidence and owner decision U1 pending |
+| ADR-0007 | Windows service + agent; prevention via App Control if VM evidence supports it | Proposed — evidence and owner decisions U1/U3 pending |
 | ADR-0008 | Release reasons and Unknown peer status | Implemented in core |
 
 ## Timekeeping
@@ -72,7 +73,8 @@ device and VM evidence exists (`docs/milestones.md`).
 - Emergency recovery is immediate, ends the session, and is distinguishable
   from an override and from a scheduled break.
 - A device is "protected" only with a fresh, verified report of the current
-  version; a silent device is "Unknown".
+  version; a silent device is "Unknown". Reports will travel as authenticated
+  heartbeats (M5); no component is assumed able to announce its own crash.
 
 ## Remote changes
 

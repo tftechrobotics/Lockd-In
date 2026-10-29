@@ -1,9 +1,9 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-  VM-ONLY. Measures per-program outbound firewall blocking as a way to keep an
-  unsupported browser or app from reaching the internet during focus, without
-  a VPN or traffic interception. Then removes the rule.
+  VM-ONLY. Per-program outbound firewall blocking as a way to keep an
+  unsupported browser or app off the internet during focus - no VPN, no
+  traffic interception. Uses its own rule group; touches no existing rules.
 
 .EXAMPLE
   .\40-Firewall.ps1 -ProgramPath "C:\Program Files\Mozilla Firefox\firefox.exe" -ConfirmDisposableVM
@@ -16,7 +16,11 @@ param(
 Assert-DisposableVM -Confirmed:$ConfirmDisposableVM
 $exp = 'firewall'
 $group = 'FocusProbeExperiment'
+if (Get-NetFirewallRule -Group $group -ErrorAction SilentlyContinue) {
+    throw "Rules in group '$group' already exist. Run 99-Cleanup.ps1 first."
+}
 
+Add-Owned @{ kind = 'firewall_group'; experiment = $exp; group = $group }
 $sw = [Diagnostics.Stopwatch]::StartNew()
 New-NetFirewallRule -DisplayName "FocusProbe block $([IO.Path]::GetFileName($ProgramPath))" -Group $group `
     -Direction Outbound -Program $ProgramPath -Action Block -Profile Any | Out-Null
@@ -29,5 +33,4 @@ foreach ($q in 'new_pages_blocked', 'already_open_connections_kept_working', 'er
 }
 Write-Result $exp 'observed' $answers
 
-Remove-NetFirewallRule -Group $group
-Write-Result $exp 'rule_removed'
+& "$PSScriptRoot\99-Cleanup.ps1" -ConfirmDisposableVM -Only firewall_group

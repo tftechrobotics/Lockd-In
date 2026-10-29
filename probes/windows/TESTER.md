@@ -1,61 +1,83 @@
 # Focus probe for Windows — tester instructions
 
 **What this is:** an experiment, not the Focus app. It checks whether an
-ordinary Windows program can keep a restricted app out of the way. It
-**minimizes** windows and **mutes** sound. It never closes apps, never needs
-administrator rights, and stops by itself.
+ordinary Windows program, without administrator rights, can keep a
+restricted app out of the way. It **minimizes** windows and **mutes** sound.
+The app keeps running underneath: nothing is paused or closed. The probe stops by itself.
 
-**What's in the folder**
+**In the folder**
 
 | File | Purpose |
 |---|---|
-| `FocusProbe.exe` | The probe (console window) |
+| `FocusProbe.exe` | The probe (console window). Starts a small hidden helper copy of itself, the *guardian*, that restores sound if the probe crashes. |
 | `FocusTarget.exe` | A harmless test app: a small window and a quiet tone. Holds no data. |
-| `vm-only-policy-experiments\` | Scripts for a **disposable virtual machine only**. Do not run them on your everyday PC — they refuse to unless they detect a VM. |
+
+The policy experiments are a **separate download** for a disposable virtual
+machine only. Never run them on this PC.
 
 **Before you start**
 
-- Windows 11 (any edition), x64 or ARM64 — use the matching download.
-- These files are **not code-signed** yet. Windows SmartScreen may warn ("More info → Run anyway"). If **Smart App Control** is On (Settings → Privacy & security → Windows Security → App & browser control), Windows may refuse to run them at all. Record that and stop; do not turn Smart App Control off for this test.
-- Logs are written to `%LOCALAPPDATA%\FocusProbe\`. They contain program names (e.g. `FocusTarget.exe`) and timings — program names can reveal what you use. Nothing is uploaded; review before sharing.
+- Windows 11 (any edition), x64 or ARM64. Use the matching download.
+- **Not code-signed yet.** SmartScreen may warn ("More info → Run anyway").
+  If **Smart App Control** is On (Settings → Privacy & security → Windows
+  Security → App & browser control), Windows may refuse to run these files.
+  Record that and stop; don't turn Smart App Control off for this.
+- Logs go to `%LOCALAPPDATA%\FocusProbe\` (`probe-*`, `guardian-*`,
+  `target-*`). They contain program names and timings, which can reveal what
+  you use. Nothing is uploaded; review before sharing.
 
 ## Step 1 — Smoke test (5 minutes, harmless target only)
 
-1. Open the folder, double-click `FocusTarget.exe`. You should hear a quiet tone.
-2. Open Terminal in the folder and run:
-   `.\FocusProbe.exe --block FocusTarget.exe --minutes 3`
+1. Double-click `FocusTarget.exe`. You should hear a quiet tone.
+2. Open Terminal in the folder and run `.\FocusProbe.exe --block FocusTarget.exe --minutes 3`
 3. Click the FocusTarget window to bring it to the front.
 
 **Pass if all are true:**
 
-- [ ] S1 FocusTarget is minimized within about a second and a message explains why.
-- [ ] S2 The tone goes silent while the probe runs (FocusTarget's log records `own_mute_state: true`).
+- [ ] S1 FocusTarget is minimized within about a second, and a message explains it is restricted, still open and may still be running.
+- [ ] S2 The tone goes silent while the probe runs (FocusTarget's log shows `own_mute_state` → `true`).
 - [ ] S3 Restoring FocusTarget from the taskbar minimizes it again.
-- [ ] S4 After 3 minutes the probe says "Released", the tone is audible again (restore the window to check), and FocusTarget is still open.
-- [ ] S5 Nothing from the probe is left running (Task Manager).
+- [ ] S4 After 3 minutes the probe prints "Released", the tone is audible again (restore the window to hear it), and FocusTarget is still open.
+- [ ] S5 Nothing from the probe is left running: no `FocusProbe.exe` in Task Manager, including the guardian.
 
-If any fail, stop and send the two newest files from `%LOCALAPPDATA%\FocusProbe\` (`probe-*.jsonl`, `target-*.jsonl`).
+If anything fails, stop and send the newest `probe-*`, `guardian-*` and `target-*` logs.
 
-## Step 2 — Extended tests (only after the smoke test passes)
+## Step 2 — Recovery tests (one at a time, harmless target only)
 
-Run with `--minutes 10` unless noted. Record pass/fail and anything surprising.
+Start each with FocusTarget's tone playing and
+`.\FocusProbe.exe --block FocusTarget.exe --minutes 10`. Wait until the tone
+is muted, then do the action.
 
-| # | Scenario | Expected / what to record |
+| # | Action | What should restore sound | Expected |
+|---|---|---|---|
+| R1 | Press Ctrl+C | The probe itself | Sound back immediately |
+| R2 | Close the probe's console window | The probe itself | Sound back immediately |
+| R3 | Task Manager → Details → right-click the **interactive** `FocusProbe.exe` (the one with a console window) → End task | **The guardian** | Sound back within ~2 s; `guardian-*` log shows `guardian_restored` |
+| R4 | In an admin-free terminal: `taskkill /F /T /IM FocusProbe.exe` (kills probe **and** guardian) | Nothing, immediately | Sound **stays muted**. This is the honest limit. Then run `.\FocusProbe.exe --recover`: sound back |
+| R5 | Like R4, but close and reopen FocusTarget **before** `--recover` | Nothing | Record whether the new FocusTarget starts muted (does Windows remember the mute?). Then `--recover` |
+| R6 | Restart Windows during a session | Nothing | After sign-in, start FocusTarget: muted or not? Then `--recover` |
+
+## Step 3 — Extended tests (only after Steps 1–2 pass)
+
+Use `--minutes 10` unless noted.
+
+| # | Scenario | Expected / record |
 |---|---|---|
 | W1 | Restricted window on a second monitor, not focused | Minimized by the 2 s sweep |
-| W2 | `--terminate-new-launches`, then start FocusTarget while the probe runs | New copy closes within ~1 s; record `age_ms` in the log |
-| W3 | Start FocusTarget **as administrator** (right-click → Run as administrator) | Expected **failure**: probe cannot minimize/mute it. Confirm the message says so |
-| W4 | Close the probe's console window mid-session | Sound restored immediately |
-| W5 | End `FocusProbe.exe` in Task Manager mid-session, then run `.\FocusProbe.exe --recover` | Sound restored by `--recover` |
-| W5b | As W5, but close and reopen FocusTarget **before** running `--recover` | Is the new FocusTarget still muted (Windows remembering app mute)? Does `--recover` fix it? |
-| W6 | Sleep the PC mid-session and wake it | Log shows `resume_detected`; restriction continues; ends on time |
-| W7 | Sign out mid-session, sign back in | Record whether FocusTarget's sound is still muted (it should not be after `--recover`) |
-| W8 | Real distracting app, e.g. `--block msedge.exe` or a game | Record behavior, including full-screen video and exclusive-full-screen games |
-| W9 | A Store app (e.g. `--block CalculatorApp.exe`) | Identified through ApplicationFrameHost; record result |
+| W2 | `--test-close-target-after-launch`, then start FocusTarget during the probe | **Measurement only:** the probe detects the new FocusTarget and closes it; record `age_ms`. This is detection followed by closing, not prevention; the app did start. Focus will never do this to real apps. |
+| W3 | Run FocusTarget **as administrator** | Expected **failure**: the probe can't minimize or mute it; the message should say so |
+| W4 | Sleep the PC mid-session and wake it | Log shows `resume_detected`; restriction continues and ends on time |
+| W5 | Sign out mid-session and back in | Is FocusTarget muted when started again? Then `--recover` |
+| W6 | A real distracting app (e.g. `--block msedge.exe`) | Record behavior, including full-screen video. Nothing is closed. |
+| W7 | A Store app (e.g. `--block CalculatorApp.exe`) | Identified through ApplicationFrameHost; record result |
 
-**Removal:** delete the folder and `%LOCALAPPDATA%\FocusProbe\`. Nothing is installed.
+**Removal:** delete the folder and `%LOCALAPPDATA%\FocusProbe\`. Run
+`.\FocusProbe.exe --recover` first if any app is still muted.
 
-**Known limitations of this probe** (being measured, not hidden): cannot act on apps
-running as administrator; minimizing does not stop an app's background work;
-muting is per audio session and new sessions are muted within ~2 s; it
-identifies apps by file name only (the product will use stronger identity).
+**Known limitations, being measured rather than hidden:**
+- Cannot act on apps running as administrator.
+- Minimizing and muting do not stop an app's background work.
+- New audio sessions are muted within about 2 s.
+- If probe and guardian are both killed, sound stays muted until the next run or `--recover`.
+- Recovery may also unmute that app if you muted it yourself.
+- Apps are identified by file name only; the product will use stronger identity.

@@ -234,6 +234,13 @@ class MainActivity : Activity() {
             appendLine("${mark(Capabilities.notifications(this@MainActivity))} Notifications")
             appendLine("${mark(Capabilities.accessibilityEnabled(this@MainActivity))} Accessibility detector (optional)")
             appendLine("${mark(Capabilities.batteryUnrestricted(this@MainActivity))} Battery unrestricted (record, don't change for the smoke test)")
+            appendLine(
+                "Advanced Protection: " + when (Capabilities.advancedProtection(this@MainActivity)) {
+                    true -> "ON"
+                    false -> "off"
+                    null -> "unknown on this Android version (record it from Settings)"
+                }
+            )
             appendLine()
             append(if (active) "Session active." else "No session running.")
         }

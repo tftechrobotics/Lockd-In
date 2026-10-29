@@ -4,20 +4,22 @@
 evidence from a real device or a disposable VM. Nothing here may be described
 as "working blocking" until its results are recorded in `docs/milestones.md`.
 
-| Folder | What | Build status (2026-10-29) | Run status |
-|---|---|---|---|
-| `windows/` | `FocusProbe.exe` (per-user: minimize, per-app mute with crash-safe ledger, launch detection; terminate-at-launch only for the harmless target) and `FocusTarget.exe` (harmless app that logs its own exposure and mute state) | Compiles with .NET SDK 10.0.113, warnings as errors, on Linux. Self-contained Windows executables are built by CI. | Not run |
-| `android/` | `focus-probe.apk` (usage-access or accessibility detector; block screen, overlay or home cover; audio-focus option; battery baseline mode; reboot/swipe/permission logging) and `focus-probe-target.apk` (harmless app: tone, picture-in-picture, self-measured exposure) | **Not compiled yet**: this sandbox can't reach Google's Maven repository. Syntax-checked with Gradle's bundled Kotlin compiler. CI compiles it. | Not run |
-| `windows-vm/` | PowerShell experiments for App Control, AppLocker, browser policies and firewall, plus cleanup. **Refuse to run unless the machine is a VM and `-ConfirmDisposableVM` is passed.** | Written; not executed or syntax-checked (no PowerShell here) | Not run |
+| Folder | What | Implemented | Compiled / checked (where) | Tested on device/VM |
+|---|---|---|---|---|
+| `windows/` | `FocusProbe.exe`: per-user minimize, per-app mute with ledger and a **guardian** process for crash recovery, launch detection. `FocusTarget.exe`: harmless app that logs its own exposure and mute state. | Yes | Compiles with .NET SDK 10.0.113, warnings as errors (Linux). Self-contained Windows executables come from CI, which also runs a headless start/release/exit check. | No |
+| `android/` | `focus-probe.apk`: usage-access or accessibility detector; block screen, overlay or home cover; audio-focus option; battery baseline; logs permission changes, Advanced Protection state, reboot and swipe. `focus-probe-target.apk`: harmless app with tone, picture-in-picture and self-measured exposure. | Yes | Kotlin **type-checks with zero errors and warnings** against the AOSP `android-16.0.0_r2` framework jar (Kotlin 2.0.21, Linux). **Full APK build not yet done**: AGP/aapt2 live only on Google's Maven, which this sandbox can't reach. CI does it. | No |
+| `windows-vm/` (**separate download**) | App Control (Pro build + Home deploy-only), AppLocker, browser policies, firewall, after-reboot check, ownership-based cleanup. Refuse to run unless on a VM with `-ConfirmDisposableVM`. | Yes | Parse clean and **PSScriptAnalyzer clean** (PowerShell 7.5.4, Linux). Ownership-manifest bookkeeping unit-tested off Windows. | No |
 
 ## Safety rules all probes follow
 
-- Never terminate the user's apps. The only exception is `--terminate-new-launches`, which is restricted to the harmless `FocusTarget.exe`.
+- Never terminate the user's apps. The only exception is `--test-close-target-after-launch`, a timing measurement that is hard-restricted to the harmless `FocusTarget.exe`. That is detect-and-terminate, not launch prevention.
 - Never discard data.
 - Never require disabling Smart App Control or Advanced Protection.
 - Stop by themselves (≤ 60 min).
 - Have an immediate stop.
-- Undo every change they make, including after a crash (Windows mute ledger, `--recover`).
+- Undo every change they make. Recovery is described precisely, not as "always immediate":
+  - Windows audio: immediate on normal stop; within seconds via the guardian if only the probe dies; only on next start or `--recover` if probe and guardian both die; unknown after reboot (test R6).
+  - VM policies: restored only from the ownership manifest; `-SimulateCrash` measures what persists when nothing cleans up.
 - Log only app identifiers, timings and outcomes, locally. App identifiers can still reveal personal usage, and the testers' instructions say so.
 
 ## Pinned toolchains

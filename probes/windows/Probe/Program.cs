@@ -4,13 +4,18 @@
 // restricted app, without closing it or touching its data:
 //   * detect its windows (foreground/restore events + 2 s sweep) and minimize them;
 //   * mute its audio sessions (they keep running — they are NOT paused);
-//   * notice launches; and, only for the harmless FocusTarget.exe and only
-//     with --terminate-new-launches, stop a freshly launched copy (to measure
-//     launch prevention without risking anyone's work).
+//   * notice launches. With --test-close-target-after-launch, and ONLY for the
+//     harmless FocusTarget.exe, it closes a copy shortly after it starts. That is
+//     detection followed by termination — NOT launch prevention (the process does
+//     start, briefly). It exists to measure timing, never to be applied to real
+//     apps, which can hold valuable state from the moment they start.
 //
-// Safety: stops itself after --minutes (max 60); Ctrl+C or closing the console
-// releases immediately; every mute it applies is recorded in a ledger file and
-// undone on exit, on the next start, or with `FocusProbe --recover`.
+// Recovery of audio it muted (every mute is recorded in a ledger first):
+//   * normal end, Ctrl+C, console closed      -> restored immediately by the probe;
+//   * probe crashes or is killed              -> restored by a separate guardian
+//                                                process that waits on the probe;
+//   * probe AND guardian killed / power loss  -> NOT immediate: restored on the next
+//                                                probe start or `FocusProbe --recover`.
 
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -35,7 +40,8 @@ internal static class Program
     private static uint _mainThreadId;
     private static DateTime _endsAtUtc;
     private static bool _mute = true;
-    private static bool _terminateNew;
+    private static bool _testCloseTarget;
+    private static Process? _guardian;
     private static int _released;
     private static int _shieldOpen;
     private static HashSet<int> _initialPids = new();
@@ -68,8 +74,11 @@ internal static class Program
                     minutes = Math.Clamp(minutes, 0.5, 60);
                     break;
                 case "--no-mute": _mute = false; break;
-                case "--terminate-new-launches": _terminateNew = true; break;
+                case "--test-close-target-after-launch": _testCloseTarget = true; break;
                 case "--recover": recoverOnly = true; break;
+                case "--guardian" when i + 2 < args.Length:
+                    return Guardian.Run(int.Parse(args[i + 1], System.Globalization.CultureInfo.InvariantCulture),
+                        long.Parse(args[i + 2], System.Globalization.CultureInfo.InvariantCulture));
                 default: return Usage($"Unknown argument: {args[i]}");
             }
         }
@@ -89,8 +98,8 @@ internal static class Program
 
         Blocked.ExceptWith(NeverTouch);
         if (Blocked.Count == 0) return Usage("Nothing to restrict. Example: --block FocusTarget.exe");
-        if (_terminateNew && !(Blocked.Count == 1 && Blocked.Contains(HarmlessTarget)))
-            return Usage("--terminate-new-launches is only allowed with --block FocusTarget.exe in this probe.");
+        if (_testCloseTarget && !(Blocked.Count == 1 && Blocked.Contains(HarmlessTarget)))
+            return Usage("--test-close-target-after-launch is only allowed with --block FocusTarget.exe. Focus never closes real apps.");
 
         _endsAtUtc = DateTime.UtcNow.AddMinutes(minutes);
         _mainThreadId = Native.GetCurrentThreadId();
@@ -101,7 +110,7 @@ internal static class Program
             blocked = Blocked.ToArray(),
             minutes,
             mute = _mute,
-            terminate_new_launches = _terminateNew,
+            test_close_target_after_launch = _testCloseTarget,
             os = Environment.OSVersion.VersionString,
             arch = RuntimeInformation.OSArchitecture.ToString(),
             probe_elevated = Native.IsCurrentProcessElevated(),
@@ -112,6 +121,9 @@ internal static class Program
         Console.WriteLine($"Restricting: {string.Join(", ", Blocked)}");
         if (_initialPids.Count > 0)
             Console.WriteLine($"{_initialPids.Count} restricted process(es) were already running; they will be minimized/muted, not closed.");
+        _guardian = Guardian.Start();
+        _log.Write("guardian_started", new { ok = _guardian is not null });
+        if (_guardian is null) Console.WriteLine("Warning: crash-recovery guardian could not start; recovery after a crash would wait for the next run.");
         Console.WriteLine($"Log: {_log.Path}");
         Console.WriteLine("Press Ctrl+C to stop early. Closing this window also stops it.");
 
@@ -158,7 +170,7 @@ internal static class Program
     private static int Usage(string problem)
     {
         Console.Error.WriteLine(problem);
-        Console.Error.WriteLine("Usage: FocusProbe --block FocusTarget.exe [--minutes 3] [--no-mute] [--terminate-new-launches]");
+        Console.Error.WriteLine("Usage: FocusProbe --block FocusTarget.exe [--minutes 3] [--no-mute] [--test-close-target-after-launch]");
         Console.Error.WriteLine("       FocusProbe --recover     (restore sound for anything an earlier run muted)");
         return 2;
     }
@@ -176,6 +188,9 @@ internal static class Program
         int restored = 0;
         try { restored = _ledger.RestoreAll(); }
         catch (Exception e) { _log.Write("release_error", new { error = e.GetType().Name, e.Message }); }
+        // After a clean release the ledger is empty, so the guardian has nothing left to do.
+        try { if (_guardian is { HasExited: false }) _guardian.Kill(); }
+        catch (Exception e) { _log.Write("guardian_stop_error", new { error = e.GetType().Name }); }
         _log.Write("released", new { reason, restored_sessions = restored });
         Console.WriteLine($"Released ({reason}). Restored sound for {restored} session(s). Minimized windows were left open and unchanged.");
         _log.Dispose();
@@ -245,16 +260,17 @@ internal static class Program
                     double? ageMs = null;
                     try { ageMs = (DateTime.Now - p.StartTime).TotalMilliseconds; } catch { /* elevated or exited */ }
                     var elevated = Native.IsProcessElevated((uint)p.Id);
-                    bool? terminated = null;
+                    bool? closed = null;
                     string? error = null;
-                    if (_terminateNew)
+                    if (_testCloseTarget && name.Equals(HarmlessTarget, StringComparison.OrdinalIgnoreCase))
                     {
-                        try { p.Kill(); terminated = true; }
-                        catch (Exception e) { terminated = false; error = e.GetType().Name; }
+                        try { p.Kill(); closed = true; }
+                        catch (Exception e) { closed = false; error = e.GetType().Name; }
                     }
-                    _log.Write("launch_detected", new { exe = name, age_ms = ageMs, elevated, terminated, error });
-                    if (terminated == true)
-                        Explain($"{name} was closed right after it started because it is restricted in this test (harmless test app only).");
+                    // age_ms = how long the process had already been running when detected.
+                    _log.Write("launch_detected", new { exe = name, age_ms = ageMs, elevated, test_closed_after_launch = closed, error });
+                    if (closed == true)
+                        Explain($"{name} started and was then closed by the probe (test app only). This is detection followed by closing, not prevention: it did run briefly.");
                 }
             }
         }

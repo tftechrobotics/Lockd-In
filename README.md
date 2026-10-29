@@ -9,25 +9,22 @@ no restriction has been demonstrated on a device. Read `HANDOFF.md` first.
 
 ## Repository
 
-| Path | What | State |
+| Path | What | Evidence |
 |---|---|---|
-| `core/` | `focus-core` (Rust): schedules, DST-correct timelines, session state, override scopes, emergency recovery, release reasons, conflicts, per-device status | Implemented; 21 tests pass (Linux) |
-| `probes/windows/` | Windows probe + harmless target (C#/.NET 10) | Compiles; not run |
-| `probes/android/` | Android probe + harmless target (Kotlin) | Not yet compiled (needs CI) |
-| `probes/windows-vm/` | VM-only policy experiments (PowerShell) | Written; not run |
+| `core/` | `focus-core` (Rust): schedules, DST, session state, override scopes, emergency recovery, release reasons, conflicts, per-device status (Unknown for silent peers) | 21 tests pass (Linux) |
+| `probes/windows/` | Windows probe + guardian + harmless target (C#/.NET 10) | Compiles; not run on Windows |
+| `probes/android/` | Android probe + harmless target (Kotlin) | Type-checks against API 36; APK not yet built (CI) |
+| `probes/windows-vm/` | VM-only policy experiments (PowerShell), separate download | Parse + lint clean; not run |
+| `tools/sandbox-checks.sh` | Reruns all checks that don't need Google Maven/NuGet/Windows | Passing |
 | `docs/` | Enforcement comparison, ADRs, milestones/evidence, risks, decisions, device checklist | Current |
-| `.github/workflows/ci.yml` | Tests + downloadable probe builds | Not yet run (no repository) |
+| `.github/workflows/ci.yml` | Tests, APK and Windows builds, headless Windows sanity run, artifacts | Lint clean; never run (no repository) |
 
 ## Build and test
 
 ```sh
-cargo test                                   # core: unit, integration, property tests
-cargo clippy --all-targets -- -D warnings
-cargo run -p focus-core --example timeline   # prints the brief's example session
-
-dotnet build probes/windows/Probe            # Windows probe (any OS; runs on Windows only)
-dotnet build probes/windows/Target
-cd probes/android && ./gradlew :probe:assembleDebug :target:assembleDebug   # needs Android SDK
+tools/sandbox-checks.sh                      # everything checkable without Windows/Android tooling
+cargo test                                   # core only
+cd probes/android && ./gradlew :probe:assembleDebug :target:assembleDebug   # needs Android SDK (CI)
 ```
 
 Device testing: `docs/device-test-checklist.md`.

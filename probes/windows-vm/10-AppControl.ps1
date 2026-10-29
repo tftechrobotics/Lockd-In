@@ -1,22 +1,29 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-  VM-ONLY. Measures App Control for Business (WDAC) as a launch-blocking
-  mechanism for one harmless executable, then removes the policy.
+  VM-ONLY. App Control for Business (WDAC) as TRUE launch prevention for one
+  harmless executable: the process never starts. Measures apply/remove timing,
+  effect on an already-running copy, and (with -SimulateCrash) what persists
+  when no Focus component is left to clean up.
 
 .DESCRIPTION
   Builds an "allow everything" base policy plus a hash deny rule for the
-  target, deploys it with CiTool, measures time-to-effect, checks what happens
-  to an already-running copy, then removes it and measures time-to-release.
-  Needs Windows 11 22H2+ (CiTool) and an edition with the ConfigCI PowerShell
-  module (Pro/Enterprise/Education) to build the policy. Policies themselves
-  take effect on all editions.
+  target, deploys it with CiTool, measures, then removes ONLY this policy
+  (recorded in the ownership manifest). Building the policy here uses the
+  ConfigCI PowerShell module, which exists on Pro/Enterprise/Education but not
+  Home. The resulting .cip is kept so 11-AppControl-DeployOnly.ps1 can test
+  deployment and enforcement on a Home VM separately from authoring.
+
+.PARAMETER SimulateCrash
+  Deploy, measure, and exit WITHOUT removing - as if Focus crashed and never
+  restarted. Then reboot the VM and run 98-AfterReboot.ps1, then 99-Cleanup.ps1.
 
 .EXAMPLE
   .\10-AppControl.ps1 -TargetExe C:\FocusProbe\FocusTarget.exe -ConfirmDisposableVM
 #>
 param(
     [Parameter(Mandatory)][string]$TargetExe,
+    [switch]$SimulateCrash,
     [switch]$ConfirmDisposableVM
 )
 . "$PSScriptRoot\Common.ps1"
@@ -24,7 +31,7 @@ Assert-DisposableVM -Confirmed:$ConfirmDisposableVM
 $exp = 'app_control'
 $TargetExe = (Resolve-Path $TargetExe).Path
 
-Write-Result $exp 'precheck' @{ smart_app_control = (Get-SmartAppControlState); target_launch = (Test-Launch $TargetExe) }
+Write-Result $exp 'precheck' @{ edition = (Get-WindowsEdition); smart_app_control = (Get-SmartAppControlState); target_launch = (Test-Launch $TargetExe) }
 
 # 1. Build policy: AllowAll example + deny the target by hash.
 $xml = Join-Path $WorkDir 'focus-deny-target.xml'
@@ -36,13 +43,14 @@ $policyId = ($policyId -replace '.*(\{[0-9A-Fa-f-]+\}).*', '$1')
 Set-RuleOption -FilePath $xml -Option 3 -Delete   # remove Audit Mode -> enforce
 $cip = Join-Path $WorkDir "$policyId.cip"
 ConvertFrom-CIPolicy -XmlFilePath $xml -BinaryFilePath $cip | Out-Null
-Write-Result $exp 'policy_built' @{ policy_id = $policyId }
+Write-Result $exp 'policy_built' @{ policy_id = $policyId; cip = $cip }
 
-# 2. Start a copy BEFORE deploying, to see what happens to already-running apps.
+# 2. A copy started BEFORE deploying shows what happens to already-running apps.
 $running = Start-Process -FilePath $TargetExe -PassThru
 Start-Sleep -Seconds 2
 
-# 3. Deploy and measure time until launches are blocked.
+# 3. Record ownership first, then deploy and measure.
+Add-Owned @{ kind = 'appcontrol_policy'; experiment = $exp; policy_id = $policyId; name = 'FocusProbe deny FocusTarget' }
 $sw = [Diagnostics.Stopwatch]::StartNew()
 & CiTool.exe --update-policy $cip -json | Out-Null
 $deployMs = [int]$sw.Elapsed.TotalMilliseconds
@@ -53,22 +61,25 @@ Write-Result $exp 'deployed' @{
     already_running_alive   = -not $running.HasExited
     smart_app_control       = (Get-SmartAppControlState)
 }
-$events = Get-WinEvent -LogName 'Microsoft-Windows-CodeIntegrity/Operational' -MaxEvents 20 -ErrorAction SilentlyContinue |
-    Where-Object { $_.Id -in 3076, 3077 } | Select-Object -First 3 | ForEach-Object { "$($_.Id): $($_.TimeCreated)" }
-Write-Result $exp 'code_integrity_events' @{ recent = @($events) }
 
-Read-Host 'Check: did Windows show a block message? Record what the user sees, then press Enter to remove the policy'
+if ($SimulateCrash) {
+    Write-Result $exp 'simulated_crash_left_policy_in_place' @{ policy_id = $policyId }
+    Write-Host 'Policy left in place on purpose. Reboot the VM, run 98-AfterReboot.ps1, then 99-Cleanup.ps1.'
+    return
+}
 
-# 4. Remove and measure time until launches work again (no reboot).
+Read-Host 'Record what the user sees when the target is blocked, then press Enter to remove the policy'
+
+# 4. Remove only our policy and measure time until launches work again (no reboot).
 $sw.Restart()
 & CiTool.exe --remove-policy $policyId -json | Out-Null
 $removeMs = [int]$sw.Elapsed.TotalMilliseconds
 $allowMs = Measure-UntilLaunch -Path $TargetExe -ExpectAllowed
+Remove-OwnedWhere { param($e) $e.kind -eq 'appcontrol_policy' -and $e.policy_id -eq $policyId }
 Write-Result $exp 'removed' @{
-    citool_ms                  = $removeMs
-    ms_until_launch_allowed    = $allowMs
-    needs_reboot_to_release    = ($allowMs -lt 0)
-    smart_app_control          = (Get-SmartAppControlState)
+    citool_ms               = $removeMs
+    ms_until_launch_allowed = $allowMs
+    needs_reboot_to_release = ($allowMs -lt 0)
+    smart_app_control       = (Get-SmartAppControlState)
 }
 if (-not $running.HasExited) { Stop-Process -Id $running.Id -Force }
-Write-Host "Done. If launches are still blocked, reboot the VM and run 99-Cleanup.ps1, then record that removal needed a reboot."

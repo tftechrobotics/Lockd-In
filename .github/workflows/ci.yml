@@ -1,5 +1,7 @@
-# Builds and tests everything, and publishes downloadable probe test packages
-# (Actions run page -> Artifacts). Not yet run: no repository existed when written.
+# Builds and tests everything, and publishes downloadable probe packages
+# (Actions run page -> Artifacts). Smoke-test downloads and VM-only policy
+# experiments are SEPARATE artifacts so the policy scripts can't be confused
+# with the everyday-PC smoke test.
 #
 # Toolchains are pinned: Rust via rust-toolchain.toml, .NET via
 # probes/windows/global.json, Android via the Gradle wrapper and
@@ -46,13 +48,60 @@ jobs:
               -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o $out
           }
           Copy-Item probes/windows/TESTER.md $out/
-          New-Item -ItemType Directory "$out/vm-only-policy-experiments" | Out-Null
-          Copy-Item probes/windows-vm/* "$out/vm-only-policy-experiments/"
           Get-ChildItem $out -Filter *.pdb | Remove-Item
+      # Mechanical check only: the runner is a headless service session, so this
+      # proves the probe starts, launches its guardian, releases on time and
+      # exits cleanly. It is NOT evidence that restriction works on a desktop.
+      - name: Runner sanity run (x64 only)
+        if: matrix.rid == 'win-x64'
+        shell: pwsh
+        run: |
+          $out = "out/focus-probe-windows-win-x64"
+          $t = Start-Process "$out/FocusTarget.exe" -ArgumentList '--silent' -PassThru
+          $p = Start-Process "$out/FocusProbe.exe" -ArgumentList '--block','FocusTarget.exe','--minutes','0.5' -PassThru -Wait -NoNewWindow
+          if (-not $t.HasExited) { Stop-Process -Id $t.Id -Force }
+          $logs = Join-Path $env:LOCALAPPDATA 'FocusProbe'
+          $probeLog = Get-ChildItem $logs -Filter 'probe-*.jsonl' | Sort-Object LastWriteTime | Select-Object -Last 1
+          Get-Content $probeLog.FullName
+          if ($p.ExitCode -ne 0) { throw "probe exit code $($p.ExitCode)" }
+          if (-not (Select-String -Path $probeLog.FullName -Pattern '"evt":"released"' -Quiet)) { throw 'probe did not log a release' }
+          if (-not (Select-String -Path $probeLog.FullName -Pattern '"evt":"guardian_started","data":\{"ok":true' -Quiet)) { throw 'guardian did not start' }
+          & "$out/FocusProbe.exe" --recover
+          if ($LASTEXITCODE -ne 0) { throw '--recover failed' }
       - uses: actions/upload-artifact@v4
         with:
           name: focus-probe-windows-${{ matrix.rid }}
           path: out/focus-probe-windows-${{ matrix.rid }}
+          retention-days: 30
+
+  vm-experiments:
+    name: VM-only policy experiments (separate download)
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: probes/windows/global.json
+      - name: Lint and parse scripts
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+          $r = Invoke-ScriptAnalyzer -Path probes/windows-vm -Severity Error,Warning -ExcludeRule PSAvoidUsingWriteHost,PSUseShouldProcessForStateChangingFunctions
+          $r | Format-Table -AutoSize | Out-String | Write-Host
+          if ($r) { throw "PSScriptAnalyzer findings: $(@($r).Count)" }
+      - name: Package (scripts + harmless x64 target only)
+        shell: pwsh
+        run: |
+          $out = 'out/focus-vm-policy-experiments-DISPOSABLE-VM-ONLY'
+          New-Item -ItemType Directory $out | Out-Null
+          Copy-Item probes/windows-vm/* $out/
+          dotnet publish probes/windows/Target -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o $out
+          Get-ChildItem $out -Filter *.pdb | Remove-Item
+      - uses: actions/upload-artifact@v4
+        with:
+          name: focus-vm-policy-experiments-DISPOSABLE-VM-ONLY
+          path: out/focus-vm-policy-experiments-DISPOSABLE-VM-ONLY
           retention-days: 30
 
   android-probe:

@@ -20,13 +20,18 @@ Three kinds of entry, kept apart on purpose:
 | R8 | Testing: compiled, reproducible probes with pinned toolchains; CI-built downloads with install, permission, removal and limitation notes; smoke test first; battery measured against a baseline; logs local, with a disclosure that app identifiers reveal usage. | Owner 2026-10-29 |
 | R9 | Milestone 1 stays open until restriction is demonstrated; don't build the product on an unproven enforcement assumption. | Owner 2026-10-29 |
 | R10 | Scope: Windows and Android, optional Google Calendar, native light/dark UI. No LMS integrations, tutoring, assignment tracking, decorative dashboards or VPN. | Owner + brief |
+| R12 | Detect-and-terminate is not launch prevention. Termination is restricted to the harmless test target; never applied to real apps, and a newly launched process is not assumed to hold no valuable state. | Owner 2026-10-29 (review 2) |
+| R13 | Describe recovery accurately: next-launch or `--recover` recovery is not immediate crash recovery. Agent crash, service crash, reboot and "nothing restarts" are defined and tested separately. | Owner 2026-10-29 (review 2) |
+| R14 | VM policy experiments preserve pre-existing settings, restore only what they changed, handle concurrent changes, never clear a policy because a backup is absent, and ship as a separate artifact. | Owner 2026-10-29 (review 2) |
+| R15 | State exact Android permission dependencies; verify Advanced Protection behavior rather than assume it. | Owner 2026-10-29 (review 2) |
+| R16 | An abruptly stopped component can't be relied on to report its own stop: use authenticated heartbeats and "unknown" when they expire. | Owner 2026-10-29 (review 2) |
 | R11 | Everything else in `Focus_Project_Brief.md` (allowlist profiles per device, no force-closing or lost work, no hidden processes, no indefinite lockouts, offline execution, privacy minimums, etc.). | Brief v1.0 |
 
 ## Engineering recommendations (not approved)
 
 | # | Recommendation | Where |
 |---|---|---|
-| E1 | Windows: privileged service plus per-user agent; no AppLocker/App Control in v1 unless VM evidence meets go criteria | ADR-0007 |
+| E1 | Windows: privileged service plus per-user agent; launch prevention via a session-scoped App Control policy (AppLocker fallback) if VM go criteria pass; window/audio restriction for everything else; never terminate real apps | ADR-0007 |
 | E2 | Android: usage access + block screen + audio focus by default; accessibility optional and evidence-dependent | ADR-0004 |
 | E3 | Defined behavior for each ordinary bypass gap | `enforcement-comparison.md` |
 | E4 | Local-first, no accounts, device-group pairing | ADR-0005 |
@@ -42,7 +47,7 @@ Three kinds of entry, kept apart on purpose:
 |---|---|---|
 | U1 | Is a Windows service running as SYSTEM, installed with admin consent, acceptable? | M3 architecture; not the current probes |
 | U2 | Unapproved apps already open when a session starts: offer to let the user close them, or minimize and mute them? Focus never closes them itself. | M2 design |
-| U3 | During focus, may Focus close a restricted app **within seconds of it being launched** (before it can hold new work)? | M3; probe W2 measures feasibility first |
+| U3 | App Control policies are machine-wide: during a session, prevented apps would also be blocked for other Windows accounts on the same PC. Acceptable, or use per-user AppLocker rules (weaker: an admin can stop its service)? | After VM tests 10/20; not now |
 | U4 | Emergency recovery is immediate. Should it also require a typed confirmation and notify paired devices? | M2 design |
 | U5 | Override countdown length (recommended 90 s) and whether "end whole session" has a longer delay | M2 design |
 | U6 | No accounts / device-group pairing (ADR-0005) vs accounts | M5 |
@@ -58,3 +63,7 @@ Three kinds of entry, kept apart on purpose:
 | 2026-10-29 | "Focus is friction, never a lock" | Owner did not approve; replaced by R2 |
 | 2026-10-29 | "Proposed decisions stand unless you object" | Silence is not approval (owner) |
 | 2026-10-29 | Probe messages saying a covered or minimized app is "paused" | Inaccurate (R3) |
+| 2026-10-29 | Former U3 ("may Focus close a restricted app seconds after launch?") | Superseded by R12: Focus never terminates real apps |
+| 2026-10-29 | "Launch gating" by detect-and-terminate | Not prevention (R12) |
+| 2026-10-29 | "App Control authoring not on Home, so impractical" | Wrong: enforcement works on all editions; authoring can be done in-app (see comparison) |
+| 2026-10-29 | "Service reports tamper events" | An abrupt stop can't self-report (R16) |

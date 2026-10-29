@@ -78,7 +78,7 @@ object ProbeSession {
 object Capabilities {
     fun usageAccess(ctx: Context): Boolean {
         val ops = ctx.getSystemService(AppOpsManager::class.java)
-        val mode = ops.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), ctx.packageName)
+        val mode = ops.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), ctx.packageName)
         return mode == AppOpsManager.MODE_ALLOWED
     }
 
@@ -105,7 +105,19 @@ object Capabilities {
     fun inputMethodPackage(ctx: Context): String? =
         Settings.Secure.getString(ctx.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)?.substringBefore('/')
 
+    /**
+     * Advanced Protection state, or null if this Android version can't report it.
+     * Read by reflection so the probe builds and runs on SDKs without the class.
+     */
+    fun advancedProtection(ctx: Context): Boolean? = runCatching {
+        if (Build.VERSION.SDK_INT < 36) return null
+        val cls = Class.forName("android.security.advancedprotection.AdvancedProtectionManager")
+        val mgr = ctx.getSystemService(cls) ?: return null
+        cls.getMethod("isAdvancedProtectionEnabled").invoke(mgr) as? Boolean
+    }.getOrNull()
+
     fun snapshot(ctx: Context): JSONObject = JSONObject()
+        .put("advanced_protection", advancedProtection(ctx) ?: JSONObject.NULL)
         .put("usage_access", usageAccess(ctx))
         .put("overlay", overlay(ctx))
         .put("accessibility", accessibilityEnabled(ctx))
@@ -200,12 +212,23 @@ object Enforcer {
         }, 1_500)
     }
 
-    /** Starts an activity from the background using the overlay-permission exemption. */
-    private fun launch(ctx: Context, intent: Intent): Boolean = try {
-        ctx.startActivity(intent)
-        true
-    } catch (e: Exception) {
-        ProbeLog.log(ctx, "launch_failed", JSONObject().put("error", e.javaClass.simpleName))
-        false
+    /**
+     * Starts an activity from the background. This depends on the user having
+     * granted "display over other apps" (SYSTEM_ALERT_WINDOW), which is the
+     * documented background-activity-launch exception — even though nothing is
+     * drawn as an overlay. The call can be silently blocked by the system, so
+     * success here only means no exception; the target app's own log is the
+     * evidence that it actually left the screen.
+     */
+    private fun launch(ctx: Context, intent: Intent): Boolean {
+        val saw = Capabilities.overlay(ctx)
+        return try {
+            ctx.startActivity(intent)
+            ProbeLog.log(ctx, "background_launch_requested", JSONObject().put("overlay_permission", saw))
+            true
+        } catch (e: Exception) {
+            ProbeLog.log(ctx, "launch_failed", JSONObject().put("error", e.javaClass.simpleName).put("overlay_permission", saw))
+            false
+        }
     }
 }
