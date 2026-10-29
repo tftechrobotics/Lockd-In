@@ -141,3 +141,61 @@ jobs:
           name: lockdin-probe-android
           path: out/lockdin-probe-android
           retention-days: 30
+
+  # Release-signed bundles for Google Play internal testing (owner decision R18:
+  # devices get builds only through trusted channels). Skips cleanly until the
+  # owner adds the two upload-key secrets. The key never leaves the runner's
+  # temp directory and is deleted at the end of the job.
+  android-play-bundles:
+    name: Android Play bundles (internal testing)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: probes/android
+    env:
+      HAS_UPLOAD_KEY: ${{ secrets.LOCKDIN_UPLOAD_KEYSTORE_B64 != '' && secrets.LOCKDIN_UPLOAD_STORE_PASSWORD != '' }}
+    steps:
+      - name: Upload key not configured
+        if: env.HAS_UPLOAD_KEY != 'true'
+        working-directory: .
+        run: echo "::notice::Play upload-key secrets are not set; skipping signed bundles."
+      - uses: actions/checkout@v4
+        if: env.HAS_UPLOAD_KEY == 'true'
+      - uses: gradle/actions/wrapper-validation@v4
+        if: env.HAS_UPLOAD_KEY == 'true'
+      - uses: actions/setup-java@v4
+        if: env.HAS_UPLOAD_KEY == 'true'
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        if: env.HAS_UPLOAD_KEY == 'true'
+      - name: Build signed release bundles (probe + harmless target)
+        if: env.HAS_UPLOAD_KEY == 'true'
+        env:
+          KEYSTORE_B64: ${{ secrets.LOCKDIN_UPLOAD_KEYSTORE_B64 }}
+          LOCKDIN_UPLOAD_STORE_PASSWORD: ${{ secrets.LOCKDIN_UPLOAD_STORE_PASSWORD }}
+          LOCKDIN_UPLOAD_KEY_PASSWORD: ${{ secrets.LOCKDIN_UPLOAD_STORE_PASSWORD }}
+          LOCKDIN_UPLOAD_KEY_ALIAS: lockdin-probe-upload
+          LOCKDIN_VERSION_CODE: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          key="$RUNNER_TEMP/upload.p12"
+          trap 'rm -f "$key"' EXIT
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$key"
+          export LOCKDIN_UPLOAD_STORE_FILE="$key"
+          ./gradlew --no-daemon :probe:bundleRelease :target:bundleRelease
+      - name: Collect
+        if: env.HAS_UPLOAD_KEY == 'true'
+        run: |
+          mkdir -p ../../out/lockdin-play-bundles
+          cp probe/build/outputs/bundle/release/probe-release.aab ../../out/lockdin-play-bundles/lockdin-probe.aab
+          cp target/build/outputs/bundle/release/target-release.aab ../../out/lockdin-play-bundles/lockdin-probe-target.aab
+          echo "versionCode ${{ github.run_number }}" > ../../out/lockdin-play-bundles/VERSION.txt
+      - uses: actions/upload-artifact@v4
+        if: env.HAS_UPLOAD_KEY == 'true'
+        with:
+          name: lockdin-play-bundles
+          path: out/lockdin-play-bundles
+          retention-days: 30

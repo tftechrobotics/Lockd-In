@@ -1,7 +1,7 @@
 # Handoff — read this first
 
-**Last session:** 2026-10-29 (third session) · **Milestone:** 1 — **OPEN**
-**Repository:** github.com/tftechrobotics/Lockd-In (private). **CI:** green as of run 40836172393. **Next:** owner runs the two smoke tests.
+**Last session:** 2026-10-29 (fourth session) · **Milestone:** 1 — **OPEN**
+**Repository:** github.com/tftechrobotics/Lockd-In (private). **CI:** green as of run 40836172393. **Next:** Android via Google Play internal testing (today); Windows code signing (next session).
 
 ## Status by evidence level
 
@@ -9,9 +9,9 @@
 |---|---|---|---|---|
 | `lockdin-core` | Yes | 21 tests (incl. 512-case property test), fmt, clippy — Ubuntu 24.04, Rust 1.97.0 | n/a (pure logic) | Heartbeat transport (M5), monotonic-clock tracking (M3/M4) |
 | Windows probe + target + guardian | Yes | Compiles, 0 warnings (.NET SDK 10.0.113, Linux) | **No** | — |
-| Android probe + target | Yes | Kotlin type-checks clean against AOSP `android-16.0.0_r2` framework jar (Kotlin 2.0.21). **No APK built yet** | **No** | — |
+| Android probe + target | Yes | Debug APKs built in CI; signed Play bundles job added (needs secrets) | **No** (Auto Blocker blocked sideload) | — |
 | VM policy scripts | Yes | Parse + PSScriptAnalyzer clean (PowerShell 7.5.4); manifest logic unit-tested | **No** | — |
-| CI (4 jobs, separate VM artifact) | Yes | actionlint + YAML parse clean | **Never run** | — |
+| CI (core, Windows x64/arm64, VM lint, Android, Play bundles) | Yes | Green, run 40836172393 (before Play job) | n/a | — |
 | Windows service, App Control prevention, in-app policy compiler | No | — | — | ADR-0007 |
 | Product UI | No | — | — | M2 |
 
@@ -50,22 +50,28 @@ sources. It needs no Google Maven or NuGet access.
 
 ## Next actions
 
-1. **Owner:** create an **empty private** GitHub repository (no README or
-   license) and reply with `owner/name`. The session then attaches it with
-   push access, pushes, and runs CI.
-2. **Developer:**
-   - fix whatever CI reports (most likely Android build configuration, since only type-checking was possible here);
-   - set the Gradle `distributionSha256Sum`;
-   - confirm the headless Windows sanity run passes;
-   - publish the artifact links.
-3. **Owner:** smoke tests only (checklist steps 1 and 2), plus device details.
-4. **Developer:** record evidence in `docs/milestones.md`, then the next probe iteration.
-5. **Later:** recovery R1–R6, extended tests, battery pair, VM experiments (Pro VM, then Home VM).
-6. **Independent work meanwhile:**
-   - App Control in-app compiler spike with round-trip tests;
-   - M2 design for enforcement-independent flows;
-   - FFI spike;
-   - monotonic-clock design.
+Device testing is blocked by protections the owner keeps on (R18): Smart App
+Control blocks the unsigned Windows build; Samsung Auto Blocker blocks the
+sideloaded APK.
+
+1. **Android / Play (in progress):**
+   - CI job `android-play-bundles` builds release-signed AABs on pushes to
+     `main` once secrets `LOCKDIN_UPLOAD_KEYSTORE_B64` and
+     `LOCKDIN_UPLOAD_STORE_PASSWORD` exist (alias `lockdin-probe-upload`,
+     versionCode = run number). It skips with a notice otherwise.
+   - A probe-only upload key was generated for the owner and handed over as a
+     file; the session's copy is deleted. If lost, generate a new one and ask
+     Play support for an upload-key reset (Play App Signing holds the app key).
+   - Owner: Play developer account → two apps (`app.lockdin.probe`,
+     `app.lockdin.probetarget`) → upload AABs to Internal testing → app content
+     forms (foreground service `specialUse`, accessibility, usage access) →
+     opt-in link → install on the S24+ → smoke test S1–S5.
+2. **Windows (next session):** Azure Artifact Signing account + identity
+   validation (owner), then CI signing via OIDC, then the Windows smoke test.
+3. **Developer:** record evidence in `docs/milestones.md`; then recovery R1–R6,
+   extended tests, battery pair, VM experiments.
+4. **Independent work meanwhile:** App Control compiler spike, M2 design for
+   enforcement-independent flows, FFI spike, monotonic-clock design.
 
 ## Open owner decisions
 

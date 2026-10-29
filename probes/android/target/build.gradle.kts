@@ -4,6 +4,10 @@ plugins {
     alias(libs.plugins.kotlin.android)
 }
 
+// Play upload signing is configured only when CI supplies the upload key via
+// environment variables (from GitHub Actions secrets). No key is ever committed.
+val uploadStoreFile: String? = System.getenv("LOCKDIN_UPLOAD_STORE_FILE")
+
 android {
     namespace = "app.lockdin.probetarget"
     compileSdk = 36
@@ -12,11 +16,25 @@ android {
         applicationId = "app.lockdin.probetarget"
         minSdk = 29
         targetSdk = 36
-        versionCode = 2
+        // CI passes the run number so every Play upload has a higher version code.
+        versionCode = (System.getenv("LOCKDIN_VERSION_CODE") ?: "2").toInt()
         versionName = "0.2-target"
     }
+    signingConfigs {
+        if (uploadStoreFile != null) {
+            create("upload") {
+                storeFile = file(requireNotNull(uploadStoreFile))
+                storePassword = System.getenv("LOCKDIN_UPLOAD_STORE_PASSWORD")
+                keyAlias = System.getenv("LOCKDIN_UPLOAD_KEY_ALIAS")
+                keyPassword = System.getenv("LOCKDIN_UPLOAD_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
-        release { isMinifyEnabled = false }
+        release {
+            isMinifyEnabled = false
+            if (uploadStoreFile != null) signingConfig = signingConfigs.getByName("upload")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
