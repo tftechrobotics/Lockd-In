@@ -48,7 +48,6 @@ function Setup() {
   const upcoming = nextUp(schedule, Date.now());
 
   const segments = breakMin > 0 ? roundsPlan(rounds, focus, breakMin) : roundsPlan(1, focus, 0);
-  const profile = profiles.find((p) => p.id === profileId) ?? profiles[0];
 
   const start = () => {
     const problem = validatePlan(segments);
@@ -66,28 +65,33 @@ function Setup() {
   };
 
   const totalMin = segments.reduce((a, s) => a + s.minutes, 0);
+  const endsAt = clockTime(Date.now() + totalMin * 60_000);
+  const plan = breakMin > 0 ? `${rounds} × ${minutesLabel(focus)}, ${breakMin} min breaks` : minutesLabel(focus);
 
-  const lock = <LockTimer remainingMs={focus * 60_000} caption="Focus time" locked={false} />;
-  const form = (lockInside: boolean) => (
-    <form className="setup" onSubmit={(e) => { e.preventDefault(); start(); }} noValidate>
+  return (
+    <div className={`page focus ${layout === 'desktop' ? 'focus--desktop' : ''}`}>
+      <h1 className="sr-only">Start a focus session</h1>
+      <form className="panel session-panel" onSubmit={(e) => { e.preventDefault(); start(); }} noValidate>
+        <div className="session-panel__lock">
+          <LockTimer remainingMs={focus * 60_000} caption="Focus time" locked={false} />
+        </div>
+        <div className="session-panel__body">
           <div className="field">
-            <label htmlFor={ids.intent}>What are you working on? <span className="optional">Optional</span></label>
-            <input id={ids.intent} className="input" value={intention} maxLength={120} list={ids.list}
-              placeholder="e.g. TAM 212 · Practice problems" autoComplete="off"
+            <label htmlFor={ids.intent}>Task</label>
+            <input id={ids.intent} className="input input--task" value={intention} maxLength={120} list={ids.list}
+              placeholder="What are you working on?" autoComplete="off"
               onChange={(e) => setIntention(e.target.value)} />
             <datalist id={ids.list}>{recent.map((r) => <option key={r.text} value={r.text} />)}</datalist>
           </div>
 
-          {lockInside && <div className="setup__lock">{lock}</div>}
-          <fieldset className="field">
-            <legend id={ids.len}>Focus time</legend>
-            <div className="chips" role="radiogroup" aria-labelledby={ids.len}>
+          <div className="field">
+            <span className="field__label" id={ids.len}>Duration</span>
+            <div className="segmented" role="radiogroup" aria-labelledby={ids.len}>
               {LENGTHS.map((m) => (
                 <button key={m} type="button" role="radio" aria-checked={!custom && focus === m}
-                  className="chip" onClick={() => { setCustom(false); setFocus(m); setError(null); }}>{m} min</button>
+                  onClick={() => { setCustom(false); setFocus(m); setError(null); }}>{m} min</button>
               ))}
-              <button type="button" role="radio" aria-checked={custom} className="chip"
-                onClick={() => setCustom(true)}>Custom</button>
+              <button type="button" role="radio" aria-checked={custom} onClick={() => setCustom(true)}>Custom</button>
             </div>
             {custom && (
               <div className="inline-number">
@@ -97,94 +101,56 @@ function Setup() {
                   onChange={(e) => { setFocus(Math.round(Number(e.target.value)) || 0); setError(null); }} />
               </div>
             )}
-          </fieldset>
+          </div>
 
           <div className="field-row">
-            <div className="field select-field">
-              <label htmlFor={ids.brk}><Icon name="coffee" size={18} />Break</label>
+            <div className="field">
+              <label htmlFor={ids.brk}>Break</label>
               <select id={ids.brk} className="input" value={breakMin} onChange={(e) => { setBreakMin(Number(e.target.value)); setError(null); }}>
-                <option value={0}>No break</option>
+                <option value={0}>None</option>
                 {[5, 10, 15, 20].map((b) => <option key={b} value={b}>{b} min</option>)}
               </select>
             </div>
-            <div className="field select-field">
-              <label htmlFor={ids.prof}><Icon name="book" size={18} />Profile</label>
+            <div className="field">
+              <label htmlFor={ids.rounds}>Focus periods</label>
+              <select id={ids.rounds} className="input" value={breakMin > 0 ? rounds : 1} disabled={breakMin === 0}
+                onChange={(e) => setRounds(Number(e.target.value))}>
+                {breakMin === 0 && <option value={1}>1</option>}
+                {[2, 3, 4, 5, 6].map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor={ids.prof}>Profile</label>
               <select id={ids.prof} className="input" value={profileId} onChange={(e) => setProfileId(e.target.value)}>
                 {profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
           </div>
-          {breakMin > 0 && (
-            <div className="field select-field field--narrow">
-              <label htmlFor={ids.rounds}>Focus periods</label>
-              <select id={ids.rounds} className="input" value={rounds} onChange={(e) => setRounds(Number(e.target.value))}>
-                {[2, 3, 4, 5, 6].map((r) => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-          )}
 
-          <p className="summary">
-            {breakMin > 0
-              ? `${rounds} × ${minutesLabel(focus)} with ${breakMin}-minute breaks · ends around ${clockTime(Date.now() + totalMin * 60_000)}`
-              : `${minutesLabel(focus)} · ends around ${clockTime(Date.now() + totalMin * 60_000)}`}
-            {' · '}{profile.name} profile
-          </p>
           {error && <p id={ids.err} className="error" role="alert">{error}</p>}
-          <button type="submit" className="button button--primary button--wide">
-            Lock in <Icon name="arrow" />
-          </button>
-        </form>
-  );
-
-  if (layout === 'desktop') {
-    return (
-      <div className="page focus focus--desktop">
-        <h1 className="display">What’s the move?</h1>
-        {form(true)}
-        <DeviceStrip compact />
-        <NextRow upcoming={upcoming} card />
-      </div>
-    );
-  }
-
-  return (
-    <div className="page focus">
-      <h1 className="display">Ready when you are.</h1>
-      <div className="focus__grid">
-        {lock}
-        {form(false)}
-      </div>
-
-      <DeviceStrip />
-      <hr className="rule" />
-      <NextRow upcoming={upcoming} />
+          <div className="session-panel__footer">
+            <p className="summary">Ends {endsAt} · {plan}</p>
+            <button type="submit" className="button button--primary">Lock in <Icon name="arrow" size={18} /></button>
+          </div>
+        </div>
+      </form>
+      <footer className="statusbar">
+        <DeviceStrip />
+        <NextRow upcoming={upcoming} />
+      </footer>
     </div>
   );
 }
 
-function NextRow({ upcoming, card = false }: { upcoming: ReturnType<typeof nextUp>; card?: boolean }) {
-  if (card) {
-    return (
-      <a className="next-card" href="#/schedule">
-        <Icon name="calendar" size={22} />
-        <span className="next-card__text">
-          <span className="next-card__label">{upcoming ? 'Next up' : 'Schedule'}</span>
-          <span>{upcoming ? `${upcoming.session.title} · ${dayLabel(upcoming.start)} ${clockTime(upcoming.start)}` : 'Nothing planned yet'}</span>
-        </span>
-        <Icon name="chevron" size={20} />
-      </a>
-    );
-  }
+function NextRow({ upcoming }: { upcoming: ReturnType<typeof nextUp> }) {
   return (
-    <div className="next">
-      <Icon name="calendar" size={22} />
-      {upcoming ? (
-        <p><strong>Next:</strong> {upcoming.session.title} · {dayLabel(upcoming.start)} {clockTime(upcoming.start)}</p>
-      ) : (
-        <p>Nothing scheduled yet.</p>
-      )}
-      <a className="link-arrow" href="#/schedule">{upcoming ? 'View schedule' : 'Plan a session'} <Icon name="arrow" size={18} /></a>
-    </div>
+    <a className="next" href="#/schedule">
+      <Icon name="calendar" size={18} />
+      {upcoming
+        ? <span>Next: {upcoming.session.title}, {dayLabel(upcoming.start).toLowerCase()} {clockTime(upcoming.start)}</span>
+        : <span>Plan a session</span>}
+      <Icon name="chevron" size={16} />
+    </a>
   );
 }
 
@@ -211,40 +177,38 @@ function SessionView({ session }: { session: ActiveSession }) {
   const task = session.intention?.text;
   const lifted = snap.overrideState.type === 'active_for_focus_period';
 
-  const headline = lifted ? 'Unlocked for now.' : focusing ? 'Locked in.' : 'On a break.';
+  const status = lifted ? 'Unlocked' : focusing ? 'Locked in' : 'On a break';
   const caption = phase.kind === 'focus'
-    ? (focusCount > 1 ? `Focus ${focusIndex} of ${focusCount}` : 'Focus time')
+    ? (focusCount > 1 ? `Focus ${focusIndex} of ${focusCount}` : 'Focus')
     : 'Break';
   const note = phase.kind === 'break'
     ? (remaining <= 60_000 ? message(tone, 'breakEnding', { task }) : message(tone, 'breakStart', { time: clockTime(phase.end) }))
-    : lifted ? null : message(tone, 'focusStart', { task });
+    : lifted ? `Unlocked until ${clockTime((snap.overrideState as { until: number }).until)}. Later focus periods lock again.`
+    : message(tone, 'focusStart', { task });
+  const meta = [
+    `${phase.kind === 'focus' ? (nextPhase ? 'Break at' : 'Ends') : 'Focus at'} ${clockTime(phase.end)}`,
+    nextPhase ? `Session ends ${clockTime(occ.end)}` : null,
+    profile?.name,
+  ].filter(Boolean).join(' · ');
 
   return (
-    <div className="page focus focus--active">
-      <h1 className="display">{headline}</h1>
-      {task && <p className="intention">{task}</p>}
-      <div className="focus__grid">
-        <LockTimer remainingMs={remaining} caption={caption} locked={focusing} />
-        <div className="session">
-          <dl className="facts">
-            <div>
-              <dt>{phase.kind === 'focus' ? (nextPhase ? 'Break at' : 'Ends at') : 'Focus resumes at'}</dt>
-              <dd>{clockTime(phase.end)}</dd>
-            </div>
-            <div><dt>Session ends</dt><dd>{clockTime(occ.end)}</dd></div>
-            <div><dt>Profile</dt><dd>{profile?.name ?? 'Custom'}</dd></div>
-          </dl>
+    <div className={`page focus ${layout === 'desktop' ? 'focus--desktop' : ''}`}>
+      <div className="panel session-panel">
+        <div className="session-panel__lock">
+          <LockTimer remainingMs={remaining} caption={caption} locked={focusing} />
+        </div>
+        <div className="session-panel__body">
+          <p className={`status status--${focusing ? 'locked' : 'open'}`} aria-live="polite">{status} · {caption}</p>
+          <h1 className="session-title">{task ?? (phase.kind === 'focus' ? 'Focus session' : 'Break')}</h1>
+          <p className="meta">{meta}</p>
           {note && <p className="nudge" aria-live="polite">{note}</p>}
-          {lifted && (
-            <p className="nudge" aria-live="polite">
-              Unlocked until {clockTime((snap.overrideState as { until: number }).until)}. Later focus periods lock again.
-            </p>
-          )}
-          <HonestyNote />
           <OverridePanel session={session} snap={snap} now={now} />
         </div>
       </div>
-      <DeviceStrip compact />
+      <footer className="statusbar">
+        <HonestyNote />
+        <DeviceStrip />
+      </footer>
     </div>
   );
 }
@@ -252,17 +216,17 @@ function SessionView({ session }: { session: ActiveSession }) {
 function HonestyNote() {
   const host = useHost();
   const text = layout === 'web'
-    ? 'Nothing is blocked from this browser. Pair the Windows or Android app to restrict apps during focus.'
+    ? 'Not blocking: browsers can’t restrict apps'
     : !host || host.agent === 'unknown'
-      ? 'Checking whether the blocking service is running on this PC. The timer and schedule work either way.'
+      ? 'Checking the blocking service…'
       : host.agent === 'running'
-        ? 'The blocking service is running. Its protection status appears under Devices once it reports in.'
-        : 'Nothing is blocked yet: the blocking service isn’t set up on this PC. The timer and schedule still work.';
+        ? 'Blocking service running'
+        : 'Not blocking: blocking isn’t set up on this PC';
   return (
-    <p className="honesty">
-      <Icon name="info" size={18} />
+    <a className="honesty" href="#/devices">
+      <Icon name="info" size={16} />
       <span>{text}</span>
-    </p>
+    </a>
   );
 }
 
@@ -304,37 +268,37 @@ function OverridePanel({ session, snap, now }: { session: ActiveSession; snap: S
     <div className="out">
       {pending ? (
         <div className="pending" role="status">
-          <p><strong>Unlocking in {countdown(pending.effectiveAt - now)}</strong>{' '}
-            {pending.scope === 'current_focus_period' ? 'for this focus period.' : '— the session will end.'}</p>
+          <p><strong>Unlocking in {countdown(pending.effectiveAt - now)}</strong>
+            {pending.scope === 'current_focus_period' ? ' · this focus period' : ' · ends the session'}</p>
           <button type="button" className="button" onClick={cancel}>Cancel unlock</button>
         </div>
       ) : open ? (
         <fieldset className="out__choices">
-          <legend>Unlock waits {DEFAULT_OVERRIDE_DELAY_SECONDS} seconds. You can cancel while it counts down.</legend>
+          <legend>Unlock after a {DEFAULT_OVERRIDE_DELAY_SECONDS}-second wait</legend>
           {inFocus && (
             <label className="radio">
               <input type="radio" name="scope" checked={scope === 'current_focus_period'} onChange={() => setScope('current_focus_period')} />
-              <span><strong>This focus period</strong><br />Later focus periods lock again</span>
+              <span>This focus period</span>
             </label>
           )}
           <label className="radio">
             <input type="radio" name="scope" checked={!inFocus || scope === 'rest_of_session'} onChange={() => setScope('rest_of_session')} />
-            <span><strong>End this session</strong><br />Your schedule for other days doesn’t change</span>
+            <span>Rest of this session</span>
           </label>
           <div className="out__actions">
-            <button type="button" className="button" onClick={request}>Start {DEFAULT_OVERRIDE_DELAY_SECONDS}-second unlock</button>
-            <button type="button" className="button button--quiet" onClick={() => setOpen(false)}>Keep going</button>
+            <button type="button" className="button" onClick={request}>Start unlock</button>
+            <button type="button" className="button button--quiet" onClick={() => setOpen(false)}>Cancel</button>
           </div>
         </fieldset>
       ) : (
-        <button type="button" className="button button--quiet" onClick={() => setOpen(true)}>Need out?</button>
+        <button type="button" className="button" onClick={() => setOpen(true)}>Need out?</button>
       )}
-      <button type="button" className="button button--quiet button--danger" onClick={openEmergency}>
-        Emergency: end now
+      <button type="button" className="button button--quiet button--danger out__end" onClick={openEmergency}>
+        End now
       </button>
       <dialog ref={dialog} className="dialog" aria-labelledby="emg-title">
         <h2 id="emg-title">End the session now?</h2>
-        <p>This ends it right away, with no countdown, on this browser. Paired devices get the change when they next connect.</p>
+        <p>Emergency recovery ends it immediately, with no countdown.</p>
         <div className="out__actions">
           <button type="button" className="button button--danger-solid" onClick={emergency}>End session now</button>
           <button type="button" className="button" data-safe onClick={() => dialog.current?.close()}>Keep going</button>
@@ -354,8 +318,8 @@ function Recap({ session, snap }: { session: ActiveSession; snap: Snapshot }) {
   const focusedMs = occ.phases.filter((p) => p.kind === 'focus')
     .reduce((a, p) => a + Math.max(0, Math.min(p.end, endedAt) - p.start), 0);
   const unlockedEarly = session.controls.overrides.filter((o) => o.scope === 'current_focus_period' && o.cancelledAt === undefined).length;
-  const how = snap.status === 'completed' ? 'Finished as planned.'
-    : snap.status === 'ended_by_override' ? 'Ended early with an unlock.' : 'Ended with emergency recovery.';
+  const how = snap.status === 'completed' ? 'Finished as planned'
+    : snap.status === 'ended_by_override' ? 'Ended early with an unlock' : 'Ended with emergency recovery';
   const finish = () => update((s) => ({ ...s, active: null }));
   const again = () => getState().active && update((s) => ({
     ...s,
@@ -363,22 +327,22 @@ function Recap({ session, snap }: { session: ActiveSession; snap: Snapshot }) {
   }));
   const note = snap.status === 'completed' ? message(tone, 'done') : null;
 
+  const meta = [`${Math.round(focusedMs / 60_000)} min focused`, `${clockTime(session.start)}–${clockTime(endedAt)}`,
+    unlockedEarly > 0 ? `${unlockedEarly} period${unlockedEarly > 1 ? 's' : ''} unlocked early` : null].filter(Boolean).join(' · ');
+
   return (
-    <div className="page focus">
-      <h1 className="display">Session complete.</h1>
-      {session.intention && <p className="intention">{session.intention.text}</p>}
-      <div className="focus__grid">
-        <LockTimer remainingMs={0} caption="Done" locked={false} />
-        <div className="session">
-          <dl className="facts">
-            <div><dt>Focused</dt><dd>{Math.round(focusedMs / 60_000)} min</dd></div>
-            <div><dt>Time</dt><dd className="facts__text">{clockTime(session.start)}–{clockTime(endedAt)}</dd></div>
-            <div><dt>How it ended</dt><dd className="facts__text">{how}</dd></div>
-            {unlockedEarly > 0 && <div><dt>Unlocked early</dt><dd>{unlockedEarly} focus period{unlockedEarly > 1 ? 's' : ''}</dd></div>}
-          </dl>
+    <div className={`page focus ${layout === 'desktop' ? 'focus--desktop' : ''}`}>
+      <div className="panel session-panel">
+        <div className="session-panel__lock">
+          <LockTimer remainingMs={0} caption="Done" locked={false} />
+        </div>
+        <div className="session-panel__body">
+          <p className="status status--open">Session complete · {how}</p>
+          <h1 className="session-title">{session.intention?.text ?? 'Focus session'}</h1>
+          <p className="meta">{meta}</p>
           {note && <p className="nudge">{note}</p>}
           <div className="out__actions">
-            <button type="button" className="button button--primary" onClick={again}>Same again <Icon name="arrow" /></button>
+            <button type="button" className="button button--primary" onClick={again}>Same again</button>
             <button type="button" className="button" onClick={finish}>Done</button>
           </div>
         </div>

@@ -29,28 +29,20 @@ export function deviceRows(host: HostInfo | null): Row[] {
   ];
 }
 
-export function DeviceStrip({ compact = false }: { compact?: boolean }) {
+export function DeviceStrip() {
   const host = useHost();
   return (
-    <div className={`devices ${compact ? 'devices--compact' : ''}`}>
+    <div className="devices">
       <ul className="devices__list" aria-label="Devices">
         {deviceRows(host).map((d) => (
           <li key={d.name} className={`device device--${d.tone}`}>
-            <Icon name={d.icon} />
+            <Icon name={d.icon} size={16} />
             <span className="device__name">{d.name}</span>
-            <span className="device__status">
-              <Icon name={d.tone === 'ok' ? 'check' : 'dash'} size={16} />
-              {d.status}
-            </span>
+            <span className={`dot dot--${d.tone}`} aria-hidden="true" />
+            <span className="device__status">{d.status}</span>
           </li>
         ))}
       </ul>
-      {!compact && (
-        <p className="devices__note">
-          Blocking happens in the Lockd In apps for Windows and Android. This browser can time your
-          session but can’t restrict other apps. <a href="#/devices">About devices</a>
-        </p>
-      )}
     </div>
   );
 }

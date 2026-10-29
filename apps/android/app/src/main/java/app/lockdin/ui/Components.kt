@@ -2,6 +2,7 @@ package app.lockdin.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -169,19 +170,113 @@ fun <T> SelectField(icon: LIcon, label: String, options: List<Pair<T, String>>, 
     }
 }
 
+/** Connected single-choice control (TalkBack: radio buttons). */
+@Composable
+fun <T> Segmented(options: List<Pair<T, String>>, selected: T?, onSelect: (T) -> Unit, modifier: Modifier = Modifier) {
+    val c = LocalColors.current
+    Surface(
+        shape = RoundedCornerShape(12.dp), color = c.ground, border = BorderStroke(1.dp, c.controlLine),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        // At very large text sizes the options split into rows instead of clipping.
+        val perRow = if (LocalDensity.current.fontScale > 1.4f) 3 else options.size
+        Column(Modifier.padding(3.dp).selectableGroup(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+          options.chunked(perRow).forEach { row ->
+          Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            row.forEach { (value, label) ->
+                val on = value == selected
+                Surface(
+                    shape = RoundedCornerShape(9.dp),
+                    color = if (on) c.ink else Color.Transparent,
+                    contentColor = if (on) c.onInk else c.ink,
+                    modifier = Modifier.weight(1f).heightIn(min = 44.dp)
+                        .selectable(selected = on, role = Role.RadioButton, onClick = { onSelect(value) }),
+                ) {
+                    Box(Modifier.heightIn(min = 44.dp).padding(horizontal = 2.dp), contentAlignment = Alignment.Center) {
+                        Text(label, style = Type.label, maxLines = 1, textAlign = TextAlign.Center)
+                    }
+                }
+            }
+            repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
+          }
+          }
+        }
+    }
+}
+
+/** Small caption above a field. */
+@Composable
+fun FieldLabel(text: String, modifier: Modifier = Modifier) {
+    Text(text, style = Type.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = LocalColors.current.inkMuted, modifier = modifier)
+}
+
+/** A labelled field that opens a menu; label above, value inside. */
+@Composable
+fun <T> CompactSelect(label: String, options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val c = LocalColors.current
+    var open by remember { mutableStateOf(false) }
+    val current = options.firstOrNull { it.first == selected }?.second ?: ""
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        FieldLabel(label, Modifier.clearAndSetSemantics { })
+        Box {
+            OutlinedButton(
+                onClick = { open = true },
+                enabled = enabled,
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, if (enabled) c.controlLine else c.line),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = c.surface, contentColor = c.ink, disabledContainerColor = c.surface, disabledContentColor = c.inkMuted),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 10.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                    .semantics { contentDescription = "$label: $current. Change" },
+            ) {
+                Text(current, style = Type.body, modifier = Modifier.weight(1f), maxLines = 1)
+                LockdIcon(LIcon.ChevronDown, size = 18.dp, tint = if (enabled) c.ink else c.inkMuted)
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                options.forEach { (value, text) ->
+                    DropdownMenuItem(text = { Text(text, style = Type.body) }, onClick = { onSelect(value); open = false })
+                }
+            }
+        }
+    }
+}
+
+/** The bordered card that holds a session: lock band on top, content below. */
+@Composable
+fun SessionCard(lock: @Composable () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val c = LocalColors.current
+    Surface(shape = RoundedCornerShape(16.dp), color = c.surface, border = BorderStroke(1.dp, c.line), modifier = modifier.fillMaxWidth()) {
+        Column {
+            Box(Modifier.fillMaxWidth().background(c.ground).padding(vertical = 18.dp), contentAlignment = Alignment.Center) { lock() }
+            androidx.compose.material3.HorizontalDivider(color = c.line)
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) { content() }
+        }
+    }
+}
+
+/** "● Locked in · Focus 1 of 2" */
+@Composable
+fun StatusLine(text: String, active: Boolean, modifier: Modifier = Modifier) {
+    val c = LocalColors.current
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Canvas(Modifier.size(7.dp)) { drawCircle(if (active) c.ink else c.controlLine) }
+        Text(text, style = Type.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = c.inkMuted)
+    }
+}
+
 @Composable
 fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, arrow: Boolean = true) {
     val c = LocalColors.current
     Button(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(containerColor = c.ink, contentColor = c.onInk),
-        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp),
+        modifier = modifier.fillMaxWidth().heightIn(min = 52.dp),
     ) {
         Text(text, style = Type.button)
         if (arrow) {
             Spacer(Modifier.width(10.dp))
-            LockdIcon(LIcon.Arrow, tint = c.onInk, size = 22.dp)
+            LockdIcon(LIcon.Arrow, tint = c.onInk, size = 18.dp)
         }
     }
 }
@@ -231,12 +326,12 @@ fun DeviceStrip(onOpen: () -> Unit, modifier: Modifier = Modifier) {
         color = c.ground,
         modifier = modifier.fillMaxWidth().semantics(mergeDescendants = true) { role = Role.Button },
     ) {
-        FlowRow(Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        FlowRow(Modifier.heightIn(min = 48.dp).padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             PHONE_DEVICE_ROWS.forEach { d ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    LockdIcon(d.icon, size = 18.dp)
-                    Text(d.name, style = Type.label, color = c.ink)
-                    LockdIcon(if (d.ok) LIcon.Check else LIcon.Dash, size = 14.dp, tint = c.inkMuted)
+                    LockdIcon(d.icon, size = 16.dp)
+                    Text(d.name, style = Type.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = c.ink)
+                    Canvas(Modifier.size(6.dp)) { drawCircle(if (d.ok) c.ink else c.controlLine) }
                     Text(d.status, style = Type.caption, color = c.inkMuted)
                 }
             }

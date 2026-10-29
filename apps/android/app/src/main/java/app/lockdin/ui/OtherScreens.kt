@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -77,7 +78,6 @@ fun ScheduleScreen(store: Store, now: Long, zone: ZoneId) {
     }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Heading("Schedule", center = false)
-        Text("Sessions you plan here live on this phone. Paired devices will get them once pairing is available.", style = Type.caption, color = c.inkMuted)
         PrimaryButton("Plan a session", arrow = false, onClick = {
             editing = ScheduledSession("", "", setOf(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY),
                 LocalTime.of(18, 0), 40, 10, 2, store.state.profiles.first().id)
@@ -86,7 +86,7 @@ fun ScheduleScreen(store: Store, now: Long, zone: ZoneId) {
             Surface(shape = RoundedCornerShape(16.dp), color = c.ground, border = BorderStroke(1.dp, c.controlLine), modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(18.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     LockdIcon(LIcon.Calendar, tint = c.inkMuted)
-                    Text("No sessions planned. Plan a regular time — like weeknights at 6 — and it shows up as “Next up” on Focus.", style = Type.body, color = c.inkMuted)
+                    Text("No sessions planned.", style = Type.body, color = c.inkMuted)
                 }
             }
         }
@@ -197,7 +197,7 @@ fun ProfilesScreen(store: Store) {
     var name by rememberSaveable { mutableStateOf("") }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Heading("Profiles", center = false)
-        Text("A profile is the set of apps that stay available while you focus. Each device keeps its own list, because the apps on your phone and PC differ.", style = Type.caption, color = c.inkMuted)
+        Text("Apps that stay available during focus. Each device keeps its own list.", style = Type.caption, color = c.inkMuted)
         store.state.profiles.forEach { p -> ProfileRow(store, p) }
         OutlinedTextField(name, { name = it.take(40) }, label = { Text("New profile") }, placeholder = { Text("e.g. Lab report") },
             singleLine = true, shape = RoundedCornerShape(12.dp), colors = fieldColors(), modifier = Modifier.fillMaxWidth())
@@ -218,7 +218,7 @@ private fun ProfileRow(store: Store, p: Profile) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(p.name, style = Type.title, color = c.ink)
         Text(p.description, style = Type.caption, color = c.inkMuted)
-        Text("No apps chosen yet. You’ll pick them from this phone’s installed apps when blocking is set up.", style = Type.caption, color = c.inkMuted)
+        Text("No apps chosen", style = Type.caption, color = c.inkMuted)
         if (!p.builtIn) QuietButton("Delete ${p.name}", { store.update { s -> s.copy(profiles = s.profiles.filter { it.id != p.id }) } })
     }
 }
@@ -239,12 +239,18 @@ fun DevicesScreen() {
             }
             HorizontalDivider(color = c.line)
         }
-        SectionTitle("What each device does")
-        Text("Android app: covers apps you didn’t approve with a block screen during focus and moves them to the background. Nothing is closed.", style = Type.body, color = c.ink)
-        Text("Windows app: keeps approved apps available and restricts the rest during focus.", style = Type.body, color = c.ink)
-        Text("Web app: plans and times sessions. A website can’t restrict other apps, so it never claims to.", style = Type.body, color = c.ink)
-        SectionTitle("Pairing")
-        Text("Pairing links your phone, PC and browser so they share session timing. Each device keeps running the schedule it received while offline. It isn’t available yet, so nothing here is connected.", style = Type.body, color = c.inkMuted)
+        Spacer(Modifier.height(4.dp))
+        listOf(
+            "Android app" to "Covers restricted apps with a block screen during focus.",
+            "Windows app" to "Restricts apps outside your profile during focus.",
+            "Browser" to "Plans and times sessions. Browsers can’t restrict other apps.",
+        ).forEach { (k, v) ->
+            Column(Modifier.semantics(mergeDescendants = true) {}) {
+                Text(k, style = Type.bodyStrong, color = c.ink)
+                Text(v, style = Type.caption, color = c.inkMuted)
+            }
+        }
+        Text("Pairing isn’t available yet.", style = Type.caption, color = c.inkMuted)
     }
 }
 
@@ -264,7 +270,6 @@ fun SettingsScreen(store: Store) {
         }
         HorizontalDivider(color = c.line)
         SectionTitle("Messages")
-        Text("Short lines at the start of focus and around breaks. Quiet shows none.", style = Type.caption, color = c.inkMuted)
         Column(Modifier.selectableGroup()) {
             listOf(Tone.CALM to "Calm", Tone.DIRECT to "Direct", Tone.PLAYFUL to "Playful", Tone.QUIET to "Quiet").forEach { (v, l) ->
                 RadioRow(l, store.state.tone == v) { store.update { it.copy(tone = v) } }
@@ -274,14 +279,14 @@ fun SettingsScreen(store: Store) {
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
         HorizontalDivider(color = c.line)
         SectionTitle("Data on this phone")
-        Text("Your schedule, profiles and current session are stored only on this phone and aren’t included in backups. Nothing is sent anywhere.", style = Type.caption, color = c.inkMuted)
+        Text("Stored only on this phone and excluded from backups.", style = Type.caption, color = c.inkMuted)
         QuietButton("Delete Lockd In data from this phone", { confirm = true }, danger = true)
     }
     if (confirm) {
         AlertDialog(
             onDismissRequest = { confirm = false },
             title = { Text("Delete Lockd In data?", style = Type.title) },
-            text = { Text("This removes your schedule, custom profiles, recent intentions and any session in progress on this phone. It can’t be undone.", style = Type.body) },
+            text = { Text("Removes your schedule, custom profiles and any session in progress. This can’t be undone.", style = Type.body) },
             confirmButton = { TextButton(onClick = { store.clearAll(); confirm = false }) { Text("Delete", style = Type.label, color = c.danger) } },
             dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel", style = Type.label, color = c.ink) } },
             containerColor = c.surface,

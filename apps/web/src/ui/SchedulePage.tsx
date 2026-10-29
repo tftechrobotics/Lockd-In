@@ -26,14 +26,14 @@ export function SchedulePage() {
           </button>
         )}
       </div>
-      <p className="lede">Sessions saved here live in this browser. Paired devices will receive them once pairing is available, and then run them even when offline.</p>
+
 
       {editing && <Editor initial={editing} onClose={() => setEditing(null)} />}
 
       {schedule.length === 0 && !editing ? (
         <div className="empty">
           <Icon name="calendar" size={28} />
-          <p>No sessions planned. Plan a regular time — like weeknights at 6 — and it shows up as “Next” on Focus.</p>
+          <p>No sessions planned.</p>
         </div>
       ) : (
         <ul className="schedule">

@@ -31,7 +31,7 @@ val Figtree = FontFamily(
 val LocalColors = staticCompositionLocalOf { LightColors }
 
 object Type {
-    val display = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.Bold, fontSize = 32.sp, lineHeight = 36.sp, letterSpacing = (-0.4).sp)
+    val display = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 30.sp, letterSpacing = (-0.2).sp)
     val timer = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.Bold, fontSize = 52.sp, lineHeight = 56.sp, fontFeatureSettings = "tnum")
     val title = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 28.sp)
     val fact = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp, fontFeatureSettings = "tnum")
