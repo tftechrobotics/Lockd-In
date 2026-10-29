@@ -69,3 +69,12 @@ Changes (web, desktop shell layout and Android):
 - One summary line ("Ends 5:53 PM · 2 × 40 min, 5 min breaks").
 - Honesty and device status are single muted lines under the panel that link to Devices; explanations live on the Devices page only.
 - Page headings are reduced to 1.6rem (web) / 24sp (Android). Copy on Schedule, Profiles, Devices and Settings is cut to one line each.
+
+## Revision 2026-10-29 (evening) — faithful implementation of the reference
+
+The owner re-sent the Cream & Ink reference (`design/reference/cream-and-ink-mockup.png`) and asked
+for faithful implementation rather than a new direction. The compact "session panel" pass above is
+**superseded**. The exact, current rules live in `docs/design-spec.md`; the reusable working
+instructions are in `design/skill/lockd-in-design/SKILL.md`. Verified in Chromium (web and
+Windows layout), on the Android emulator (API 35) and in the real WinUI window on a GitHub
+windows-2025 runner (`ci-screenshots-windows` branch). Not yet seen on the owner's PC or phone.

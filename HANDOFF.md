@@ -1,6 +1,6 @@
 # Handoff — read this first
 
-**Last session:** 2026-10-29 (fifth session) · **Milestone:** 1 — **OPEN**; M2 (design + main flow) **in progress**
+**Last session:** 2026-10-29 (fifth session, design pass) · **Milestone:** 1 — **OPEN**; M2 (design + main flow) **in progress**
 **Read first:** `docs/product-spec.md` (v2, owner direction) and `docs/backlog.md`.
 **Repository:** github.com/tftechrobotics/Lockd-In (private).
 **Next:** owner sets up Azure Artifact Signing (Windows app + probe) and
@@ -31,6 +31,20 @@ not free trial — Artifact Signing doesn't support trials) and Play wait.
 `tools/sandbox-checks.sh` reruns every Linux-side check (core, .NET builds,
 spike self-test, Kotlin type-check with an R stand-in, VM script lint,
 actionlint).
+
+## What changed this session (design pass, latest)
+- Owner re-sent the approved Cream & Ink reference (now `design/reference/cream-and-ink-mockup.png`)
+  and asked for faithful implementation. All three Focus screens rebuilt to it; other pages restyled.
+  Exact rules: `docs/design-spec.md` (incl. §9 deliberate deviations: no "What's the move?",
+  honest device phrases, Custom pill, periods control, lock icon for the Focus tab).
+- Reusable instructions: `design/skill/lockd-in-design/SKILL.md` (offered to the owner as a skill).
+- CI now photographs the **real WinUI window** (light/dark, 620×748 and minimum 480×600) on
+  windows-2025 and pushes to branch `ci-screenshots-windows`; Android screenshots stay on `ci-screenshots`.
+- Tokens: `controlLine` light → #8F8270 (3.3:1), new `statusDot`, drawing opacity up; Outfit 800 added
+  for timer digits (web variable font; Android `outfit_800.ttf` via `design/export-android.py`).
+- Verified: Chromium (web + Windows layout, 30 Playwright tests incl. axe/keyboard/200% text),
+  Android emulator API 35 (10 UI tests + screenshots incl. 2× font), real WinUI window on a CI runner.
+  Not verified: owner's PC or phone, NVDA/TalkBack, Firefox/Safari.
 
 ## What changed this session (fifth, later)
 - Android app shell (A8). Compose BOM pinned to 2025.08.00 because 2026.x
