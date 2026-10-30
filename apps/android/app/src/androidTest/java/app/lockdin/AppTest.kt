@@ -9,7 +9,12 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.onLast
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -71,49 +76,67 @@ class AppTest {
     @Suppress("UNUSED_PARAMETER")
     private fun tick(store: Store) { rule.waitForIdle() }
 
+    /** Opens a setting row (e.g. "Breaks") and picks a value from its menu. */
+    private fun pickSetting(row: String, item: String) {
+        rule.onNodeWithText(row).performScrollTo().performClick()
+        pickMenuItem(item)
+    }
+
     @Test fun configureStartFocusBreakResumeFinish() {
         val store = launch()
-        rule.onNodeWithText("Lock in").assertExists()
+        rule.onNodeWithText("Start timer").assertExists()
         rule.onNodeWithContentDescription("Task").performTextInput("TAM 212 · Practice problems")
-        rule.onNodeWithText("25 min").performClick()
-        rule.onNodeWithContentDescription("Break: No break. Change", substring = true).performScrollTo().performClick()
-        pickMenuItem("Break · 5 min")
-        rule.onNodeWithText("Lock in").performScrollTo().performClick()
-        rule.onNodeWithText("Locked in.").assertIsDisplayed()
-        rule.onNodeWithContentDescription("Focus 1 of 2: 25 minutes left").assertIsDisplayed()
+        rule.onNode(hasText("25 min") and isSelectable()).performClick()
+        pickSetting("Breaks", "5 min")
+        rule.onNodeWithText("2 rounds of 25 min, 5 min breaks").assertIsDisplayed()
+        rule.onNodeWithText("Start timer").performClick()
+        rule.onNodeWithText("Focus · round 1 of 2").assertIsDisplayed()
+        rule.onNodeWithContentDescription("left to focus: 25 minutes left").assertIsDisplayed()
+        rule.onNodeWithText("Timer only. Apps stay available on this phone.").assertIsDisplayed()
 
         clock.advanceMinutes(25); tick(store)
-        rule.onNodeWithText("On a break.").assertIsDisplayed()
+        rule.onNodeWithText("Break · round 1 of 2").assertIsDisplayed()
+        rule.onNodeWithText("Focus resumes").assertIsDisplayed()
         clock.advanceMinutes(5); tick(store)
-        rule.onNodeWithText("Locked in.").assertIsDisplayed()
-        rule.onNodeWithContentDescription("Focus 2 of 2", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Focus · round 2 of 2").assertIsDisplayed()
         clock.advanceMinutes(25); tick(store)
-        rule.onNodeWithText("Session complete.").assertIsDisplayed()
+        rule.onNodeWithText("Session complete").assertIsDisplayed()
         rule.onNodeWithText("50 min focused", substring = true).assertIsDisplayed()
         rule.onNodeWithText("Finished as planned.").assertIsDisplayed()
-        rule.onNodeWithText("Done").performScrollTo().performClick()
-        rule.onNodeWithText("Lock in").assertExists()
+        rule.onNodeWithText("Done").performClick()
+        rule.onNodeWithText("Start timer").assertExists()
+    }
+
+    @Test fun customLengthMatchingAPresetSelectsIt() {
+        launch()
+        rule.onNodeWithText("Custom").performClick()
+        rule.onNodeWithContentDescription("Minutes").performTextClearance()
+        rule.onNodeWithContentDescription("Minutes").performTextInput("25")
+        rule.onNode(hasText("25 min") and isSelectable()).assertIsSelected()
     }
 
     @Test fun unlockWaitsAndCanBeCancelled_emergencyIsImmediate() {
         val store = launch()
-        rule.onNodeWithText("Lock in").performScrollTo().performClick()
-        rule.onNodeWithText("Need out?").performScrollTo().performClick()
-        rule.onNodeWithText("Start unlock").performScrollTo().performClick()
+        rule.onNodeWithText("Start timer").performClick()
+        rule.onNodeWithText("Need out?").performClick()
+        rule.onNodeWithText("Start unlock").performClick()
         rule.onNodeWithText("Unlocking in 01:30", substring = true).assertIsDisplayed()
         rule.onNodeWithText("Cancel unlock").performClick()
         clock.advanceMinutes(2); tick(store)
-        rule.onNodeWithText("Locked in.").assertIsDisplayed()
-        rule.onNodeWithText("End now").performScrollTo().performClick()
+        rule.onNodeWithContentDescription("left to focus", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("End now").performClick()
         rule.onNodeWithText("End session now").performClick()
         rule.onNodeWithText("Ended with emergency recovery.").assertIsDisplayed()
     }
 
     @Test fun navigationAndHonestStatus() {
         launch()
-        rule.onNodeWithText("Phone blocking off").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Timer only. Apps stay available on this phone.").assertIsDisplayed()
+        rule.onNodeWithText("Set up blocking").performClick()
+        rule.onNodeWithText("Not in this version yet", substring = true).assertIsDisplayed()
+        rule.onNodeWithContentDescription("Back").performClick()
         rule.onNodeWithTag("tab-schedule").performClick()
-        rule.onNodeWithText("No sessions planned", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("No sessions planned yet").assertIsDisplayed()
         rule.onNodeWithTag("tab-profiles").performClick()
         rule.onNodeWithText("Study").assertIsDisplayed()
         rule.onNodeWithContentDescription("Settings").performClick()
@@ -125,10 +148,30 @@ class AppTest {
     @Test fun invalidCustomLengthExplained() {
         launch()
         rule.onNodeWithText("Custom").performClick()
-        rule.onNode(hasText("Minutes")).performTextClearance()
-        rule.onNode(hasText("Minutes")).performTextInput("0")
-        rule.onNodeWithText("Lock in").performScrollTo().performClick()
+        rule.onNodeWithContentDescription("Minutes").performTextClearance()
+        rule.onNodeWithContentDescription("Minutes").performTextInput("0")
+        rule.onNodeWithText("Start timer").performClick()
         rule.onNodeWithText("Focus periods are 1–240 minutes.").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test fun scheduleAddToggleEditDelete() {
+        launch()
+        rule.onNodeWithTag("tab-schedule").performClick()
+        rule.onNodeWithText("Add session").performClick()
+        rule.onNode(hasText("Name") and hasSetTextAction()).performTextInput("Physics review")
+        rule.onNodeWithText("Summary").performScrollTo()
+        rule.onNodeWithText("every week at", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Save session").performClick()
+        rule.onNodeWithText("Weekly routines").assertIsDisplayed()
+        rule.onNodeWithText("Next up").assertIsDisplayed()
+        rule.onAllNodesWithText("Physics review").onFirst().assertIsDisplayed()
+        rule.onNodeWithContentDescription("Physics review on").performClick()
+        rule.onNodeWithText("Off").assertIsDisplayed()
+        rule.onNodeWithText("Physics review").performClick()
+        rule.onNodeWithText("Edit session").assertIsDisplayed()
+        rule.onNodeWithText("Delete").performClick()
+        rule.onAllNodesWithText("Delete").onLast().performClick()
+        rule.onNodeWithText("No sessions planned yet").assertIsDisplayed()
     }
 
     // ---- Screenshots for design review (pulled by CI; not assertions) ----
@@ -145,19 +188,18 @@ class AppTest {
     @Test fun screenshotFocusAndBreak() {
         val store = launch()
         rule.onNodeWithContentDescription("Task").performTextInput("TAM 212 · Practice problems")
-        rule.onNodeWithText("Lock in").performScrollTo().performClick()
+        rule.onNodeWithText("Start timer").performClick()
         clock.advanceMinutes(16); tick(store)
         shot("04-focus-light")
-        rule.onNodeWithText("Need out?").performScrollTo().performClick()
-        rule.onNodeWithText("Start unlock").performScrollTo().performClick()
+        rule.onNodeWithText("Need out?").performClick()
+        rule.onNodeWithText("Start unlock").performClick()
         shot("05-unlock-pending")
     }
     @Test fun screenshotFocusDark() {
         val store = launch(AppState(theme = ThemeChoice.DARK), dark = true)
-        rule.onNodeWithText("25 min").performClick()
-        rule.onNodeWithContentDescription("Break: No break. Change", substring = true).performScrollTo().performClick()
-        pickMenuItem("Break · 5 min")
-        rule.onNodeWithText("Lock in").performScrollTo().performClick()
+        rule.onNode(hasText("25 min") and isSelectable()).performClick()
+        pickSetting("Breaks", "5 min")
+        rule.onNodeWithText("Start timer").performClick()
         clock.advanceMinutes(27); tick(store)
         shot("06-break-dark")
     }
@@ -165,7 +207,11 @@ class AppTest {
         launch()
         rule.onNodeWithTag("tab-schedule").performClick()
         shot("07-schedule-empty")
-        rule.onNodeWithText("Plan a session").performClick()
+        rule.onNodeWithText("Add session").performClick()
+        rule.onNode(hasText("Name") and hasSetTextAction()).performTextInput("Physics review")
         shot("08-schedule-editor")
+        rule.onNodeWithText("Save session").performClick()
+        shot("09-schedule-list")
     }
+    @Test fun screenshotDevices() { launch(); rule.onNodeWithText("Set up blocking").performClick(); shot("10-devices") }
 }

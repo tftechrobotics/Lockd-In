@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -30,6 +28,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
+import app.lockdin.engine.ScheduledSession
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.background
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
@@ -50,69 +56,84 @@ enum class Route(val label: String, val icon: LIcon, val tab: Boolean) {
     SETTINGS("Settings", LIcon.Gear, false),
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun LockdInApp(store: Store, clock: AppClock = AppClock.System, zone: ZoneId = ZoneId.systemDefault(), dark: Boolean = isDark(store.state.theme)) {
     LockdInTheme(dark) {
         val c = LocalColors.current
         var route by rememberSaveable { mutableStateOf(Route.FOCUS) }
         var lastTab by rememberSaveable { mutableStateOf(Route.FOCUS) }
+        var editing by remember { mutableStateOf<ScheduledSession?>(null) }
         fun go(r: Route) { if (r.tab) lastTab = r; route = r }
-        BackHandler(enabled = !route.tab || route != Route.FOCUS) { go(if (!route.tab) lastTab else Route.FOCUS) }
+        BackHandler(enabled = editing != null || !route.tab || route != Route.FOCUS) {
+            when {
+                editing != null -> editing = null
+                !route.tab -> go(lastTab)
+                else -> go(Route.FOCUS)
+            }
+        }
+
+        // Schedule create/edit is its own full screen: no tabs, its own close and save.
+        editing?.let { e ->
+            Box(
+                Modifier.fillMaxSize().background(c.ground)
+                    .windowInsetsPadding(WindowInsets.safeDrawing).semantics { contentDescription = "Schedule editor" },
+            ) { ScheduleEditor(store, e, zone, clock.now(), onClose = { editing = null }) }
+            return@LockdInTheme
+        }
 
         Scaffold(
             containerColor = c.ground,
             contentWindowInsets = WindowInsets.safeDrawing,
             topBar = {
-                Box(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)).height(64.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                        .height(56.dp).padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     if (!route.tab) {
-                        IconButton(onClick = { go(lastTab) }, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp)) {
-                            LockdIcon(LIcon.Back, description = "Back")
-                        }
-                    }
+                        IconButton(onClick = { go(lastTab) }) { LockdIcon(LIcon.Back, description = "Back") }
+                    } else Spacer(Modifier.width(16.dp))
                     Image(
                         painterResource(R.drawable.wordmark), contentDescription = "Lockd In",
                         colorFilter = ColorFilter.tint(c.ink),
-                        modifier = Modifier.align(Alignment.Center).height(32.dp),
+                        modifier = Modifier.height(24.dp),
                     )
-                    IconButton(onClick = { go(Route.SETTINGS) }, modifier = Modifier.align(Alignment.CenterEnd).padding(end = 4.dp)) {
-                        LockdIcon(LIcon.Gear, description = "Settings")
-                    }
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = { go(Route.SETTINGS) }) { LockdIcon(LIcon.Gear, description = "Settings") }
                 }
             },
             bottomBar = {
                 Column {
-                HorizontalDivider(color = c.line)
-                NavigationBar(containerColor = c.ground, contentColor = c.ink) {
-                    Route.entries.filter { it.tab }.forEach { r ->
-                        NavigationBarItem(
-                            selected = (if (route.tab) route else lastTab) == r,
-                            onClick = { go(r) },
-                            icon = { LockdIcon(r.icon) },
-                            label = { Text(r.label, style = Type.caption.copy(fontWeight = if ((if (route.tab) route else lastTab) == r) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal)) },
-                            modifier = Modifier.testTag("tab-${r.name.lowercase()}"),
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = c.ink, selectedTextColor = c.ink, indicatorColor = c.taupeSoft,
-                                unselectedIconColor = c.inkMuted, unselectedTextColor = c.inkMuted,
-                            ),
-                        )
+                    HorizontalDivider(color = c.line)
+                    NavigationBar(containerColor = c.ground, contentColor = c.ink, tonalElevation = 0.dp) {
+                        Route.entries.filter { it.tab }.forEach { r ->
+                            val selected = (if (route.tab) route else lastTab) == r
+                            NavigationBarItem(
+                                selected = selected,
+                                onClick = { go(r) },
+                                icon = { LockdIcon(r.icon) },
+                                label = { Text(r.label, style = UiType.caption.copy(fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)) },
+                                modifier = Modifier.testTag("tab-${r.name.lowercase()}"),
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = c.ink, selectedTextColor = c.ink, indicatorColor = c.taupeSoft,
+                                    unselectedIconColor = c.inkMuted, unselectedTextColor = c.inkMuted,
+                                ),
+                            )
+                        }
                     }
-                }
                 }
             },
         ) { padding ->
-            Box(Modifier.fillMaxSize().padding(padding).imePadding(), contentAlignment = Alignment.TopCenter) {
-                Column(
-                    Modifier
-                        .widthIn(max = 560.dp)
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp, vertical = 8.dp)
-                        .padding(bottom = 24.dp)
-                        .semantics { contentDescription = "${route.label} screen" },
-                ) {
+            // Each screen owns its scrolling and pinned actions; the IME pushes the content up.
+            Box(
+                Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding(),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                Box(Modifier.widthIn(max = 600.dp).fillMaxSize().semantics { contentDescription = "${route.label} screen" }) {
                     when (route) {
                         Route.FOCUS -> FocusScreen(store, clock, zone, openDevices = { go(Route.DEVICES) }, openSchedule = { go(Route.SCHEDULE) })
-                        Route.SCHEDULE -> ScheduleScreen(store, clock.now(), zone)
+                        Route.SCHEDULE -> ScheduleScreen(store, clock.now(), zone, onEdit = { editing = it })
                         Route.PROFILES -> ProfilesScreen(store)
                         Route.DEVICES -> DevicesScreen()
                         Route.SETTINGS -> SettingsScreen(store)

@@ -77,4 +77,28 @@ class ScheduleAndStateTest {
         assertNull(bad.active)
         assertEquals(ThemeChoice.SYSTEM, bad.theme)
     }
+
+    @Test fun oneTimeAndDisabledSessions() {
+        val now = at(2026, 10, 26, 12, 0) // Monday noon
+        val once = ScheduledSession("o", "Exam prep", emptySet(), LocalTime.parse("09:00"), 40, 10, 2, "study", date = java.time.LocalDate.of(2026, 10, 28))
+        val off = mk(id = "off", start = "13:00").copy(enabled = false)
+        val next = Schedule.nextUp(listOf(once, off), now, chicago)!!
+        assertEquals("o", next.session.id)
+        assertEquals(at(2026, 10, 28, 9, 0), next.start)
+        assertEquals(null, Schedule.nextUp(listOf(once.copy(date = java.time.LocalDate.of(2026, 10, 1))), now, chicago))
+        // One-time overlaps a weekly routine on its weekday only; disabled routines never conflict.
+        val wed = mk(id = "w", start = "09:30", days = setOf(WEDNESDAY))
+        assertEquals(1, Schedule.overlaps(once, listOf(wed)).size)
+        assertEquals(0, Schedule.overlaps(once, listOf(wed.copy(enabled = false))).size)
+        assertEquals(0, Schedule.overlaps(once, listOf(once.copy(id = "o2", date = java.time.LocalDate.of(2026, 11, 4)))).size)
+    }
+
+    @Test fun scheduleRoundTripsWithNewFieldsAndReadsOldSaves() {
+        val once = ScheduledSession("o", "Exam prep", emptySet(), LocalTime.parse("09:00"), 40, 10, 2, "study", date = java.time.LocalDate.of(2026, 10, 28), enabled = false)
+        val back = StateCodec.decode(StateCodec.encode(AppState(schedule = listOf(once, mk()))))
+        assertEquals(listOf(once, mk()), back.schedule)
+        val old = """{"version":1,"schedule":[{"id":"a","title":"Old","days":[1,2],"startTime":"18:00","focusMinutes":40,"breakMinutes":10,"rounds":2,"profileId":"study"}]}"""
+        val s = StateCodec.decode(old).schedule.single()
+        assertEquals(true, s.enabled); assertEquals(null, s.date)
+    }
 }

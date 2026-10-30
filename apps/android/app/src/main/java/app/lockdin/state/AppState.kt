@@ -65,6 +65,7 @@ object StateCodec {
                 .put("days", JSONArray(it.days.map { d -> d.value }.sorted()))
                 .put("startTime", it.startTime.toString()).put("focusMinutes", it.focusMinutes)
                 .put("breakMinutes", it.breakMinutes).put("rounds", it.rounds).put("profileId", it.profileId)
+                .put("date", it.date?.toString() ?: JSONObject.NULL).put("enabled", it.enabled)
         }))
         put("last", JSONObject().put("focusMinutes", s.last.focusMinutes).put("breakMinutes", s.last.breakMinutes)
             .put("rounds", s.last.rounds).put("profileId", s.last.profileId))
@@ -112,11 +113,14 @@ object StateCodec {
     }
 
     private fun scheduleOf(s: JSONObject): ScheduledSession? = try {
-        val days = s.getJSONArray("days").let { a -> (0 until a.length()).map { DayOfWeek.of(a.getInt(it)) }.toSet() }
+        val days = s.optJSONArray("days")?.let { a -> (0 until a.length()).map { DayOfWeek.of(a.getInt(it)) }.toSet() } ?: emptySet()
+        // Older saves have no "date"/"enabled": weekly and on.
+        val date = if (s.isNull("date") || !s.has("date")) null else java.time.LocalDate.parse(s.getString("date"))
         ScheduledSession(
             s.getString("id"), s.getString("title").take(80), days, LocalTime.parse(s.getString("startTime")),
             s.getInt("focusMinutes"), s.getInt("breakMinutes"), s.getInt("rounds"), s.getString("profileId"),
-        ).takeIf { it.days.isNotEmpty() }
+            date = date, enabled = s.optBoolean("enabled", true),
+        ).takeIf { (it.date != null || it.days.isNotEmpty()) && it.focusMinutes in 1..240 && it.rounds in 1..12 && it.breakMinutes in 0..120 }
     } catch (e: Exception) {
         null // DateTimeException, JSONException, bad day numbers: drop the item
     }

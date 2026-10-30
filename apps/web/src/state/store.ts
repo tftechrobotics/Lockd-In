@@ -25,6 +25,10 @@ export interface ScheduledSession {
   title: string;
   /** 0 = Sunday … 6 = Saturday, like Date.getDay(). */
   days: number[];
+  /** One-time session on this local date (YYYY-MM-DD); `days` is then ignored. */
+  date?: string | null;
+  /** Disabled sessions stay listed but never come up. Missing = enabled. */
+  enabled?: boolean;
   /** Local wall-clock start, "HH:MM". */
   startTime: string;
   focusMinutes: number;
@@ -92,7 +96,7 @@ export function parseState(raw: string | null): State {
       theme,
       tone,
       profiles: Array.isArray(v.profiles) && v.profiles.length ? v.profiles.filter((p) => p && typeof p.id === 'string' && typeof p.name === 'string') : base.profiles,
-      schedule: Array.isArray(v.schedule) ? v.schedule.filter((s) => s && typeof s.id === 'string' && Array.isArray(s.days)) : [],
+      schedule: Array.isArray(v.schedule) ? v.schedule.filter((s) => s && typeof s.id === 'string' && Array.isArray(s.days) && (s.days.length > 0 || typeof s.date === 'string')) : [],
       last: v.last && typeof v.last.focusMinutes === 'number' ? v.last : base.last,
       active: v.active && typeof v.active.start === 'number' && Array.isArray(v.active.segments) ? v.active : null,
       recentIntentions: Array.isArray(v.recentIntentions) ? v.recentIntentions.filter((i) => i && typeof i.text === 'string').slice(0, 8) : [],

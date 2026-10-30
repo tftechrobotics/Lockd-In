@@ -57,4 +57,16 @@ describe('daylight-saving behavior matches the core (America/Chicago)', () => {
       process.env.TZ = prev;
     }
   });
+  it('handles one-time and disabled sessions', () => {
+    const now = new Date(2026, 9, 26, 12, 0).getTime(); // Monday noon
+    const once = mk({ id: 'o', days: [], date: '2026-10-28', startTime: '09:00' });
+    const off = mk({ id: 'off', startTime: '13:00', enabled: false });
+    const n = nextUp([once, off], now)!;
+    expect(n.session.id).toBe('o');
+    expect(n.start).toBe(new Date(2026, 9, 28, 9, 0).getTime());
+    const wed = mk({ id: 'w', days: [3], startTime: '09:30' });
+    expect(overlaps(once, [wed])).toHaveLength(1);
+    expect(overlaps(once, [{ ...wed, enabled: false }])).toHaveLength(0);
+    expect(overlaps(once, [{ ...once, id: 'o2', date: '2026-11-04' }])).toHaveLength(0);
+  });
 });
