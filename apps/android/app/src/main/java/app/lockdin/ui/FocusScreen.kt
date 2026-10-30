@@ -92,14 +92,17 @@ fun FocusScreen(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -> 
 
 /** Scrolling content with the action area pinned below it (above the bottom navigation). */
 @Composable
-fun WithActionBar(content: @Composable () -> Unit, actions: @Composable () -> Unit) {
+fun WithActionBar(content: @Composable () -> Unit, actions: @Composable () -> Unit, note: (@Composable () -> Unit)? = null) {
+    // With large text the pinned bar would eat the screen, so the status note moves into
+    // the scrolling content and only the actions stay pinned.
+    val large = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
     Column(Modifier.fillMaxSize()) {
         Column(
             Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
                 .padding(horizontal = Dim.gutter).padding(top = Dim.s2, bottom = Dim.s5),
             verticalArrangement = Arrangement.spacedBy(Dim.s5),
-        ) { content() }
-        ActionBar { actions() }
+        ) { content(); if (large) note?.invoke() }
+        ActionBar { if (!large) note?.invoke(); actions() }
     }
 }
 
@@ -187,9 +190,11 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
                 }
             }
         },
-        actions = {
+        note = {
             if (PHONE_BLOCKING_AVAILABLE) ProtectionLine("Apps outside ${s.profiles.firstOrNull { it.id == profileId }?.name ?: "your profile"} are blocked during focus", true, null) {}
             else ProtectionLine("Timer only. Apps stay available on this phone.", false, "Set up blocking", openDevices)
+        },
+        actions = {
             MainButton(if (PHONE_BLOCKING_AVAILABLE) "Start focus" else "Start timer", icon = LIcon.Arrow, onClick = {
                 val problem = Session.validatePlan(segments)
                 if (problem != null) error = problem
@@ -284,8 +289,8 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
                 nudge?.let { Text(it, style = UiType.body, color = c.inkMuted, textAlign = TextAlign.Center) }
             }
         },
+        note = { ProtectionLine(protection, protected, if (protected) null else "Set up blocking", openDevices) },
         actions = {
-            ProtectionLine(protection, protected, if (protected) null else "Set up blocking", openDevices)
             OutPanel(store, session, snap, now, clock)
         },
     )

@@ -35,6 +35,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -127,7 +128,10 @@ fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T?, onSelect: 
 fun LengthControl(minutes: Int, onChange: (Int) -> Unit, modifier: Modifier = Modifier, presets: List<Int> = listOf(25, 40, 60)) {
     val c = LocalColors.current
     var customOpen by remember { mutableStateOf(minutes !in presets) }
-    var text by remember(minutes) { mutableStateOf(minutes.toString()) }
+    // The field keeps what the user typed; it only resyncs when the length changes from
+    // elsewhere (a preset or the ± buttons), so typing is never rewritten mid-edit.
+    var text by remember { mutableStateOf(minutes.toString()) }
+    LaunchedEffect(minutes) { if ((text.toIntOrNull() ?: 0) != minutes) text = minutes.toString() }
     val selected = if (minutes in presets) minutes else -1
     val focus = LocalFocusManager.current
     Column(modifier, verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
