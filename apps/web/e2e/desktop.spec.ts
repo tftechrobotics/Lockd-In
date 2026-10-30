@@ -28,10 +28,10 @@ test.beforeEach(async ({ page }) => {
 test('desktop layout: switch + menu, no masthead, honest PC status', async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 860 });
   await page.goto(D);
-  await expect(page.getByRole('button', { name: /Lock in/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start timer' })).toBeVisible();
   await expect(page.locator('.masthead')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Focus' })).toHaveAttribute('aria-current', 'page');
-  await expect(page.getByText('PC blocking off')).toBeVisible();
+  await expect(page.locator('.devices')).toContainText('Blocking not set up');
   await expect(page.getByText('This browser')).toHaveCount(0);
 });
 
@@ -56,8 +56,8 @@ test('desktop menu works with the keyboard', async ({ page }) => {
 
 test('desktop: running session says blocking is not set up on this PC', async ({ page }) => {
   await page.goto(D);
-  await page.getByRole('button', { name: /Lock in/ }).click();
-  await expect(page.getByText(/blocking isn’t set up on this PC/)).toBeVisible();
+  await page.getByRole('button', { name: 'Start timer' }).click();
+  await expect(page.locator('.protection')).toContainText('Apps and websites stay available on this PC');
 });
 
 for (const scheme of ['light', 'dark'] as const) {
@@ -83,16 +83,16 @@ test('desktop: minimum window size with 200% text has no horizontal scrolling', 
 
 test('bridge: reports session state and theme; tray command starts a 10-minute focus', async ({ page }) => {
   await page.goto(D);
-  await expect(page.getByText('PC blocking off')).toBeVisible();
+  await expect(page.locator('.devices')).toContainText('Blocking not set up');
   const sent = () => page.evaluate(() => (window as unknown as { __sent: { type: string }[] }).__sent);
   expect((await sent()).map((m) => m.type)).toEqual(expect.arrayContaining(['ui.ready', 'ui.theme', 'ui.session_state']));
   await page.evaluate(() => (window as unknown as { __host: (d: unknown) => void }).__host({ v: 1, type: 'host.command', command: 'start_quick' }));
-  await expect(page.getByRole('heading', { name: 'Locked in.' })).toBeVisible();
+  await expect(page.locator('.tag')).toHaveText('Focus');
   await expect(page.locator('.lock__time')).toHaveText(/^(10:00|09:5\d)$/);
   const last = (await sent()).filter((m) => m.type === 'ui.session_state').pop() as { active: boolean; endsAt: number };
   expect(last.active).toBe(true);
   expect(last.endsAt).toBeGreaterThan(Date.now() + 9 * 60_000);
   // Unknown commands are ignored.
   await page.evaluate(() => (window as unknown as { __host: (d: unknown) => void }).__host({ v: 1, type: 'host.command', command: 'end_session' }));
-  await expect(page.getByRole('heading', { name: 'Locked in.' })).toBeVisible();
+  await expect(page.locator('.tag')).toHaveText('Focus');
 });

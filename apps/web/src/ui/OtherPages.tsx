@@ -1,6 +1,6 @@
+import { layout, useHost } from '../platform';
 import { useId, useRef, useState } from 'react';
 import { clearAll, newId, storageAvailable, update, useStore, type ThemeChoice, type Tone } from '../state/store';
-import { DeviceStrip } from './DeviceStrip';
 import { Icon } from './Icon';
 import { message } from './messages';
 
@@ -16,8 +16,7 @@ export function ProfilesPage() {
   };
   return (
     <div className="page">
-      <h1 className="display display--page">Profiles</h1>
-      <p className="lede">Apps that stay available during focus. Each device keeps its own list.</p>
+      <header className="pagehead"><h1>Profiles</h1><p>The apps that stay available while you focus. Each device keeps its own list.</p></header>
       <ul className="profiles">
         {profiles.map((p) => (
           <li key={p.id} className="profile">
@@ -46,18 +45,39 @@ export function ProfilesPage() {
 }
 
 export function DevicesPage() {
+  const host = useHost();
+  const pcStatus = !host ? 'Checking…' : host.agent === 'running' ? 'Blocking on' : host.agent === 'stopped' ? 'Blocking off' : host.agent === 'unknown' ? 'Status unknown' : 'Not set up';
   return (
     <div className="page">
-      <h1 className="display display--page">Devices</h1>
-      <DeviceStrip />
-      <div className="explain">
-        <dl>
-          <div><dt>Windows app</dt><dd>Restricts apps outside your profile during focus.</dd></div>
-          <div><dt>Android app</dt><dd>Covers restricted apps with a block screen during focus.</dd></div>
-          <div><dt>Browser</dt><dd>Plans and times sessions. Browsers can’t restrict other apps.</dd></div>
-        </dl>
-        <p className="lede lede--small">Pairing isn’t available yet. Paired devices will share session timing and keep working offline.</p>
-      </div>
+      <header className="pagehead"><h1>Devices</h1><p>Where Lockd In runs, and what each device can do today.</p></header>
+      <ul className="device-list">
+        {layout === 'desktop' ? (
+          <li id="windows">
+            <Icon name="laptop" size={22} />
+            <div><h2>This PC</h2><p>The blocking service restricts apps outside your profile during focus. It runs separately from this window. It isn’t included in this test build yet, so sessions here are timer only.</p></div>
+            <span className={`pill-status ${host?.agent === 'running' ? 'pill-status--ok' : ''}`}>{pcStatus}</span>
+          </li>
+        ) : (
+          <>
+            <li>
+              <Icon name="browser" size={22} />
+              <div><h2>This browser</h2><p>Plans and times sessions. Browsers can’t restrict apps or other websites, so sessions here are timer only.</p></div>
+              <span className="pill-status pill-status--ok">Timer only</span>
+            </li>
+            <li id="windows">
+              <Icon name="laptop" size={22} />
+              <div><h2>Windows PC</h2><p>The Windows app restricts apps outside your profile during focus. It isn’t released yet.</p></div>
+              <span className="pill-status">Not paired</span>
+            </li>
+          </>
+        )}
+        <li id="android">
+          <Icon name="phone" size={22} />
+          <div><h2>Android phone</h2><p>The Android app will cover restricted apps with a block screen during focus. Blocking isn’t in the current test build.</p></div>
+          <span className="pill-status">Not paired</span>
+        </li>
+      </ul>
+      <p className="hint">Pairing isn’t available yet. Once it is, paired devices share session timing and keep working offline.</p>
     </div>
   );
 }
@@ -70,7 +90,7 @@ export function SettingsPage() {
   const themes: [ThemeChoice, string][] = [['system', 'Match system'], ['light', 'Light'], ['dark', 'Dark']];
   return (
     <div className="page">
-      <h1 className="display display--page">Settings</h1>
+      <header className="pagehead"><h1>Settings</h1></header>
       <section className="setting">
         <fieldset>
           <legend><h2>Appearance</h2></legend>

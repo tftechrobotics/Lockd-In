@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import wordmark from '@design/assets/wordmark.svg?raw';
-import libraryEdge from '@design/assets/library-edge.svg?raw';
 import { useStore } from './state/store';
 import { FocusPage } from './ui/FocusPage';
 import { SchedulePage } from './ui/SchedulePage';
@@ -68,8 +67,6 @@ export function App() {
     return (
       <>
         <a className="skip" href="#main">Skip to content</a>
-        <div className="edge edge--left" aria-hidden="true" dangerouslySetInnerHTML={{ __html: libraryEdge }} />
-        <div className="edge edge--right" aria-hidden="true" dangerouslySetInnerHTML={{ __html: libraryEdge }} />
         <DesktopBar route={route} sessionRunning={active} />
         <main id="main" tabIndex={-1}>
           <Page />
@@ -81,8 +78,6 @@ export function App() {
   return (
     <>
       <a className="skip" href="#main">Skip to content</a>
-      <div className="edge edge--left" aria-hidden="true" dangerouslySetInnerHTML={{ __html: libraryEdge }} />
-      <div className="edge edge--right" aria-hidden="true" dangerouslySetInnerHTML={{ __html: libraryEdge }} />
       <header className="masthead">
         <div className="masthead__inner">
           <a className="wordmark" href="#/focus" aria-label="Lockd In, Focus" dangerouslySetInnerHTML={{ __html: wordmark }} />

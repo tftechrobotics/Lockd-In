@@ -6,8 +6,8 @@ import {
 import { nextUp } from '../engine/schedule';
 import { getState, newId, update, useStore, type ActiveSession } from '../state/store';
 import { DeviceStrip } from './DeviceStrip';
-import { clockTime, countdown, dayLabel } from './format';
-import { Icon, type IconName } from './Icon';
+import { clockTime, countdown, dayLabel, durationLabel } from './format';
+import { Icon } from './Icon';
 import { LockTimer } from './LockTimer';
 import { message } from './messages';
 import { layout, useHost } from '../platform';
@@ -32,24 +32,12 @@ export function FocusPage() {
 
 const LENGTHS = [25, 40, 60];
 const BREAKS = [5, 10, 15, 20];
+const ROUNDS = [1, 2, 3, 4, 5, 6];
 
-/**
- * The Focus composition shared by setup, session and recap. Web: headline,
- * then lock beside the controls. Desktop (Windows shell): one centered column.
- */
-function FocusLayout({ head, lock, children, foot }: {
-  head: React.ReactNode; lock: React.ReactNode; children: React.ReactNode; foot: React.ReactNode;
-}) {
-  return (
-    <div className={`page focus focus--${layout}`}>
-      <div className="focus__head">{head}</div>
-      <div className="focus__stage">
-        <div className="focus__lock">{lock}</div>
-        <div className="focus__controls">{children}</div>
-      </div>
-      <div className="focus__foot">{foot}</div>
-    </div>
-  );
+/** Whether this surface can restrict apps right now (only a running Windows blocking service can). */
+export function useCanBlock(): boolean {
+  const host = useHost();
+  return layout === 'desktop' && host?.agent === 'running';
 }
 
 function Setup() {
@@ -57,17 +45,25 @@ function Setup() {
   const profiles = useStore((s) => s.profiles);
   const recent = useStore((s) => s.recentIntentions);
   const schedule = useStore((s) => s.schedule);
+  const canBlock = useCanBlock();
   const [intention, setIntention] = useState('');
   const [focus, setFocus] = useState(last.focusMinutes);
-  const [custom, setCustom] = useState(!LENGTHS.includes(last.focusMinutes));
+  const [customOpen, setCustomOpen] = useState(!LENGTHS.includes(last.focusMinutes));
   const [breakMin, setBreakMin] = useState(last.rounds > 1 ? last.breakMinutes : 0);
-  const [rounds, setRounds] = useState(Math.max(2, last.rounds));
+  const [rounds, setRounds] = useState(last.rounds > 1 ? last.rounds : 1);
   const [profileId, setProfileId] = useState(last.profileId);
   const [error, setError] = useState<string | null>(null);
-  const ids = { intent: useId(), len: useId(), custom: useId(), list: useId(), err: useId() };
+  const ids = { intent: useId(), len: useId(), custom: useId(), brk: useId(), rnd: useId(), prof: useId(), list: useId(), err: useId(), sum: useId() };
   const upcoming = nextUp(schedule, Date.now());
 
-  const segments = breakMin > 0 ? roundsPlan(rounds, focus, breakMin) : roundsPlan(1, focus, 0);
+  // Rounds need a break between them, so the two settings keep each other consistent.
+  const effRounds = breakMin > 0 ? rounds : 1;
+  const segments = roundsPlan(effRounds, focus, effRounds > 1 ? breakMin : 0);
+  const total = segments.reduce((a, s) => a + s.minutes, 0);
+  const plan = effRounds > 1 ? `${effRounds} rounds of ${focus} min, ${breakMin} min breaks` : `One ${focus}-minute round, no breaks`;
+  // A custom value that equals a preset shows the preset as selected.
+  const preset = LENGTHS.includes(focus) ? focus : null;
+  const profile = profiles.find((p) => p.id === profileId) ?? profiles[0];
 
   const start = () => {
     const problem = validatePlan(segments);
@@ -75,7 +71,7 @@ function Setup() {
     const text = intention.trim().slice(0, 120);
     update((s) => ({
       ...s,
-      last: { focusMinutes: focus, breakMinutes: breakMin || s.last.breakMinutes, rounds: breakMin > 0 ? rounds : 1, profileId },
+      last: { focusMinutes: focus, breakMinutes: breakMin || s.last.breakMinutes, rounds: effRounds, profileId },
       active: {
         id: newId(), start: Date.now(), segments, profileId,
         intention: text ? { text } : null, controls: { overrides: [] },
@@ -84,114 +80,132 @@ function Setup() {
     }));
   };
 
-  const desktop = layout === 'desktop';
-  const task = (
-    <>
-      <input id={ids.intent} className={desktop ? 'task-title' : 'input'} value={intention} maxLength={120} list={ids.list}
-        placeholder={desktop ? 'What are you working on?' : 'e.g. TAM 212 · Practice problems'} autoComplete="off"
-        aria-label={desktop ? 'What are you working on?' : undefined}
-        onChange={(e) => setIntention(e.target.value)} />
-      <datalist id={ids.list}>{recent.map((r) => <option key={r.text} value={r.text} />)}</datalist>
-    </>
-  );
-
   return (
-    <form onSubmit={(e) => { e.preventDefault(); start(); }} noValidate>
-      <FocusLayout
-        head={desktop
-          ? <><h1 className="sr-only">Start a focus session</h1>{task}</>
-          : <h1 className="display">Ready when you are.</h1>}
-        lock={<LockTimer remainingMs={focus * 60_000} caption="Focus time" locked={false} />}
-        foot={<><DeviceStrip /><NextRow upcoming={upcoming} /></>}
-      >
-        {!desktop && (
+    <div className={`page focus focus--${layout}`}>
+      {layout === 'web'
+        ? <header className="pagehead"><h1>Focus</h1><p>Set up a session, then start when you’re ready.</p></header>
+        : <h1 className="sr-only">Focus</h1>}
+      <form className="setup" onSubmit={(e) => { e.preventDefault(); start(); }} noValidate>
+        <div className="setup__form">
           <div className="field">
-            <label htmlFor={ids.intent}>What are you working on?</label>
-            {task}
+            <label htmlFor={ids.intent}>Task <span className="optional">optional</span></label>
+            <input id={ids.intent} className="input" value={intention} maxLength={120} list={ids.list}
+              placeholder="What are you working on?" autoComplete="off" onChange={(e) => setIntention(e.target.value)} />
+            <datalist id={ids.list}>{recent.map((r) => <option key={r.text} value={r.text} />)}</datalist>
           </div>
-        )}
-        <div className="field">
-          <div className="field__row">
-            <span className="field__label" id={ids.len}>Focus time</span>
-            {breakMin > 0 && (
-              <Select icon="focus" label="Focus periods" value={rounds} onChange={setRounds} quiet
-                options={[2, 3, 4, 5, 6].map((r) => [r, `${r} periods`])} />
+
+          <div className="field">
+            <span className="field__label" id={ids.len}>Focus length</span>
+            <div className="segmented" role="radiogroup" aria-labelledby={ids.len}>
+              {LENGTHS.map((m) => (
+                <button key={m} type="button" role="radio" aria-checked={preset === m}
+                  onClick={() => { setCustomOpen(false); setFocus(m); setError(null); }}>{m} min</button>
+              ))}
+              <button type="button" role="radio" aria-checked={preset === null}
+                onClick={() => setCustomOpen(true)}>Custom</button>
+            </div>
+            {(customOpen || preset === null) && (
+              <div className="custom">
+                <label htmlFor={ids.custom}>Custom length</label>
+                <span className="custom__input">
+                  <input id={ids.custom} className="input input--number" type="number" inputMode="numeric"
+                    min={1} max={240} value={focus || ''} aria-describedby={error ? ids.err : undefined}
+                    onChange={(e) => { setFocus(Math.round(Number(e.target.value)) || 0); setError(null); }} />
+                  <span aria-hidden="true">min</span>
+                </span>
+              </div>
             )}
           </div>
-          <div className="pills" role="radiogroup" aria-labelledby={ids.len}>
-            {LENGTHS.map((m) => (
-              <button key={m} type="button" role="radio" className="pill" aria-checked={!custom && focus === m}
-                onClick={() => { setCustom(false); setFocus(m); setError(null); }}>{m} min</button>
-            ))}
-            <button type="button" role="radio" className="pill" aria-checked={custom} onClick={() => setCustom(true)}>Custom</button>
-          </div>
-          {custom && (
-            <div className="inline-number">
-              <label htmlFor={ids.custom}>Minutes</label>
-              <input id={ids.custom} className="input input--number" type="number" inputMode="numeric"
-                min={1} max={240} value={focus} aria-describedby={error ? ids.err : undefined}
-                onChange={(e) => { setFocus(Math.round(Number(e.target.value)) || 0); setError(null); }} />
+
+          <div className="field-pair">
+            <div className="field">
+              <label htmlFor={ids.brk}>Breaks</label>
+              <select id={ids.brk} className="input" value={effRounds > 1 ? breakMin : 0}
+                onChange={(e) => { const b = Number(e.target.value); setBreakMin(b); setRounds(b > 0 ? Math.max(2, rounds) : 1); setError(null); }}>
+                <option value={0}>None</option>
+                {BREAKS.map((b) => <option key={b} value={b}>{b} min</option>)}
+              </select>
             </div>
-          )}
+            <div className="field">
+              <label htmlFor={ids.rnd}>Focus rounds</label>
+              <select id={ids.rnd} className="input" value={effRounds}
+                onChange={(e) => { const r = Number(e.target.value); setRounds(r); setBreakMin(r > 1 ? (breakMin || 10) : 0); }}>
+                {ROUNDS.map((r) => <option key={r} value={r}>{r === 1 ? '1 round' : `${r} rounds`}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <details className="more">
+            <summary>More options <span className="more__value">{profile.name} profile</span></summary>
+            <div className="field">
+              <label htmlFor={ids.prof}>Profile</label>
+              <select id={ids.prof} className="input" value={profileId} onChange={(e) => setProfileId(e.target.value)}>
+                {profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <p className="hint">The apps each device leaves available while you focus.</p>
+            </div>
+          </details>
+          {error && <p id={ids.err} className="error" role="alert">{error}</p>}
         </div>
-        <div className="selects">
-          <Select icon="coffee" label="Break" value={breakMin} onChange={(v) => { setBreakMin(v); setError(null); }}
-            options={[[0, 'No break'], ...BREAKS.map((b) => [b, `Break · ${b} min`] as [number, string])]} />
-          <Select icon="book" label="Profile" value={profileId} onChange={setProfileId}
-            options={profiles.map((p) => [p.id, `${p.name} profile`])} />
-        </div>
-        {error && <p id={ids.err} className="error" role="alert">{error}</p>}
-        <button type="submit" className="button button--primary button--lockin">Lock in <Icon name="arrow" size={22} /></button>
-      </FocusLayout>
-    </form>
+
+        <aside className="plan" aria-labelledby={ids.sum}>
+          <div className="plan__top">
+            <LockTimer remainingMs={focus * 60_000} caption="Focus length" locked={false} size="small" />
+            <div className="plan__text">
+              <p id={ids.sum} className="plan__total">{durationLabel(total)}</p>
+              <p className="plan__ends">Ends at {clockTime(Date.now() + total * 60_000)}</p>
+              <p className="plan__detail">{plan}</p>
+            </div>
+          </div>
+          <button type="submit" className="button button--primary button--start">{canBlock ? 'Start focus' : 'Start timer'}</button>
+          <Protection canBlock={canBlock} profileName={profile.name} />
+        </aside>
+      </form>
+
+      <footer className="focus__foot">
+        <DeviceStrip />
+        <NextRow upcoming={upcoming} />
+      </footer>
+    </div>
   );
 }
 
-/** A native select dressed as the reference's dropdown: leading icon, value text, chevron. */
-function Select<T extends string | number>({ icon, label, value, options, onChange, quiet = false }: {
-  icon: IconName; label: string; value: T; options: [T, string][]; onChange: (v: T) => void; quiet?: boolean;
-}) {
+/** One honest line about blocking, with a way to set it up when it isn't available. */
+function Protection({ canBlock, profileName, during = false }: { canBlock: boolean; profileName?: string; during?: boolean }) {
+  if (canBlock) {
+    return (
+      <p className="protection protection--on">
+        <span className="dot dot--ok" aria-hidden="true" />
+        <span>{during ? 'Apps outside your profile are restricted.' : `Apps outside ${profileName ?? 'your profile'} are restricted during focus.`}</span>
+      </p>
+    );
+  }
+  const where = layout === 'web' ? 'Browsers can’t restrict apps, so apps and websites stay available.' : 'Apps and websites stay available on this PC.';
   return (
-    <span className={`select ${quiet ? 'select--quiet' : ''}`}>
-      {!quiet && <Icon name={icon} size={20} />}
-      <select aria-label={label} value={String(value)}
-        onChange={(e) => {
-          const raw = e.target.value;
-          onChange((typeof value === 'number' ? Number(raw) : raw) as T);
-        }}>
-        {options.map(([v, text]) => <option key={String(v)} value={String(v)}>{text}</option>)}
-      </select>
-      <Icon name="chevronDown" size={16} />
-    </span>
+    <p className="protection">
+      <span className="dot" aria-hidden="true" />
+      <span>Timer only. {where} <a href="#/devices">Set up blocking</a></span>
+    </p>
   );
 }
 
 function NextRow({ upcoming }: { upcoming: ReturnType<typeof nextUp> }) {
-  const when = upcoming ? `${upcoming.session.title} · ${dayLabel(upcoming.start)} ${clockTime(upcoming.start)}` : null;
-  if (layout === 'desktop') {
-    return (
-      <a className="next-card" href="#/schedule">
-        <Icon name="calendar" size={22} />
-        <span className="next-card__text">
-          <span className="next-card__label">Next up</span>
-          <span>{when ?? 'Nothing planned'}</span>
-        </span>
-        <Icon name="chevron" size={18} />
-      </a>
-    );
-  }
   return (
-    <div className="next">
-      <Icon name="calendar" size={22} />
-      <p><strong>Next:</strong> {when ?? 'nothing planned'}</p>
-      <a className="link-arrow" href="#/schedule">{upcoming ? 'View schedule' : 'Plan a session'} <Icon name="arrow" size={18} /></a>
-    </div>
+    <a className="next" href="#/schedule">
+      <Icon name="calendar" size={20} />
+      <span className="next__text">
+        <span className="next__label">Next</span>{' '}
+        {upcoming ? `${upcoming.session.title} · ${dayLabel(upcoming.start)} ${clockTime(upcoming.start)}` : 'Nothing planned yet'}
+      </span>
+      <span className="next__go">{upcoming ? 'Schedule' : 'Plan one'} <Icon name="chevron" size={16} /></span>
+    </a>
   );
 }
 
 function SessionView({ session }: { session: ActiveSession }) {
   const tone = useStore((s) => s.tone);
   const profiles = useStore((s) => s.profiles);
+  const canBlock = useCanBlock();
   const occ = occurrenceFrom(session.start, session.segments);
   const firstSnap = evaluate(occ, session.controls, Date.now());
   const ended = firstSnap.status !== 'active' && firstSnap.status !== 'upcoming';
@@ -205,59 +219,42 @@ function SessionView({ session }: { session: ActiveSession }) {
 
   const phase = snap.phase!;
   const remaining = phase.end - now;
-  const focusing = snap.restricting;
   const focusCount = session.segments.filter((s) => s.kind === 'focus').length;
   const focusIndex = session.segments.slice(0, phase.index + 1).filter((s) => s.kind === 'focus').length;
   const nextPhase = occ.phases[phase.index + 1];
   const task = session.intention?.text;
   const lifted = snap.overrideState.type === 'active_for_focus_period';
-
-  const status = lifted ? 'Unlocked for now.' : focusing ? 'Locked in.' : 'On a break.';
-  const caption = phase.kind === 'focus'
-    ? (focusCount > 1 ? `Focus ${focusIndex} of ${focusCount}` : 'Focus time')
-    : 'Break';
+  const protectedNow = canBlock && snap.restricting;
+  const round = focusCount > 1 ? ` · round ${focusIndex} of ${focusCount}` : '';
+  const tag = phase.kind === 'break' ? `Break${round}` : lifted ? `Unlocked${round}` : `Focus${round}`;
   const note = phase.kind === 'break'
     ? (remaining <= 60_000 ? message(tone, 'breakEnding', { task }) : message(tone, 'breakStart', { time: clockTime(phase.end) }))
-    : lifted ? `Unlocked until ${clockTime((snap.overrideState as { until: number }).until)}. Later focus periods lock again.`
+    : lifted ? `Unlocked until ${clockTime((snap.overrideState as { until: number }).until)}. Later rounds start as planned.`
     : message(tone, 'focusStart', { task });
   const facts: [string, string][] = [
-    [phase.kind === 'focus' ? (nextPhase ? 'Break at' : 'Ends at') : 'Focus resumes', clockTime(phase.end)],
+    phase.kind === 'break' ? ['Focus resumes', clockTime(phase.end)] : nextPhase ? ['Next break', clockTime(phase.end)] : ['Ends at', clockTime(phase.end)],
     ...(nextPhase ? [['Session ends', clockTime(occ.end)] as [string, string]] : []),
     ...(profile ? [['Profile', profile.name] as [string, string]] : []),
   ];
 
   return (
-    <FocusLayout
-      head={<>
-        <h1 className={layout === 'desktop' ? 'title' : 'display'} aria-live="polite">{status}</h1>
-        {task && <p className="subtitle">{task}</p>}
-      </>}
-      lock={<LockTimer remainingMs={remaining} caption={caption} locked={focusing} />}
-      foot={<><HonestyNote /><DeviceStrip /></>}
-    >
-      <dl className="facts">
-        {facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
-      </dl>
-      {note && <p className="nudge" aria-live="polite">{note}</p>}
-      <OverridePanel session={session} snap={snap} now={now} />
-    </FocusLayout>
-  );
-}
-
-function HonestyNote() {
-  const host = useHost();
-  const text = layout === 'web'
-    ? 'Not blocking: browsers can’t restrict apps'
-    : !host || host.agent === 'unknown'
-      ? 'Checking the blocking service…'
-      : host.agent === 'running'
-        ? 'Blocking service running'
-        : 'Not blocking: blocking isn’t set up on this PC';
-  return (
-    <a className="honesty" href="#/devices">
-      <Icon name="info" size={18} />
-      <span>{text}</span>
-    </a>
+    <div className={`page focus focus--${layout} focus--running`}>
+      <div className="running">
+        <div className="running__timer">
+          <LockTimer remainingMs={remaining} caption={phase.kind === 'break' ? 'left in break' : 'left to focus'} locked={protectedNow} />
+        </div>
+        <div className="running__info">
+          <p className={`tag ${phase.kind === 'focus' && !lifted ? 'tag--on' : ''}`} aria-live="polite">{tag}</p>
+          <h1 className="running__task">{task ?? (phase.kind === 'break' ? 'Break' : 'Focus session')}</h1>
+          <dl className="facts">
+            {facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+          </dl>
+          {note && <p className="nudge" aria-live="polite">{note}</p>}
+          <Protection canBlock={canBlock} during />
+          <OverridePanel session={session} snap={snap} now={now} />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -300,7 +297,7 @@ function OverridePanel({ session, snap, now }: { session: ActiveSession; snap: S
       {pending ? (
         <div className="pending" role="status">
           <p><strong>Unlocking in {countdown(pending.effectiveAt - now)}</strong>
-            {pending.scope === 'current_focus_period' ? ' · this focus period' : ' · ends the session'}</p>
+            {pending.scope === 'current_focus_period' ? ' · this round' : ' · ends the session'}</p>
           <button type="button" className="button" onClick={cancel}>Cancel unlock</button>
         </div>
       ) : open ? (
@@ -309,7 +306,7 @@ function OverridePanel({ session, snap, now }: { session: ActiveSession; snap: S
           {inFocus && (
             <label className="radio">
               <input type="radio" name="scope" checked={scope === 'current_focus_period'} onChange={() => setScope('current_focus_period')} />
-              <span>This focus period</span>
+              <span>This round</span>
             </label>
           )}
           <label className="radio">
@@ -361,26 +358,26 @@ function Recap({ session, snap }: { session: ActiveSession; snap: Snapshot }) {
   const facts: [string, string][] = [
     ['Focused', `${Math.round(focusedMs / 60_000)} min`],
     ['Time', `${clockTime(session.start)}–${clockTime(endedAt)}`],
-    ...(unlockedEarly > 0 ? [['Unlocked early', `${unlockedEarly} period${unlockedEarly > 1 ? 's' : ''}`] as [string, string]] : []),
+    ...(unlockedEarly > 0 ? [['Unlocked early', `${unlockedEarly} round${unlockedEarly > 1 ? 's' : ''}`] as [string, string]] : []),
   ];
 
   return (
-    <FocusLayout
-      head={<>
-        <h1 className={layout === 'desktop' ? 'title' : 'display'}>Session complete.</h1>
-        {session.intention && <p className="subtitle">{session.intention.text}</p>}
-      </>}
-      lock={<LockTimer remainingMs={0} caption="Done" locked={false} />}
-      foot={null}
-    >
-      <dl className="facts">
-        {facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
-      </dl>
-      <p className="nudge">{how}{note ? ` ${note}` : ''}</p>
-      <div className="out__actions">
-        <button type="button" className="button button--primary button--lockin" onClick={again}>Same again</button>
-        <button type="button" className="button" onClick={finish}>Done</button>
+    <div className={`page focus focus--${layout} focus--running`}>
+      <div className="running">
+        <div className="running__timer"><LockTimer remainingMs={0} caption="Done" locked={false} /></div>
+        <div className="running__info">
+          <p className="tag">Session complete</p>
+          <h1 className="running__task">{session.intention?.text ?? 'Focus session'}</h1>
+          <dl className="facts">
+            {facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+          </dl>
+          <p className="nudge">{how}{note ? ` ${note}` : ''}</p>
+          <div className="out__actions">
+            <button type="button" className="button button--primary" onClick={again}>Same again</button>
+            <button type="button" className="button" onClick={finish}>Done</button>
+          </div>
+        </div>
       </div>
-    </FocusLayout>
+    </div>
   );
 }

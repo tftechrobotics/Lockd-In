@@ -31,3 +31,6 @@ export function dayLabel(t: number, now = Date.now()): string {
 export const minutesLabel = (m: number) => (m >= 60 && m % 60 === 0 ? `${m / 60} h` : `${m} min`);
 
 export const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** 55 → "55 min", 90 → "1 h 30 min". */
+export const durationLabel = (m: number) => (m < 60 ? `${m} min` : m % 60 === 0 ? `${m / 60} h` : `${Math.floor(m / 60)} h ${m % 60} min`);

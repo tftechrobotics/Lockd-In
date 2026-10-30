@@ -16,7 +16,7 @@ interface Props {
   remainingMs: number;
   caption: string;
   locked: boolean;
-  size?: 'large' | 'compact';
+  size?: 'large' | 'small';
 }
 
 export function LockTimer({ remainingMs, caption, locked, size = 'large' }: Props) {
@@ -27,12 +27,14 @@ export function LockTimer({ remainingMs, caption, locked, size = 'large' }: Prop
         <rect className="lock__body" x="14" y="120" width="212" height="172" rx="26" />
       </svg>
       <div className="lock__face">
-        <svg className="lock__clock" viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="11" />
-          <path d="M12 6.5V12.5H16.5" />
-        </svg>
+        {size === 'large' && (
+          <svg className="lock__clock" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="11" />
+            <path d="M12 6.5V12.5H16.5" />
+          </svg>
+        )}
         <span className="lock__time" aria-hidden="true">{countdown(remainingMs)}</span>
-        <figcaption className="lock__caption">{caption}</figcaption>
+        <figcaption className={size === 'large' ? 'lock__caption' : 'sr-only'}>{caption}</figcaption>
       </div>
     </figure>
   );
