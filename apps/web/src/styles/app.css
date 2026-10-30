@@ -303,7 +303,7 @@ select.input { appearance: none; padding-right: 36px; cursor: pointer;
 :root[data-layout="desktop"] .pagehead h1 { font-size: 1.375rem; }
 .focus--desktop .setup { grid-template-columns: minmax(0, 1fr); gap: 16px; }
 .focus--desktop .setup__form { gap: 16px; }
-.focus--desktop .plan { position: sticky; top: auto; bottom: 0; padding: 14px 16px; gap: 12px; border-radius: 12px; box-shadow: 0 -8px 20px -16px rgba(48, 42, 37, 0.4); }
+.focus--desktop .plan { position: sticky; top: auto; bottom: 8px; padding: 14px 16px; gap: 12px; border-radius: 12px; box-shadow: 0 8px 0 0 var(--ground), 0 -8px 20px -16px rgba(48, 42, 37, 0.4); }
 .focus--desktop .plan__total { font-size: 1.5rem; }
 .focus--desktop .lock--small { max-width: 64px; }
 .focus--desktop .focus__foot { margin-top: 16px; }

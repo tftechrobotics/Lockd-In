@@ -78,3 +78,12 @@ for faithful implementation rather than a new direction. The compact "session pa
 instructions are in `design/skill/lockd-in-design/SKILL.md`. Verified in Chromium (web and
 Windows layout), on the Android emulator (API 35) and in the real WinUI window on a GitHub
 windows-2025 runner (`ci-screenshots-windows` branch). Not yet seen on the owner's PC or phone.
+
+## Revision 2026-10-29 (night) — design pass 3 (R33)
+
+Owner feedback: copying the mockup's oversized proportions made the app feel generic and
+cumbersome. Pass 3 keeps the identity and rebuilds hierarchy, controls and behavior; see the
+pass-3 block at the top of `docs/design-spec.md`. Verified: Chromium (web + Windows layout,
+32 Playwright tests incl. axe light/dark, keyboard, 200% text at 320/390 px), Android emulator
+API 35 (Compose UI tests + screenshots incl. 2× font), real WinUI window on a GitHub windows-2025
+runner. Not verified on the owner's PC or phone.

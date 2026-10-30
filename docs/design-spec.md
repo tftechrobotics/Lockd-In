@@ -1,4 +1,35 @@
-# Lockd In design specification — Cream & Ink
+# Lockd In design specification — Cream & Ink, pass 3
+
+> **Pass 3 (2026-10-29 night, R33) supersedes the "faithful to the mockup" rules below where they
+> conflict.** The mockup is now a mood reference. Current rules:
+>
+> - **Type:** Figtree for all interface text (15 px web base; 13–16 px roles). Outfit only for the
+>   wordmark, page titles (26 px web, 22 sp Android) and timer/summary figures.
+> - **Sizes:** controls 44 px (web) / 48 dp (Android); primary action 48 px / 52 dp; icons 20;
+>   radii 8 px controls, 12 px grouped surfaces; full pills only for segmented choices, day
+>   toggles, status tags and the desktop Focus/Schedule switch.
+> - **No library artwork** in the workspace. Paper grain at 60% of the token opacity.
+> - **Focus setup:** task first; one segmented duration control with inline custom (a custom value
+>   equal to a preset selects it); Breaks and Focus rounds as labeled settings (rounds need a
+>   break, the two stay consistent); profile under "More options" on web/Windows; a plan summary
+>   (small lock, total, end time, plan in words) next to the primary action.
+> - **Primary action:** "Start timer" whenever blocking isn't verified, with "Timer only. Apps and
+>   websites stay available… Set up blocking". "Start focus" only when the Windows service reports
+>   running (Android: when `PHONE_BLOCKING_AVAILABLE` is true after device verification).
+> - **Running:** remaining time in the lock (closed only when restriction is verified), task,
+>   status tag "Focus · round 1 of 2" / "Break · round 1 of 2", next break or resume time, session
+>   end, honest protection line, Need out? / End now.
+> - **Android:** compact top bar (wordmark + Settings), scrolling content, primary action pinned
+>   above the bottom navigation (status note moves into content at large text), bottom navigation
+>   Focus / Schedule / Profiles. Schedule editor is a full screen; day toggles are seven equal
+>   targets with full names for TalkBack.
+> - **Web:** compact taupe masthead (128 px wordmark), restrained page heading, form column
+>   (max 520) beside a summary card (260–320), device row with actions, one "Next" row.
+> - **Windows:** no masthead; Focus/Schedule switch + Menu; single column; the summary card with
+>   the primary action sticks to the bottom of the window.
+
+---
+
 
 Status: **approved direction, implemented on all three Focus screens** (2026-10-29).
 Reference: `design/reference/cream-and-ink-mockup.png` (owner's image: Windows, web, Android).

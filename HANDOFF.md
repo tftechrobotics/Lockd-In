@@ -32,7 +32,24 @@ not free trial — Artifact Signing doesn't support trials) and Play wait.
 spike self-test, Kotlin type-check with an R stand-in, VM script lint,
 actionlint).
 
-## What changed this session (design pass, latest)
+## What changed this session (design pass 3, latest — R33)
+- Owner: the mockup is a mood reference; fix hierarchy and usability. Rules now live in the pass-3
+  block at the top of `docs/design-spec.md`.
+- Web + Windows layout (`apps/web/src/ui/FocusPage.tsx`, `SchedulePage.tsx`, `styles/app.css`):
+  new Focus setup (task, segmented length + inline custom, Breaks/Focus rounds, More options,
+  summary card with the primary action), running view, Schedule list + dialog editor,
+  actionable Devices page. Library artwork removed from the shell.
+- Android (`ui/Kit.kt`, `FocusScreen.kt`, `ScheduleScreen.kt`, `LockdInApp.kt`, `OtherScreens.kt`):
+  same structure natively; action bar pinned above bottom nav; full-screen schedule editor.
+- Model: schedules gained one-time `date` and `enabled` (web store + Android codec; old saves load
+  as weekly/on). Tests added on both sides.
+- Honesty: "Start timer" everywhere blocking isn't verified. Android flag
+  `PHONE_BLOCKING_AVAILABLE` (FocusScreen.kt) stays false until device tests pass.
+- Known gaps: the clickable prototype artifact (`design/prototype/`) still shows the earlier
+  design; Profiles app selection is not built (needs blocking); Android Settings/Profiles got the
+  new kit but no new screenshots beyond Devices.
+
+## What changed this session (design pass, earlier)
 - Owner re-sent the approved Cream & Ink reference (now `design/reference/cream-and-ink-mockup.png`)
   and asked for faithful implementation. All three Focus screens rebuilt to it; other pages restyled.
   Exact rules: `docs/design-spec.md` (incl. §9 deliberate deviations: no "What's the move?",

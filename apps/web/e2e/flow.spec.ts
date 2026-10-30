@@ -129,6 +129,7 @@ test('schedule: empty state, add weekly and one-time, overlap error, switch off,
   await page.getByRole('button', { name: 'Save session' }).click();
   await expect(page.getByRole('alert')).toContainText('This overlaps “Physics review”');
   await page.getByRole('radio', { name: 'One time' }).click();
+  await page.getByLabel('Date').fill('2026-11-10');
   await page.getByLabel('Starts at').fill('14:00');
   await page.getByRole('button', { name: 'Save session' }).click();
   await expect(page.getByRole('heading', { name: 'One-time' })).toBeVisible();
