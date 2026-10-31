@@ -47,10 +47,11 @@ jobs:
                       print(f"::error title=Unit test {tc.get('name')}::{msg}")
           PY
       - uses: actions/upload-artifact@v4
+        continue-on-error: true   # artifact storage quota must not fail the build
         with:
           name: lockdin-android-debug-apk
           path: apps/android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 30
+          retention-days: 7
 
   ui:
     name: UI tests on emulator (API 35)

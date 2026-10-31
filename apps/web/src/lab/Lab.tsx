@@ -162,7 +162,8 @@ function RunA({ state }: { state: TimerState }) {
 
 function SetupB() {
   const [task, setTask] = useState(TASK);
-  const plan = SEGMENTS.map((s) => ({ ...s, start: s.start - 0, end: s.end }));
+  const shift = NOW.ready - T0;
+  const plan = SEGMENTS.map((s) => ({ ...s, start: s.start + shift, end: s.end + shift }));
   return (
     <div className="b-setup">
       <form onSubmit={(e) => e.preventDefault()}>
@@ -185,7 +186,7 @@ function SetupB() {
         </p>
         <div className="b-plan">
           <SessionRail segments={plan} now={NOW.ready} fmt={clockTime} />
-          <p className="b-plan__sum"><strong>{durationLabel(90)}</strong> · {clockTime(T0)} to {clockTime(SEGMENTS[2].end)}</p>
+          <p className="b-plan__sum"><strong>{durationLabel(90)}</strong> · if you start now, {clockTime(NOW.ready)} to {clockTime(NOW.ready + 90 * MIN)}</p>
         </div>
         <div className="b-go">
           <button type="submit" className="btn btn--primary btn--large">Start timer</button>

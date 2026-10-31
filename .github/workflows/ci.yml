@@ -133,10 +133,11 @@ jobs:
           Write-Host "::notice title=Signing (${{ matrix.rid }})::$head $($lines -join '; ')"
           if ($bad) { exit 1 }
       - uses: actions/upload-artifact@v4
+        continue-on-error: true   # artifact storage quota must not fail the build
         with:
           name: lockdin-probe-windows-${{ matrix.rid }}
           path: out/lockdin-probe-windows-${{ matrix.rid }}
-          retention-days: 30
+          retention-days: 7
       # Mechanical check only: the runner is a headless service session, so this
       # proves the probe starts, launches its guardian, releases on time and
       # exits cleanly. It is NOT evidence that restriction works on a desktop.
@@ -252,10 +253,11 @@ jobs:
           Write-Host "::notice title=Windows app signing (${{ matrix.rid }})::$head"
           if ($env:SIGN -eq 'true' -and $sig.Status -ne 'Valid') { exit 1 }
       - uses: actions/upload-artifact@v4
+        continue-on-error: true   # artifact storage quota must not fail the build
         with:
           name: lockdin-windows-${{ matrix.rid }}
           path: out/lockdin-windows-${{ matrix.rid }}
-          retention-days: 30
+          retention-days: 7
       - name: Launch test (x64)
         if: matrix.rid == 'win-x64'
         shell: pwsh
@@ -371,10 +373,11 @@ jobs:
             -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o $out
           Get-ChildItem $out -Filter *.pdb | Remove-Item
       - uses: actions/upload-artifact@v4
+        continue-on-error: true   # artifact storage quota must not fail the build
         with:
           name: lockdin-vm-policy-experiments-DISPOSABLE-VM-ONLY
           path: out/lockdin-vm-policy-experiments-DISPOSABLE-VM-ONLY
-          retention-days: 30
+          retention-days: 7
 
   android-probe:
     name: Android probe
@@ -399,10 +402,11 @@ jobs:
           cp target/build/outputs/apk/debug/target-debug.apk ../../out/lockdin-probe-android/lockdin-probe-target.apk
           cp TESTER.md ../../out/lockdin-probe-android/
       - uses: actions/upload-artifact@v4
+        continue-on-error: true   # artifact storage quota must not fail the build
         with:
           name: lockdin-probe-android
           path: out/lockdin-probe-android
-          retention-days: 30
+          retention-days: 7
 
   # Release-signed bundles for Google Play internal testing (owner decision R18:
   # devices get builds only through trusted channels). Skips cleanly until the
@@ -456,8 +460,9 @@ jobs:
           cp target/build/outputs/bundle/release/target-release.aab ../../out/lockdin-play-bundles/lockdin-probe-target.aab
           echo "versionCode ${{ github.run_number }}" > ../../out/lockdin-play-bundles/VERSION.txt
       - uses: actions/upload-artifact@v4
+        continue-on-error: true   # artifact storage quota must not fail the build
         if: env.HAS_UPLOAD_KEY == 'true'
         with:
           name: lockdin-play-bundles
           path: out/lockdin-play-bundles
-          retention-days: 30
+          retention-days: 7

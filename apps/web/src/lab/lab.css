@@ -165,8 +165,7 @@ a { color: inherit; }
   .mast nav { width: 100%; }
   .mast ul { justify-content: space-between; }
   .a-setup { grid-template-columns: minmax(0, 1fr); padding: 24px 16px 40px; gap: 32px; }
-  .a-preview { position: static; order: -1; flex-direction: row; gap: 16px; text-align: left; }
-  .a-preview .padlock { width: 96px !important; }
+  .a-preview { display: none; }
   .a-run { padding: 24px 16px 40px; }
   .b-setup, .b-run { padding: 28px 16px 40px; }
   .sentence { font-size: 28px; }

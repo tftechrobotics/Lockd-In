@@ -42,8 +42,9 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: probes/android/ci/emulator-demo.sh probes/android/probe/build/outputs/apk/release/probe-release.apk probes/android/target/build/outputs/apk/release/target-release.apk out/emulator-demo
       - uses: actions/upload-artifact@v4
+        continue-on-error: true   # artifact storage quota must not fail the build
         if: always()
         with:
           name: lockdin-emulator-demo-EMULATOR-ONLY
           path: out/emulator-demo
-          retention-days: 30
+          retention-days: 7
