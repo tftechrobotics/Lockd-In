@@ -101,7 +101,7 @@ private object LabType {
 /* ------------------------------ shared shell ------------------------------ */
 
 @Composable
-fun LabShell(content: @Composable () -> Unit, action: @Composable () -> Unit) {
+fun LabShell(content: @Composable () -> Unit, action: @Composable (large: Boolean) -> Unit) {
     val c = LocalColors.current
     Column(Modifier.fillMaxSize().background(c.ground)) {
         Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -112,8 +112,13 @@ fun LabShell(content: @Composable () -> Unit, action: @Composable () -> Unit) {
             Spacer(Modifier.weight(1f))
             LockdIcon(LIcon.Gear, description = "Settings")
         }
-        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) { content() }
-        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { action() }
+        // At large text the status note scrolls with the content so the pinned bar stays small.
+        val large = LocalDensity.current.fontScale > 1.3f
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
+            content()
+            if (large) { Spacer(Modifier.height(16.dp)); Honest() }
+        }
+        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { action(large) }
         HorizontalDivider(color = c.line)
         NavigationBar(containerColor = c.ground, tonalElevation = 0.dp) {
             listOf(LIcon.Focus to "Focus", LIcon.Calendar to "Schedule", LIcon.Book to "Profiles").forEachIndexed { i, (icon, label) ->
@@ -204,7 +209,7 @@ fun Padlock(state: LabState, blocked: Boolean, width: Dp, caption: String) {
                 Text(Sample.countdown(Sample.remaining(state)), style = LabType.numeralsA.copy(fontSize = size, lineHeight = size), color = fg, maxLines = 1)
             }
             val cap = with(density) { (w * 0.058f).toSp() }
-            Text(if (state == LabState.DONE) "Session complete" else caption, style = LabType.label.copy(fontSize = cap, lineHeight = cap * 1.2f), color = if (state == LabState.DONE) c.inkMuted else fg)
+            if (w >= 140.dp || state == LabState.DONE) Text(if (state == LabState.DONE) "Session complete" else caption, style = LabType.label.copy(fontSize = cap, lineHeight = cap * 1.2f), color = if (state == LabState.DONE) c.inkMuted else fg)
         }
     }
 }
@@ -294,7 +299,7 @@ fun SetupA() {
         Spacer(Modifier.height(12.dp))
         ProfileChips("Study")
         Spacer(Modifier.height(16.dp))
-    }, action = { Honest(); Primary("Start timer") })
+    }, action = { large -> if (!large) Honest(); Primary("Start timer") })
 }
 
 @Composable
@@ -317,9 +322,9 @@ fun RunA(state: LabState, blocked: Boolean = false) {
                 style = LabType.meta.copy(fontSize = 15.sp), color = c.inkMuted, textAlign = TextAlign.Center,
             )
         }
-    }, action = {
+    }, action = { large ->
         if (state == LabState.DONE) { Primary("Same again"); Ghost("Done", Modifier.fillMaxWidth()) }
-        else { Honest(); Ghost("Need out?", Modifier.fillMaxWidth()) }
+        else { if (!large) Honest(); Ghost("Need out?", Modifier.fillMaxWidth()) }
     })
 }
 
@@ -413,7 +418,7 @@ fun SetupB() {
         RowSetting("Profile", "Study")
         HorizontalDivider(color = c.line)
         Spacer(Modifier.height(12.dp))
-    }, action = { Honest(); Primary("Start timer · ends ${Sample.clock(90)}") })
+    }, action = { large -> if (!large) Honest(); Primary(if (large) "Start timer" else "Start timer · ends ${Sample.clock(90)}") })
 }
 
 @Composable
@@ -452,9 +457,9 @@ fun RunB(state: LabState, blocked: Boolean = false) {
             RowFact("Session ends", Sample.clock(90))
             HorizontalDivider(color = c.line)
         }
-    }, action = {
+    }, action = { large ->
         if (state == LabState.DONE) { Primary("Same again"); Ghost("Done", Modifier.fillMaxWidth()) }
-        else { Honest(); Ghost("Need out?", Modifier.fillMaxWidth()) }
+        else { if (!large) Honest(); Ghost("Need out?", Modifier.fillMaxWidth()) }
     })
 }
 
