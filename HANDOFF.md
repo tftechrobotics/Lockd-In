@@ -32,7 +32,18 @@ not free trial — Artifact Signing doesn't support trials) and Play wait.
 spike self-test, Kotlin type-check with an R stand-in, VM script lint,
 actionlint).
 
-## What changed this session (design pass 3, latest — R33)
+## Design pass 4 — exploration, awaiting owner's pick (2026-10-31)
+- Two isolated directions, same sample session: **A** session composer + refined padlock with
+  integrated countdown; **B** sentence composer + typography-led numerals with a mini lock and a
+  session rail. Web: `apps/web/lab.html` + `src/lab/` (dev server only, not in the build:
+  `npx vite`, then `/lab.html?dir=a|b&screen=setup|focus|break|done|states&shell=web|desktop&theme=light|dark`).
+  Android: `app/src/androidTest/.../lab/` (never ships); `LabScreenshotTest` → `ci-screenshots` (lab-*.png).
+- Lock rule in both: shackle closes only when blocking is verified; timer-only focus shows an open shackle.
+- Known lab defect: A's "rounds · Change" row squeezes at 2× text on Android (fix with FlowRow when applied).
+- CI: upload-artifact steps are now non-fatal (GitHub artifact storage quota was hit); retention 7 days.
+- Next: apply the chosen direction to production Focus (web, Windows, Android), then the remaining screens.
+
+## What changed this session (design pass 3 — R33)
 - Owner: the mockup is a mood reference; fix hierarchy and usability. Rules now live in the pass-3
   block at the top of `docs/design-spec.md`.
 - Web + Windows layout (`apps/web/src/ui/FocusPage.tsx`, `SchedulePage.tsx`, `styles/app.css`):
