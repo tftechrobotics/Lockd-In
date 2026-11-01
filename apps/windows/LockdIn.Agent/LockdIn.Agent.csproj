@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Lockd In blocking agent for Windows (per user, no administrator rights). Runs as its
+       own windowless process so blocking continues when the app window is closed. It
+       MINIMIZES and MUTES windows of restricted apps after they open; it does not prevent
+       launches and never closes or kills an app. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AssemblyName>LockdIn.Agent</AssemblyName>
+    <RootNamespace>LockdIn.Agent</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Deterministic>true</Deterministic>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <Version>0.1.0</Version>
+    <Product>Lockd In</Product>
+    <Company>TF Tech Robotics</Company>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\LockdIn.Enforcement\LockdIn.Enforcement.csproj" />
+  </ItemGroup>
+</Project>
