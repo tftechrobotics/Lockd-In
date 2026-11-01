@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import app.lockdin.enforce.Commitment
 import app.lockdin.state.Profile
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import app.lockdin.state.Store
 import app.lockdin.state.ThemeChoice
 import app.lockdin.state.Tone
@@ -147,6 +148,7 @@ fun SettingsScreen(store: Store) {
             Text(message(store.state.tone, Moment.BREAK_ENDING, "TAM 212")?.let { "Example: “$it”" } ?: "No messages during sessions.", style = UiType.caption, color = c.inkMuted,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
         }
+        RemindersSettings(store)
         Column {
             SectionLabel("Ending a session early")
             SettingsGroup {
@@ -194,5 +196,69 @@ private fun RadioRow(label: String, selected: Boolean, onClick: () -> Unit) {
     ) {
         Text(label, style = UiType.body, color = c.ink, modifier = Modifier.weight(1f))
         RadioButton(selected = selected, onClick = null, colors = RadioButtonDefaults.colors(selectedColor = c.ink, unselectedColor = c.controlLine))
+    }
+}
+
+/** Reminders and notifications: what Lockd In may tell you, and when not to. */
+@Composable
+private fun RemindersSettings(store: Store) {
+    val c = LocalColors.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val r = store.state.reminders
+    fun set(f: (app.lockdin.engine.ReminderSettings) -> app.lockdin.engine.ReminderSettings) = store.update { it.copy(reminders = f(it.reminders)) }
+    val allowed = remember(Resumes.tick) { app.lockdin.sched.Notifier.allowed(ctx) }
+    val fmt = java.time.format.DateTimeFormatter.ofPattern("h:mm a")
+    Column {
+        SectionLabel("Reminders and notifications")
+        SettingsGroup {
+            SwitchRow("Reminders before sessions", "Each planned session sets how long before", r.remindersOn) { v -> set { it.copy(remindersOn = v) } }
+            GroupDivider()
+            SwitchRow("Focus and break notices", "Break starting, focus back on, session complete", r.sessionEventsOn) { v -> set { it.copy(sessionEventsOn = v) } }
+            GroupDivider()
+            SwitchRow("Follow-up after a missed session", "One gentle note offering a 10-minute start", r.missedFollowUpOn) { v -> set { it.copy(missedFollowUpOn = v) } }
+            GroupDivider()
+            SwitchRow(
+                "Quiet hours", r.quietStart?.let { "${it.format(fmt)} – ${r.quietEnd!!.format(fmt)}: reminders and follow-ups wait" } ?: "Off",
+                r.quietStart != null,
+            ) { v -> set { if (v) it.copy(quietStart = java.time.LocalTime.of(22, 0), quietEnd = java.time.LocalTime.of(7, 0)) else it.copy(quietStart = null, quietEnd = null) } }
+            if (r.quietStart != null) {
+                GroupDivider()
+                SettingRow("Quiet from", r.quietStart.format(fmt), onClick = {
+                    android.app.TimePickerDialog(ctx, { _, h, m -> set { it.copy(quietStart = java.time.LocalTime.of(h, m)) } }, r.quietStart.hour, r.quietStart.minute, false).show()
+                })
+                GroupDivider()
+                SettingRow("Quiet until", r.quietEnd!!.format(fmt), onClick = {
+                    android.app.TimePickerDialog(ctx, { _, h, m -> set { it.copy(quietEnd = java.time.LocalTime.of(h, m)) } }, r.quietEnd.hour, r.quietEnd.minute, false).show()
+                })
+            }
+            GroupDivider()
+            SettingMenuRow("At most", listOf(2, 4, 6).map { it to "$it per hour" }, r.maxPerHour, { v -> set { it.copy(maxPerHour = v) } })
+        }
+        Spacer(Modifier.height(Dim.s2))
+        Text(
+            if (allowed) "Each kind also has its own switch in Android’s notification settings for Lockd In."
+            else "Notifications are off for Lockd In, so none of these can be shown. Turn them on in Devices › Set up blocking.",
+            style = UiType.caption, color = c.inkMuted,
+        )
+    }
+}
+
+@Composable
+private fun SwitchRow(label: String, supporting: String, on: Boolean, onChange: (Boolean) -> Unit) {
+    val c = LocalColors.current
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = Dim.control + 4.dp)
+            .toggleable(on, role = Role.Switch, onValueChange = onChange)
+            .padding(horizontal = Dim.s4, vertical = Dim.s2),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = UiType.label, color = c.ink)
+            Text(supporting, style = UiType.caption, color = c.inkMuted)
+        }
+        androidx.compose.material3.Switch(
+            checked = on, onCheckedChange = null,
+            colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = c.ink, checkedThumbColor = c.onInk, uncheckedTrackColor = c.taupeSoft, uncheckedBorderColor = c.controlLine, uncheckedThumbColor = c.controlLine),
+        )
     }
 }

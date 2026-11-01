@@ -347,6 +347,44 @@ class AppTest {
         clock.advanceMinutes(1); tick(store)
         rule.onNodeWithText("New session").assertIsDisplayed()
     }
+    @Test fun autoStartIsExplainedBeforeItTurnsOn() {
+        launch()
+        rule.onNodeWithTag("tab-schedule").performClick()
+        rule.onNodeWithText("Add session").performClick()
+        rule.onNode(hasText("Name") and hasSetTextAction()).performTextInput("Physics review")
+        rule.onNodeWithText("Start automatically").performScrollTo().performClick()
+        rule.onNodeWithText("Start this session automatically?").assertIsDisplayed()
+        rule.onNodeWithText("Turn on").performClick()
+        rule.onNodeWithText("Starts and blocks automatically").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Save session").performClick()
+        rule.onAllNodesWithText("Starts automatically", substring = true).onFirst().assertExists()
+    }
+
+    @Test fun reminderSettingsAndQuietHours() {
+        val store = launch()
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.onNodeWithText("Quiet hours").performScrollTo().performClick()
+        rule.onNodeWithText("Quiet from").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Follow-up after a missed session").performScrollTo().performClick()
+        rule.runOnIdle {
+            assert(store.state.reminders.quietStart != null)
+            assert(!store.state.reminders.missedFollowUpOn)
+        }
+    }
+
+    @Test fun lastSessionStaysOnHomeUntilDismissed() {
+        val store = launch()
+        rule.onNodeWithText("Start timer").performClick()
+        clock.advanceMinutes(41); tick(store)
+        clock.advanceMinutes(1); tick(store) // recap times out
+        rule.onNodeWithText("Last session", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Last session", substring = true).performClick()
+        rule.onNodeWithText("Session complete").assertIsDisplayed()
+        rule.onNodeWithText("Back").performClick()
+        rule.onNodeWithContentDescription("Dismiss last session").performClick()
+        rule.onAllNodesWithText("Last session", substring = true).assertCountEquals(0)
+    }
+
     @Test fun screenshotHome() { launch(home = true); shot("00-home-light") }
     @Test fun screenshotHomeDark() { launch(AppState(theme = ThemeChoice.DARK), dark = true, home = true); shot("00-home-dark") }
     @Test fun screenshotDevices() { launch(); rule.onNodeWithText("Set up blocking").performClick(); shot("10-devices") }

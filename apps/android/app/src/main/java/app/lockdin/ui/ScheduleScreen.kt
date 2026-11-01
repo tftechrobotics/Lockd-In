@@ -142,10 +142,15 @@ fun ScheduleScreen(store: Store, now: Long, zone: ZoneId, onEdit: (ScheduledSess
                             Text("${Fmt.dayLabel(n.start, now, zone)} · ${Fmt.clock(n.start, zone)}–${Fmt.clock(n.end, zone)}", style = UiType.caption, color = c.inkMuted)
                             Text(n.session.title, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
                             Text("${planLabel(n.session)} · ${profileName(n.session.profileId)}", style = UiType.caption, color = c.inkMuted)
+                            if (n.session.autoStart) Text("Starts automatically", style = UiType.caption.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
                         }
                         LockdIcon(LIcon.Chevron, size = 18.dp, tint = c.inkMuted)
                     }
                 }
+                if (n.start > now) TextAction("Skip this time", {
+                    val day = Instant.ofEpochMilli(n.start).atZone(zone).toLocalDate()
+                    store.update { st -> st.copy(schedule = st.schedule.map { if (it.id == n.session.id) it.copy(skipped = it.skipped + day) else it }) }
+                })
             }
         }
         if (routines.isNotEmpty()) Column {
@@ -186,6 +191,12 @@ private fun PlanRow(store: Store, s: ScheduledSession, whenText: String, profile
             Column(Modifier.weight(1f)) {
                 Text(s.title, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = if (muted) c.inkMuted else c.ink)
                 Text("$whenText · ${planLabel(s)} · $profile", style = UiType.caption, color = c.inkMuted)
+                val notes = listOfNotNull(
+                    if (s.autoStart) "Starts automatically" else null,
+                    if (s.remindMinutes > 0) "Reminder ${s.remindMinutes} min before" else null,
+                    s.skipped.filter { !it.isBefore(java.time.LocalDate.now()) }.minOrNull()?.let { "Skipping ${it.format(dateFmt)}" },
+                )
+                if (notes.isNotEmpty()) Text(notes.joinToString(" · "), style = UiType.caption, color = c.inkMuted)
                 if (muted) Text("Off", style = UiType.caption.copy(fontWeight = FontWeight.SemiBold), color = c.inkMuted)
             }
         }
@@ -206,6 +217,7 @@ fun ScheduleEditor(store: Store, initial: ScheduledSession, zone: ZoneId, now: L
     var s by remember { mutableStateOf(initial) }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var explainAuto by remember { mutableStateOf(false) }
     val isNew = initial.id.isEmpty()
     val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
     fun patch(f: (ScheduledSession) -> ScheduledSession) { s = f(s); error = null }
@@ -218,6 +230,7 @@ fun ScheduleEditor(store: Store, initial: ScheduledSession, zone: ZoneId, now: L
         add("$whenText at ${s.startTime.format(timeFmt)}")
         add("${if (s.rounds > 1) "${s.rounds} rounds of ${s.focusMinutes} min with ${s.breakMinutes}-minute breaks" else "One ${s.focusMinutes}-minute round"}, ending at ${endTime.format(timeFmt)} (${durationLabel(s.totalMinutes)})")
         add("$profileName profile · on this phone")
+        if (s.autoStart) add("Starts and blocks automatically")
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -282,6 +295,29 @@ fun ScheduleEditor(store: Store, initial: ScheduledSession, zone: ZoneId, now: L
                 }
             }
             Column {
+                SectionLabel("Reminder and start")
+                SettingsGroup {
+                    SettingMenuRow("Reminder", app.lockdin.engine.Planner.REMIND_CHOICES.map { it to if (it == 0) "None" else "$it min before" }, s.remindMinutes, { m ->
+                        patch { it.copy(remindMinutes = m) }
+                    }, icon = LIcon.Clock)
+                    GroupDivider()
+                    AutoStartRow(s.autoStart, onChange = { on -> if (on) explainAuto = true else patch { it.copy(autoStart = false) } })
+                    if (s.autoStart && !app.lockdin.sched.Scheduler.canExact(context)) {
+                        GroupDivider()
+                        SettingRow("On-time starts", "Allow", supporting = "Without “Alarms & reminders”, Android may start it a few minutes late.", onClick = {
+                            runCatching {
+                                context.startActivity(android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                    android.net.Uri.fromParts("package", context.packageName, null)))
+                            }
+                        })
+                    }
+                }
+                if (!app.lockdin.sched.Notifier.allowed(context)) Text(
+                    "Notifications are off for Lockd In, so reminders can’t be shown. Turn them on in Devices › Set up blocking.",
+                    style = UiType.caption, color = c.inkMuted, modifier = Modifier.padding(top = Dim.s2),
+                )
+            }
+            Column {
                 SectionLabel("Summary")
                 SummaryText(summary)
             }
@@ -309,6 +345,25 @@ fun ScheduleEditor(store: Store, initial: ScheduledSession, zone: ZoneId, now: L
                 }
             })
         }
+    }
+    if (explainAuto) {
+        val rules = store.state.profiles.firstOrNull { it.id == s.profileId }?.rules
+        AlertDialog(
+            onDismissRequest = { explainAuto = false },
+            title = { Text("Start this session automatically?", style = Type.title) },
+            text = {
+                Text(
+                    "At ${s.startTime.format(timeFmt)} Lockd In will start “${s.title.ifBlank { "this session" }}” without asking" +
+                        (if (rules != null && rules.restrictsAnything) " and block ${rulesSummary(rules).replace(" during focus", "").lowercase()}." else ". This profile blocks nothing yet, so it runs as a timer.") +
+                        "\n\nYou’ll get a notification when it starts. Ending early follows your commitment setting, and emergency recovery always works." +
+                        " If a session is already running, the planned one doesn’t replace it.",
+                    style = UiType.body,
+                )
+            },
+            confirmButton = { TextButton(onClick = { patch { it.copy(autoStart = true) }; explainAuto = false }) { Text("Turn on", style = UiType.label, color = c.ink) } },
+            dismissButton = { TextButton(onClick = { explainAuto = false }) { Text("Cancel", style = UiType.label, color = c.ink) } },
+            containerColor = c.surface,
+        )
     }
     if (confirmDelete) {
         AlertDialog(
@@ -356,3 +411,25 @@ fun DayPicker(days: Set<DayOfWeek>, onToggle: (DayOfWeek) -> Unit) {
     }
 }
 
+
+@Composable
+private fun AutoStartRow(on: Boolean, onChange: (Boolean) -> Unit) {
+    val c = LocalColors.current
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = Dim.control + 4.dp)
+            .toggleable(on, role = Role.Switch, onValueChange = onChange)
+            .padding(horizontal = Dim.s4, vertical = Dim.s2),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        LockdIcon(LIcon.Focus, size = Dim.icon, tint = c.ink)
+        Spacer(Modifier.width(Dim.s3))
+        Column(Modifier.weight(1f)) {
+            Text("Start automatically", style = UiType.label, color = c.ink)
+            Text("Starts and blocks at the set time, without opening the app", style = UiType.caption, color = c.inkMuted)
+        }
+        Switch(
+            checked = on, onCheckedChange = null,
+            colors = SwitchDefaults.colors(checkedTrackColor = c.ink, checkedThumbColor = c.onInk, uncheckedTrackColor = c.taupeSoft, uncheckedBorderColor = c.controlLine, uncheckedThumbColor = c.controlLine),
+        )
+    }
+}

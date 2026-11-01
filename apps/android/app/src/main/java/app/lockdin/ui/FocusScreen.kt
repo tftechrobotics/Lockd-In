@@ -107,18 +107,24 @@ fun FocusScreen(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -> 
     val active = store.state.active
     // Approved idle view (R36): the lock shows the time and the next session; setup opens on demand.
     var composing by rememberSaveable { mutableStateOf(false) }
+    var viewingLast by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(active?.id) { if (active != null) composing = false }
     BackHandler(enabled = active == null && composing) { composing = false }
     when {
         active != null -> SessionView(store, active, clock, zone, openDevices)
         composing -> Setup(store, clock, zone, openDevices, openSchedule, onBack = { composing = false })
-        else -> Home(store, clock, zone, onNew = { composing = true }, openSchedule = openSchedule)
+        viewingLast && store.state.lastSession != null -> {
+            val last = store.state.lastSession!!
+            BackHandler { viewingLast = false }
+            Recap(store, last, FocusService.evaluate(last, clock.now()), clock, zone, onClose = { viewingLast = false })
+        }
+        else -> Home(store, clock, zone, onNew = { composing = true }, openSchedule = openSchedule, onViewLast = { viewingLast = true })
     }
 }
 
 /** The idle lock: the time of day on its face, the next planned session below, one way to begin. */
 @Composable
-private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit, openSchedule: () -> Unit) {
+private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit, openSchedule: () -> Unit, onViewLast: () -> Unit = {}) {
     val c = LocalColors.current
     val now = rememberNow(clock, true)
     val upcoming = Schedule.nextUp(store.state.schedule, now, zone)
@@ -148,6 +154,28 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
                             },
                             style = UiType.caption, color = c.inkMuted,
                         )
+                        if (upcoming?.session?.autoStart == true) Text("Starts automatically", style = UiType.caption.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
+                    }
+                }
+                // The last finished session stays here until dismissed.
+                store.state.lastSession?.let { last ->
+                    val blockedTimes = last.blocked.values.sum()
+                    Row(
+                        Modifier.fillMaxWidth().clickable(role = Role.Button, onClickLabel = "View summary", onClick = onViewLast)
+                            .padding(start = Dim.s4, top = Dim.s2, bottom = Dim.s2),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Last session · ${last.intention ?: "Focus session"}", style = UiType.label, color = c.ink)
+                            Text(
+                                "${Fmt.dayLabel(last.start, now, zone)} ${Fmt.clock(last.start, zone)}" +
+                                    (if (blockedTimes > 0) " · blocked $blockedTimes ${if (blockedTimes == 1) "time" else "times"}" else "") + " · View summary",
+                                style = UiType.caption, color = c.inkMuted,
+                            )
+                        }
+                        androidx.compose.material3.IconButton(onClick = { store.dismissLastSession() }) {
+                            LockdIcon(LIcon.Close, size = 18.dp, tint = c.inkMuted, description = "Dismiss last session")
+                        }
                     }
                 }
             }
@@ -636,7 +664,11 @@ private fun ScopeOption(title: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Recap(store: Store, session: ActiveSession, snap: Snapshot, clock: AppClock, zone: ZoneId) {
+private fun Recap(
+    store: Store, session: ActiveSession, snap: Snapshot, clock: AppClock, zone: ZoneId,
+    /** null = the live recap (auto-returns home); otherwise a saved one viewed from Home. */
+    onClose: (() -> Unit)? = null,
+) {
     val c = LocalColors.current
     val occ = Session.occurrenceFrom(session.start, session.segments)
     val endedAt = when (snap.status) {
@@ -671,7 +703,7 @@ private fun Recap(store: Store, session: ActiveSession, snap: Snapshot, clock: A
     val shownAt = remember(session.id) { clock.now() }
     val now = rememberNow(clock, true)
     val left = ((AUTO_HOME_MS - (now - shownAt)) / 1000).coerceAtLeast(0)
-    LaunchedEffect(left) { if (left == 0L) store.finish() }
+    LaunchedEffect(left) { if (left == 0L && onClose == null) store.finish(dismissed = false) }
 
     WithActionBar(
         content = {
@@ -717,9 +749,10 @@ private fun Recap(store: Store, session: ActiveSession, snap: Snapshot, clock: A
             }
         },
         actions = {
-            Text("Back to home in $left s", style = UiType.caption, color = c.inkMuted)
-            MainButton("Done", { store.finish() })
-            SecondaryButton("Same again", {
+            if (onClose == null) Text("Back to home in $left s", style = UiType.caption, color = c.inkMuted)
+            MainButton("Done", { if (onClose == null) store.finish() else { store.dismissLastSession(); onClose() } })
+            if (onClose != null) SecondaryButton("Back", onClose, modifier = Modifier.fillMaxWidth())
+            else SecondaryButton("Same again", {
                 store.startSession(clock.now(), session.segments, session.intention, session.profileId, store.state.last)
             }, modifier = Modifier.fillMaxWidth())
         },

@@ -65,6 +65,10 @@ object Resumes {
     var tick by mutableIntStateOf(0)
         private set
     fun bump() { tick++ }
+
+    /** A screen asked for from outside (a notification), consumed by the app's navigation. */
+    var route by androidx.compose.runtime.mutableStateOf<String?>(null)
+    fun openRoute(r: String) { route = r }
 }
 
 /** Required permissions that are missing right now; re-checked on resume and every few seconds. */

@@ -26,11 +26,17 @@ data class ScheduledSession(
     val profileId: String,
     val date: LocalDate? = null,
     val enabled: Boolean = true,
+    /** Start (and block) at the scheduled time without the app being open. */
+    val autoStart: Boolean = false,
+    /** Reminder this many minutes before; 0 = none. */
+    val remindMinutes: Int = 10,
+    /** Occurrence dates skipped once ("Skip this time"). */
+    val skipped: Set<LocalDate> = emptySet(),
 ) {
     val oneTime: Boolean get() = date != null
     val totalMinutes: Int get() = rounds * focusMinutes + (rounds - 1) * breakMinutes
     val plan: List<Segment> get() = Session.roundsPlan(rounds, focusMinutes, breakMinutes)
-    fun occursOn(day: LocalDate): Boolean = if (date != null) day == date else day.dayOfWeek in days
+    fun occursOn(day: LocalDate): Boolean = day !in skipped && (if (date != null) day == date else day.dayOfWeek in days)
 }
 
 data class Upcoming(val session: ScheduledSession, val start: Long, val end: Long)

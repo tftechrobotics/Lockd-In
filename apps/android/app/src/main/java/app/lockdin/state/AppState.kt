@@ -9,6 +9,7 @@ import app.lockdin.enforce.RuleMode
 import app.lockdin.engine.OverrideRecord
 import app.lockdin.engine.OverrideScope
 import app.lockdin.engine.PhaseKind
+import app.lockdin.engine.ReminderSettings
 import app.lockdin.engine.ScheduledSession
 import app.lockdin.engine.Segment
 import app.lockdin.engine.SessionControls
@@ -42,6 +43,8 @@ data class ActiveSession(
      * names, or "site:<domain>" for websites, with how many times each was covered.
      */
     val blocked: Map<String, Int> = emptyMap(),
+    /** Set when started for a planned occurrence ("<scheduleId>@<startMs>"). */
+    val occurrenceKey: String? = null,
 )
 
 data class AppState(
@@ -54,6 +57,15 @@ data class AppState(
     val recentIntentions: List<String> = emptyList(),
     /** Default commitment for new sessions. */
     val commitment: Commitment = Commitment.DELAYED,
+    val reminders: ReminderSettings = ReminderSettings(),
+    /** Planner events already handled ("KIND:<occurrence key>", also session notices); newest last. */
+    val planLog: List<String> = emptyList(),
+    /** When recent sessions started (missed-session check). */
+    val recentStarts: List<Long> = emptyList(),
+    /** When reminders / follow-ups were shown (frequency limit). */
+    val notifyLog: List<Long> = emptyList(),
+    /** The last finished session, until dismissed (Home shows it). */
+    val lastSession: ActiveSession? = null,
 ) {
     companion object {
         /** v2 (2026-11): per-profile app rules, commitment, the session's rule snapshot. v1 reads as v2 with defaults. */
@@ -84,22 +96,21 @@ object StateCodec {
                 .put("startTime", it.startTime.toString()).put("focusMinutes", it.focusMinutes)
                 .put("breakMinutes", it.breakMinutes).put("rounds", it.rounds).put("profileId", it.profileId)
                 .put("date", it.date?.toString() ?: JSONObject.NULL).put("enabled", it.enabled)
+                .put("autoStart", it.autoStart).put("remindMinutes", it.remindMinutes)
+                .put("skipped", JSONArray(it.skipped.map { d -> d.toString() }.sorted()))
         }))
+        put("reminders", JSONObject().put("remindersOn", s.reminders.remindersOn).put("sessionEventsOn", s.reminders.sessionEventsOn)
+            .put("missedFollowUpOn", s.reminders.missedFollowUpOn)
+            .put("quietStart", s.reminders.quietStart?.toString() ?: JSONObject.NULL)
+            .put("quietEnd", s.reminders.quietEnd?.toString() ?: JSONObject.NULL)
+            .put("maxPerHour", s.reminders.maxPerHour))
+        put("planLog", JSONArray(s.planLog.takeLast(MAX_LOG)))
+        put("recentStarts", JSONArray(s.recentStarts.takeLast(MAX_STARTS)))
+        put("notifyLog", JSONArray(s.notifyLog.takeLast(MAX_STARTS)))
+        s.lastSession?.let { put("lastSession", activeJson(it)) }
         put("last", JSONObject().put("focusMinutes", s.last.focusMinutes).put("breakMinutes", s.last.breakMinutes)
             .put("rounds", s.last.rounds).put("profileId", s.last.profileId))
-        s.active?.let { a ->
-            put("active", JSONObject().put("id", a.id).put("start", a.start)
-                .put("segments", JSONArray(a.segments.map { JSONObject().put("kind", it.kind.name).put("minutes", it.minutes) }))
-                .put("intention", a.intention ?: JSONObject.NULL).put("profileId", a.profileId)
-                .put("rules", rulesJson(a.rules)).put("commitment", a.commitment.name)
-                .put("blocked", JSONObject().apply { a.blocked.forEach { (k, v) -> put(k, v) } })
-                .put("emergencyRecoveryAt", a.controls.emergencyRecoveryAt ?: JSONObject.NULL)
-                .put("overrides", JSONArray(a.controls.overrides.map {
-                    JSONObject().put("id", it.id).put("scope", it.scope.name).put("phaseIndex", it.phaseIndex)
-                        .put("requestedAt", it.requestedAt).put("delaySeconds", it.delaySeconds)
-                        .put("cancelledAt", it.cancelledAt ?: JSONObject.NULL)
-                })))
-        }
+        s.active?.let { put("active", activeJson(it)) }
         put("recentIntentions", JSONArray(s.recentIntentions))
     }.toString()
 
@@ -128,6 +139,11 @@ object StateCodec {
                     (0 until a.length()).mapNotNull { a.optString(it).takeIf { s -> s.isNotBlank() } }
                 }?.take(8) ?: emptyList(),
                 commitment = enumOr(o.optString("commitment"), Commitment.DELAYED),
+                reminders = o.optJSONObject("reminders")?.let(::remindersOf) ?: ReminderSettings(),
+                planLog = o.optJSONArray("planLog")?.let { a -> (0 until a.length()).mapNotNull { a.optString(it).takeIf { x -> x.isNotBlank() && x.length < 200 } } }?.takeLast(MAX_LOG) ?: emptyList(),
+                recentStarts = longs(o.optJSONArray("recentStarts")).takeLast(MAX_STARTS),
+                notifyLog = longs(o.optJSONArray("notifyLog")).takeLast(MAX_STARTS),
+                lastSession = o.optJSONObject("lastSession")?.let(::activeOf),
             )
         } catch (e: JSONException) {
             AppState()
@@ -142,6 +158,10 @@ object StateCodec {
             s.getString("id"), s.getString("title").take(80), days, LocalTime.parse(s.getString("startTime")),
             s.getInt("focusMinutes"), s.getInt("breakMinutes"), s.getInt("rounds"), s.getString("profileId"),
             date = date, enabled = s.optBoolean("enabled", true),
+            autoStart = s.optBoolean("autoStart", false),
+            remindMinutes = s.optInt("remindMinutes", 10).takeIf { it in app.lockdin.engine.Planner.REMIND_CHOICES } ?: 10,
+            skipped = s.optJSONArray("skipped")?.let { a -> (0 until a.length()).mapNotNull { runCatching { java.time.LocalDate.parse(a.getString(it)) }.getOrNull() } }
+                ?.takeLast(60)?.toSet() ?: emptySet(),
         ).takeIf { (it.date != null || it.days.isNotEmpty()) && it.focusMinutes in 1..240 && it.rounds in 1..12 && it.breakMinutes in 0..120 }
     } catch (e: Exception) {
         null // DateTimeException, JSONException, bad day numbers: drop the item
@@ -169,12 +189,43 @@ object StateCodec {
                     .associateWith { o.optInt(it, 0).coerceIn(0, 100_000) }
                     .filterValues { it > 0 }
             } ?: emptyMap(),
+            if (a.isNull("occurrenceKey") || !a.has("occurrenceKey")) null else a.getString("occurrenceKey").take(120),
         )
     } catch (e: Exception) {
         null
     }
 
+    private fun remindersOf(r: JSONObject): ReminderSettings {
+        fun time(k: String) = if (r.isNull(k) || !r.has(k)) null else runCatching { LocalTime.parse(r.getString(k)) }.getOrNull()
+        val qs = time("quietStart"); val qe = time("quietEnd")
+        return ReminderSettings(
+            remindersOn = r.optBoolean("remindersOn", true),
+            sessionEventsOn = r.optBoolean("sessionEventsOn", true),
+            missedFollowUpOn = r.optBoolean("missedFollowUpOn", true),
+            quietStart = if (qs != null && qe != null) qs else null,
+            quietEnd = if (qs != null && qe != null) qe else null,
+            maxPerHour = r.optInt("maxPerHour", 4).coerceIn(1, 20),
+        )
+    }
+
+    private fun longs(a: JSONArray?): List<Long> = a?.let { (0 until it.length()).mapNotNull { i -> it.optLong(i, -1).takeIf { v -> v > 0 } } } ?: emptyList()
+
     private const val MAX_BLOCKED_KEYS = 100
+    private const val MAX_LOG = 300
+    private const val MAX_STARTS = 40
+
+    private fun activeJson(a: ActiveSession): JSONObject = JSONObject().put("id", a.id).put("start", a.start)
+                .put("segments", JSONArray(a.segments.map { JSONObject().put("kind", it.kind.name).put("minutes", it.minutes) }))
+                .put("intention", a.intention ?: JSONObject.NULL).put("profileId", a.profileId)
+                .put("rules", rulesJson(a.rules)).put("commitment", a.commitment.name)
+                .put("blocked", JSONObject().apply { a.blocked.forEach { (k, v) -> put(k, v) } })
+                .put("emergencyRecoveryAt", a.controls.emergencyRecoveryAt ?: JSONObject.NULL)
+                .put("overrides", JSONArray(a.controls.overrides.map {
+                    JSONObject().put("id", it.id).put("scope", it.scope.name).put("phaseIndex", it.phaseIndex)
+                        .put("requestedAt", it.requestedAt).put("delaySeconds", it.delaySeconds)
+                        .put("cancelledAt", it.cancelledAt ?: JSONObject.NULL)
+                }))
+        .put("occurrenceKey", a.occurrenceKey ?: JSONObject.NULL)
 
     private fun rulesJson(r: AppRules): JSONObject =
         JSONObject().put("mode", r.mode.name).put("packages", JSONArray(r.packages.sorted())).put("sites", JSONArray(r.sites.sorted()))

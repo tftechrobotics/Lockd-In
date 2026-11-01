@@ -139,8 +139,21 @@ class FocusService : Service() {
         val session = Store.get(this).state.active
         val snap = session?.let { evaluate(it, now) }
         if (session == null || snap == null || !running(snap)) {
+            if (session != null && snap?.status == SessionStatus.COMPLETED) sessionEvent(session, "end") {
+                val occ = Session.occurrenceFrom(session.start, session.segments)
+                val mins = occ.phases.filter { it.kind == PhaseKind.FOCUS }.sumOf { it.end - it.start } / 60_000
+                "Session complete" to "${session.intention ?: "Focus session"} · focused $mins min."
+            }
             stop(if (session == null) "no_session" else "session_over")
             return
+        }
+        // Break starting / focus back on: one notice per phase change (not the first phase).
+        snap.phase?.takeIf { it.index > 0 }?.let { ph ->
+            sessionEvent(session, "phase${ph.index}") {
+                val at = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(ph.end))
+                if (ph.kind == PhaseKind.BREAK) "Break until $at" to "Apps are available. Focus resumes at $at."
+                else "Focus is back on" to "${session.intention ?: "Your session"} until $at."
+            }
         }
         val (detection, appMissing) = Capabilities.detection(this)
         val missing = BlockPolicy.missingFor(session.rules, detection, appMissing)
@@ -169,6 +182,17 @@ class FocusService : Service() {
 
         scheduleWake(snap.nextTransition)
         handler.postDelayed(tick, if (interactive && protection == Protection.PROTECTING && !FocusAccessibilityService.connected) POLL_MS else IDLE_MS)
+    }
+
+    /** Posts a session notice once (survives service restarts via the plan log). */
+    private fun sessionEvent(session: ActiveSession, what: String, text: () -> Pair<String, String>) {
+        val store = Store.get(this)
+        val id = "evt:${session.id}:$what"
+        if (id in store.state.planLog) return
+        store.logPlan(listOf(id))
+        if (!store.state.reminders.sessionEventsOn) return
+        val (title, body) = text()
+        app.lockdin.sched.Notifier.post(this, EVENT_ID, app.lockdin.sched.Notifier.CH_EVENTS, title, body)
     }
 
     private fun essentials(now: Long): Set<String> {
@@ -279,6 +303,7 @@ class FocusService : Service() {
         private const val CHANNEL_ALERTS = "alerts"
         private const val ONGOING_ID = 1
         private const val ALERT_ID = 2
+        private const val EVENT_ID = 3
         private const val POLL_MS = 500L
         private const val IDLE_MS = 2_000L
         private const val COVER_DEBOUNCE_MS = 400L

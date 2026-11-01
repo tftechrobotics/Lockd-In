@@ -12,8 +12,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Resume a running session after a restart. -->
+    <!-- Resume a running session after a restart; re-arm planned sessions. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- On-time automatic starts. The user grants it in Settings ("Alarms & reminders"); without
+         it, starts use inexact alarms and the app says they may be late. Not USE_EXACT_ALARM. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- Optional Accessibility mode (owner decision 2026-11-01): see FocusAccessibilityService.
          No QUERY_ALL_PACKAGES, no VPN, no exact alarms. -->
 
@@ -83,6 +86,23 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service" />
         </service>
+
+        <!-- Planned sessions: the next alarm, plus reboot, clock, time-zone and exact-alarm
+             permission changes (all exempt from implicit-broadcast limits). -->
+        <receiver
+            android:name=".sched.PlanReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".sched.PlanActionReceiver"
+            android:exported="false" />
 
         <receiver
             android:name=".enforce.BootReceiver"

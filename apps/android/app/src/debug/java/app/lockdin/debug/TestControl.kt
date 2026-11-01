@@ -36,6 +36,23 @@ class TestControl : BroadcastReceiver() {
                     LastChoice(focus, brk, rounds, "study"),
                 )
             }
+            // Plans a one-time session today at HH:mm (`at`), optionally starting automatically.
+            "plan" -> {
+                val at = java.time.LocalTime.parse(intent.getStringExtra("at") ?: return)
+                val auto = intent.getBooleanExtra("auto", false)
+                val pkgs = intent.getStringExtra("block")?.split(',')?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+                store.update { s ->
+                    s.copy(
+                        profiles = s.profiles.map { if (it.id == "study") it.copy(rules = AppRules(RuleMode.BLOCK_LIST, pkgs)) else it },
+                        schedule = s.schedule + app.lockdin.engine.ScheduledSession(
+                            Store.newId(), intent.getStringExtra("title") ?: "E2E plan", emptySet(), at,
+                            intent.getIntExtra("focus", 2), 1, 1, "study",
+                            date = java.time.LocalDate.now(), autoStart = auto, remindMinutes = 0,
+                        ),
+                    )
+                }
+                app.lockdin.sched.Scheduler.run(context)
+            }
             "emergency" -> store.state.active?.let { a ->
                 store.setControls(a.id) { it.copy(emergencyRecoveryAt = System.currentTimeMillis()) }
             }

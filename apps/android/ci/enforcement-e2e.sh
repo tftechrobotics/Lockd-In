@@ -234,7 +234,28 @@ r=$(trial_blocked 10000) && record a11y-fallback-usage pass "usage access took o
 ctl --es cmd emergency; sleep 3
 r=$(trial_open) && record emergency-release pass "target opens right after emergency recovery" || record emergency-release FAIL "$r"
 
-adb logcat -d -s LockdInFocus LockdInTest ActivityTaskManager:W ActivityManager:W > "$OUT/logcat.txt" 2>/dev/null || true
+# ---------------- Milestone A: planned sessions ----------------
+ctl --es cmd finish
+adb shell appops set $A SCHEDULE_EXACT_ALARM allow
+# Phone clock: plan for the start of the next-but-one minute (schedules are minute-precise).
+ph=$(adb shell date +%H:%M:%S | tr -d '\r'); h=${ph%%:*}; m=${ph#*:}; m=${m%%:*}; sec=${ph##*:}
+mins=$((10#$h * 60 + 10#$m + 2)); T1=$(printf '%02d:%02d' $(( (mins / 60) % 24 )) $(( mins % 60 )))
+mins2=$((mins + 1)); T2=$(printf '%02d:%02d' $(( (mins2 / 60) % 24 )) $(( mins2 % 60 )))
+wait1=$(( (2 * 60 - 10#$sec) ))
+ctl --es cmd plan --es at "$T1" --es title "Manual plan" --ez auto false --es block "$T"
+ctl --es cmd plan --es at "$T2" --es title "Auto plan" --ez auto true --es block "$T" --ei focus 2
+note "  planned $T1 (manual) and $T2 (automatic) at phone time $ph"
+sleep $(( wait1 + 15 ))
+notif_has "Manual plan starts now" && record A-start-reminder pass "'starts now' notice with Start now for a non-automatic plan" \
+  || record A-start-reminder FAIL "no 'starts now' notice at $T1"
+service_up && record A-manual-not-started FAIL "a session started without the person" || record A-manual-not-started pass "nothing started without the person"
+sleep 60
+service_up && record A-auto-start pass "automatic plan started the blocking service at $T2" || record A-auto-start FAIL "service not running after $T2"
+notif_has "Auto plan started" && record A-auto-notice pass "'Auto plan started' notice" || record A-auto-notice FAIL "no start notice"
+r=$(trial_blocked 6000) && record A-auto-blocks pass "target covered during the automatic session (${r} ms)" || record A-auto-blocks FAIL "$r"
+ctl --es cmd emergency; sleep 3
+
+adb logcat -d -s LockdInFocus LockdInTest LockdInPlan ActivityTaskManager:W ActivityManager:W > "$OUT/logcat.txt" 2>/dev/null || true
 # On-device detection time: from Android's record of the app coming to the front to the
 # service asking for the block screen (no adb overhead). Logcat is cleared on reboot.
 det=$(cat "$OUT/logcat-before-reboot.txt" "$OUT/logcat-usage-phase.txt" 2>/dev/null | grep -v 'source=a11y' | grep -oE 'detect_ms=[0-9]+' | cut -d= -f2 | sort -n)

@@ -10,6 +10,18 @@ class LockdInApplication : Application() {
         FocusService.createChannels(this)
         // Any change that leaves a running session (start, schedule, remote start later)
         // makes sure the blocking service is up, independent of which screen is open.
-        Store.get(this).onChange = { FocusService.sync(this) }
+        app.lockdin.sched.Notifier.channels(this)
+        var lastPlanInputs: Any? = null
+        Store.get(this).onChange = { st ->
+            FocusService.sync(this)
+            // Schedule or reminder settings changed: re-plan alarms.
+            val inputs = st.schedule to st.reminders
+            if (inputs != lastPlanInputs) {
+                val first = lastPlanInputs == null
+                lastPlanInputs = inputs
+                if (!first) app.lockdin.sched.Scheduler.run(this)
+            }
+        }
+        lastPlanInputs = Store.get(this).state.let { it.schedule to it.reminders }
     }
 }

@@ -66,6 +66,12 @@ fun LockdInApp(store: Store, clock: AppClock = AppClock.System, zone: ZoneId = Z
         var editing by remember { mutableStateOf<ScheduledSession?>(null) }
         var editingProfile by remember { mutableStateOf<String?>(null) }
         fun go(r: Route) { if (r.tab) lastTab = r; route = r }
+        // A notification asked for a screen (e.g. Reschedule → Schedule).
+        val asked = Resumes.route
+        androidx.compose.runtime.LaunchedEffect(asked) {
+            when (asked) { "schedule" -> go(Route.SCHEDULE); "focus" -> go(Route.FOCUS) }
+            if (asked != null) Resumes.route = null
+        }
         BackHandler(enabled = editing != null || editingProfile != null || !route.tab || route != Route.FOCUS) {
             when {
                 editing != null -> editing = null

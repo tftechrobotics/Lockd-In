@@ -35,7 +35,7 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
         onChange?.invoke(state)
     }
 
-    fun startSession(now: Long, segments: List<Segment>, intention: String?, profileId: String, last: LastChoice) = update { s ->
+    fun startSession(now: Long, segments: List<Segment>, intention: String?, profileId: String, last: LastChoice, occurrenceKey: String? = null) = update { s ->
         val text = intention?.trim()?.take(120)?.takeIf { it.isNotEmpty() }
         s.copy(
             last = last,
@@ -43,7 +43,10 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
                 newId(), now, segments, text, profileId, SessionControls(),
                 rules = s.profiles.firstOrNull { it.id == profileId }?.rules ?: app.lockdin.enforce.AppRules(),
                 commitment = s.commitment,
+                occurrenceKey = occurrenceKey,
             ),
+            recentStarts = (s.recentStarts + now).takeLast(40),
+            lastSession = null,
             recentIntentions = if (text == null) s.recentIntentions else (listOf(text) + s.recentIntentions.filter { it != text }).take(8),
         )
     }
@@ -53,7 +56,18 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
         if (a == null || a.id != sessionId) s else s.copy(active = a.copy(controls = fn(a.controls)))
     }
 
-    fun finish() = update { it.copy(active = null) }
+    /**
+     * Leaves the finished session. `dismissed` = the person tapped Done; otherwise (the recap
+     * timed out) Home keeps a "Last session" card until they dismiss it.
+     */
+    fun finish(dismissed: Boolean = true) = update { it.copy(active = null, lastSession = if (dismissed) null else it.active) }
+
+    fun dismissLastSession() = update { it.copy(lastSession = null) }
+
+    /** Marks planner events / notices as handled. */
+    fun logPlan(ids: Collection<String>) = update { s -> s.copy(planLog = (s.planLog + ids.filter { it !in s.planLog }).takeLast(300)) }
+
+    fun noteNotified(at: Long) = update { s -> s.copy(notifyLog = (s.notifyLog + at).takeLast(40)) }
 
     /** Counts one covered attempt for the session's recap. Ignored if that session isn't running. */
     fun recordBlocked(sessionId: String, key: String) = update { s ->
