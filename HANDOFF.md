@@ -32,6 +32,19 @@ not free trial — Artifact Signing doesn't support trials) and Play wait.
 spike self-test, Kotlin type-check with an R stand-in, VM script lint,
 actionlint).
 
+## Current phase — UI design and prototyping only (R35, 2026-10-31)
+- Review tool: **design preview** (`apps/web/preview.html`, `src/preview/`, `src/demo.ts`). Run `npm run preview:dev`
+  and open `/preview.html`, or `npm run build:preview` → `dist-preview/` (publish with index.html = preview.html,
+  app.html = index.html; see the "Lockd In Preview" artifact). Frames: Windows (desktop layout), Android
+  (browser approximation: `?shell=android`, preview build only), Web. Sample scenes: setup / focusing / break /
+  unlock pending / done; theme; 100/200% text; demo toggles "Blocking verified" and "Devices paired", each
+  labeled DEMO in the UI. Demo code is compiled out of the production build (checked: no traces in `dist/`).
+- Status: Focus is awaiting owner approval. Then Schedule → Profiles → Devices → Settings, one at a time.
+- **Unresolved native issue (deferred):** Android CI `AppTest.configureStartFocusBreakResumeFinish` fails at
+  "Ends at 6:55 PM … is not displayed" (pinned plan line) after choosing 25 min + 5 min breaks; not the keyboard
+  (reordering didn't fix it). Other 14 emulator tests pass and screenshots render. Investigate when native
+  validation resumes.
+
 ## Design pass 4 — "A setup, B timer" applied to Focus (2026-10-31, R34)
 - Owner picked the mix from the two lab directions. Rules: pass-4 block at the top of `docs/design-spec.md`.
 - **Web + Windows layout** (`apps/web/src/ui/FocusPage.tsx`, new `ui/Timer.tsx`, `styles/app.css`):
