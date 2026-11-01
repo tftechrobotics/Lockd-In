@@ -1,11 +1,91 @@
 # Milestones, acceptance criteria and evidence
 
-A milestone is complete only when every criterion has **recorded evidence**
-from the named environment. Compiling, unit tests and screenshots are not
-evidence that restriction works. Numeric thresholds are **targets until
-measured**; record the measured value next to each.
+Replanned 2026-10-31 (R37) when functional development began. See
+`docs/audit-2026-11.md` for the inventory behind it. The earlier M2–M7
+plan is superseded. Its design-system criteria are met by the approved UI
+(R34–R36); its remaining criteria are folded into the milestones below.
 
-## M1 — Feasibility and product contract · **OPEN**
+A milestone is complete only when **every** criterion has **recorded
+evidence** from the named environment. Compiling, unit tests, screenshots
+and emulator runs are not evidence that restriction works on a person's
+device. Numeric thresholds are **targets until measured**; record the
+measured value beside each.
+
+Environments: **E-emu** = CI Android emulator (API 35); **E-phone** =
+physical phone via Play internal testing (owner's S24+ plus at least one
+more); **E-win-ci** = GitHub windows-2025 runner; **E-pc** = Windows 11 PC
+with a signed build; **E-vm** = disposable Windows VM.
+
+## M1 — Reliable single-device focus · **IN PROGRESS**
+
+**Sessions (all platforms)**
+- M1.1 Start now, or start at a set time today. Focus length 1–240 min, break 1–120 min, rounds 1–12. The total length and finish time are shown before starting and match the core within 1 min (unit + UI tests).
+- M1.2 Profiles Study / Writing / Coding / Custom can each be edited and saved per device: Block list or Approved only, plus a list of apps. The session snapshots its rules at start; editing a profile does not change a running session (unit test).
+- M1.3 Commitment level is chosen at start:
+  - Flexible: end immediately.
+  - Delayed: countdown, default 90 s, cancellable.
+  - Locked: no early end; emergency recovery only.
+  - Emergency recovery is always one deliberate action away, ends the session immediately and is recorded separately from an ordinary end (core + UI tests).
+- M1.4 State is persisted after every change. Data from v1 migrates to v2 without loss (migration unit tests with v1 fixtures). Corrupt data falls back safely and never leaves a session stuck restricting (test).
+
+**Android enforcement (E-emu first, then E-phone)**
+- M1.5 During focus, opening a restricted app brings up the Lockd In block screen. The block screen shows the task, the time to the next break, Return to work, and the session-options route.
+  - E-emu: 20/20 trials.
+  - E-phone: ≥ 49/50, detection p95 ≤ 1.5 s.
+- M1.6 Always reachable during any session: phone/dialer, emergency calls, Settings, the launcher, the keyboard and Lockd In (unit test of the decision table + E-emu check of Settings).
+- M1.7 Restrictions lift for a break, return at the next focus period, and lift at the end. A restricted app opens normally ≤ 2 s after each release (E-emu, then E-phone).
+- M1.8 Blocking keeps working after the app UI is swiped away, after the process is killed, after the screen is off for 10 min, and after a reboot mid-session. The service resumes from persisted state and the session still ends on time (E-emu for process kill and reboot; E-phone for all).
+- M1.9 Permission loss (usage access or display-over-apps) is detected within 10 s. Status changes to **Permission needed** and a notification explains how to fix it. The lock never shows closed without verified restriction (E-emu via `appops`).
+- M1.10 Apps are never closed or killed by Lockd In (code review + test that no kill APIs are used).
+
+**Windows enforcement (E-win-ci first, then E-pc / E-vm)**
+- M1.11 A per-user agent runs separately from the window. Closing the window does not end blocking; quitting from the tray asks first.
+- M1.12 During focus, windows of restricted apps are minimized and their audio sessions muted. p95 ≤ 500 ms after the window appears. This is named "minimize and mute", not launch prevention.
+- M1.13 Release restores mute state at breaks and at the end. A crash or reboot recovers audio via the ledger (R1–R5).
+- M1.14 Launch prevention is offered only if the VM go criteria in §F pass and U1/U3 are answered yes. Otherwise the UI states that apps can open and will be minimized.
+
+**Product essentials for M1**
+- M1.15 Onboarding requests each permission with a one-sentence reason, re-checks it on resume, and shows a denied state with a Settings shortcut.
+- M1.16 Signed Windows installer and Play internal-testing build install, update and uninstall cleanly, leaving no policy or service behind. Needs the owner's accounts (audit §5).
+
+**M1 closes when** M1.1–M1.16 have evidence, with M1.5–M1.9 on E-phone and M1.11–M1.13 on E-pc.
+
+## M2 — Connected devices
+- M2.1 Pairing by QR/code between Windows, Android and the web. Devices can be named, removed and revoked; a revoked device can no longer read new schedules (test).
+- M2.2 A session or schedule started on one device reaches each paired device. Each device shows **received** and **activated** separately. Different restrictions per device are honored.
+- M2.3 Per-device status is Protecting / Permission needed / Offline / Unknown / Ready. A device that is silent past its heartbeat expiry shows Unknown within 2 min. It is never shown as Protecting (test).
+- M2.4 Offline devices run schedules they already received. Conflicting edits resolve by the documented rule and are shown, never silently dropped (tests: duplicate, delayed, out-of-order and conflicting messages).
+- M2.5 The web app never shows itself as protecting. A recovery path is documented and tested for "all devices lost" and "browser storage cleared".
+- M2.6 Measured timing skew is reported (target ≤ 2 s with synced clocks).
+
+## M3 — Everyday planning
+- M3.1 Recurring schedules start on their own at the scheduled time:
+  - Android: exact alarm when granted, else within a 10 min window, with that stated in the UI.
+  - Windows: scheduled wake of the agent.
+- M3.2 Reminders: upcoming session, start task, break start and end, and missed session with a reschedule action. Quiet hours, snooze and frequency limits apply. One alert across paired devices.
+- M3.3 Task presets: subject, task, first action, duration, profile and resources, with "Open my study resources" and a short-start option.
+- M3.4 Google Calendar:
+  - Connect and disconnect.
+  - Free/busy only by default; event details only with separate consent.
+  - Suggestions to accept, edit or dismiss; optional creation of accepted sessions.
+  - Correct across time zones, DST, recurrence, cancellations, token expiry and duplicates.
+  - Nothing is created or moved without the user's action.
+
+## M4 — Useful insights
+- M4.1 Opt-in usage analytics stored locally. Every metric is labelled measured, user-reported or estimated. Foreground, idle and timer time are kept separate. Device-hours are kept separate from elapsed time. Gaps in data are shown.
+- M4.2 Session history: completed, interrupted, overridden, emergency.
+- M4.3 Time by subject, task and profile, and blocked-attempt counts.
+- M4.4 Retention control, export and deletion work (tests). No keystrokes, screenshots or contents. No scores.
+
+## M5 — Optional support
+- M5.1 Personalized block-screen messages per app or category.
+- M5.2 Manual question timing.
+- M5.3 Inactivity check-ins. Paper work is a valid answer; a check-in never adds restrictions.
+- M5.4 Location routines: opt-in, arrival reminder first, evaluated on device.
+
+**Later research:** SMS coaching (consent and cost write-up first), tutoring, LMS integrations, iOS.
+
+## F — Feasibility evidence (formerly M1) · **OPEN**, feeds the new M1
 
 ### Evidence tracker
 
@@ -66,53 +146,5 @@ If it fails while accessibility passes, owner decision U8 decides. If both
 fail, NO-GO: redefine the Android promise with the owner. A10 (Advanced
 Protection) results decide what the product may claim for those users.
 
-**M1 closes when** rows 2–5 have device/VM evidence, CI is green,
+**Feasibility closes when** rows 2–5 have device/VM evidence, CI is green,
 ADR-0004 and ADR-0007 are finalized from evidence, and U1 and U3 are answered.
-
-## M2 — Design system and complete workflows · **IN PROGRESS**
-Status 2026-10-29: Cream & Ink approved (R20). Web: tokens, assets and the main
-flow implemented and verified in Chromium (see `docs/design.md`). Windows and
-Android shells wait on U11. Remaining criteria below still apply to every
-platform.
-- Tokens and components for type, spacing, color, borders, elevation, controls, dialogs, notifications and motion. Light and dark designed separately; reduced motion.
-- All 10 brief flows with empty, loading, offline, denied-permission, partially-connected, error and success states.
-- Every screen shows desired, acknowledged and observed state separately.
-- UI copy never claims a restricted app is paused when it may still be running (R3).
-- Verified interactively in both themes:
-  - keyboard order and screen-reader labels;
-  - 200% text scaling;
-  - contrast ≥ WCAG 2.2 AA;
-  - targets ≥ 48 dp / 40 px.
-- May start before M1 closes only for flows that don't depend on the enforcement choice (onboarding shell, scheduling, settings, theme).
-
-## M3 — Windows vertical slice (tested on Windows 11)
-- Installer installs, upgrades and uninstalls cleanly, including the service if U1 = yes, and leaves no policy behind.
-- Pick approved apps; run a real scheduled session with a break; restriction applied during focus and released within 1 s (target) of each boundary.
-- Override, emergency recovery, sleep/resume, sign-out, reboot mid-session, agent crash and service crash each end in a correct, honestly reported state, per the recovery matrix in `enforcement-comparison.md`.
-- Never terminates a real app (R12).
-- Clock-change handling: a wall-clock jump does not shorten a running session.
-
-## M4 — Android vertical slice (≥ 2 physical phones incl. owner's)
-- Permission onboarding verified after each grant and on every resume.
-- Sessions start from the UI and from a schedule with the screen off; breaks release and resume; the end releases.
-- Process death, swipe-away, reboot, permission revocation and battery saver each produce correct enforcement or an immediate, visible `Degraded`.
-
-## M5 — Cross-device coordination
-- Pairing, revocation and key rotation.
-- Per-device status: Protected / NotYetApplied / Degraded / NotEnforcing / Unknown.
-- Offline devices keep executing their schedule.
-- Measured timing skew reported against the target (≤ 2 s with synced clocks).
-- Duplicate, delayed, out-of-order and conflicting messages are tested.
-
-## M6 — Optional calendar
-- Free/busy suggestions that the user can accept, edit or dismiss.
-- Nothing activates from an unaccepted suggestion.
-- Disconnecting deletes calendar data.
-- Manual scheduling is unaffected by Google outages.
-
-## M7 — Release hardening
-- Published OS/architecture matrix from actual runs.
-- Accessibility audit, threat-model review, signing, update verification.
-- Diagnostics with consent and redaction.
-- Privacy disclosures and license review.
-- A statement of exactly what was demonstrated.
