@@ -40,16 +40,9 @@ class FocusAccessibilityService : AccessibilityService() {
             try {
                 val session = Store.get(this@FocusAccessibilityService).state.active
                 val now = System.currentTimeMillis()
-                if (session != null && (session.rules.restrictsApps || session.rules.siteMode == RuleMode.APPROVED_ONLY) &&
+                if (session != null && session.rules.restrictsAnything &&
                     FocusService.evaluate(session, now).restricting && !BlockActivity.showing) {
-                    val root = rootInActiveWindow
-                    val pkg = root?.packageName?.toString()
-                    root?.recycleCompat()
-                    if (pkg != null && pkg != packageName &&
-                        (BlockPolicy.isRestricted(pkg, session.rules, essentials(now)) || unsupportedBrowserBlocked(pkg, session.rules))) {
-                        Log.i(TAG, "safety_net_cover")
-                        cover(pkg, null, null)
-                    }
+                    checkFront(session.rules, "safety_net")
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "check_failed: ${e.javaClass.simpleName}")
@@ -59,6 +52,30 @@ class FocusAccessibilityService : AccessibilityService() {
     }
 
     private val recheck = Runnable { check.run().also { handler.removeCallbacks(check); handler.postDelayed(check, CHECK_MS) } }
+
+    /**
+     * Looks at the app that owns the window in front and covers it if it, or the site it shows,
+     * is restricted. Used by the safety net and shortly after a window event that arrived before
+     * its app was in front (a page opened from a link, for example).
+     */
+    private fun checkFront(rules: AppRules, source: String) {
+        val root = rootInActiveWindow
+        val pkg = root?.packageName?.toString()
+        root?.recycleCompat()
+        if (pkg == null || pkg == packageName) return
+        val now = System.currentTimeMillis()
+        when {
+            BlockPolicy.isRestricted(pkg, rules, essentials(now)) -> { Log.i(TAG, "${source}_cover"); cover(pkg, null, null) }
+            unsupportedBrowserBlocked(pkg, rules) -> { Log.i(TAG, "${source}_cover"); cover(pkg, null, null) }
+            else -> checkAddress(pkg, rules, force = true)
+        }
+    }
+
+    private val frontCheck = Runnable {
+        val session = Store.get(this).state.active ?: return@Runnable
+        if (session.rules.restrictsAnything && FocusService.evaluate(session, System.currentTimeMillis()).restricting && !BlockActivity.showing)
+            checkFront(session.rules, "front_recheck")
+    }
 
     override fun onServiceConnected() {
         handler.removeCallbacks(check)
@@ -96,7 +113,13 @@ class FocusAccessibilityService : AccessibilityService() {
                 // Only act on the app that actually owns the window in front. Panels, pop-ups and
                 // quick-access sheets (e.g. a wallet's swipe-up card on the home screen) also send
                 // this event; covering them made the home screen unusable.
-                if (!ownsActiveWindow(pkg)) return
+                if (!ownsActiveWindow(pkg)) {
+                    // The window may not be in front yet: look again in a moment.
+                    handler.removeCallbacks(frontCheck)
+                    handler.postDelayed(frontCheck, 300)
+                    handler.postDelayed(frontCheck, 900)
+                    return
+                }
                 when {
                     BlockPolicy.isRestricted(pkg, rules, essentials(now)) ->
                         // Event time is on the uptime clock; report the delay to our request.
