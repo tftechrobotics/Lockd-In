@@ -2,6 +2,11 @@ import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const MIN = 60_000;
+const status = (page: import('@playwright/test').Page) => page.locator('.timer-status');
+const numerals = (page: import('@playwright/test').Page) => page.locator('.numerals');
+async function rounds(page: import('@playwright/test').Page) {
+  await page.getByRole('button', { name: 'Change rounds and breaks' }).click();
+}
 
 test.beforeEach(async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-03T18:00:00-06:00') });
@@ -10,66 +15,73 @@ test.beforeEach(async ({ page }) => {
 test('configure → start → focus → break → resume → finish', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Start timer' })).toBeVisible();
-  await page.getByLabel(/^Task/).fill('TAM 212 · Practice problems');
-  await page.getByRole('radio', { name: '25 min' }).click();
+  await page.getByLabel('What are you working on?').fill('TAM 212 · Practice problems');
+  await page.getByRole('radio', { name: '25 minutes' }).click();
+  await rounds(page);
   await page.getByLabel('Breaks').selectOption('5');
   await expect(page.getByLabel('Focus rounds')).toHaveValue('2');
-  await expect(page.locator('.plan')).toContainText('55 min');
-  await expect(page.locator('.plan')).toContainText('2 rounds of 25 min, 5 min breaks');
+  await expect(page.locator('.rounds')).toContainText('2 rounds · 5 min break between');
+  // Wide web: the preview carries the end time.
+  await expect(page.locator('.preview')).toContainText('6:55 PM');
   await page.getByRole('button', { name: 'Start timer' }).click();
 
-  await expect(page.locator('.tag')).toHaveText('Focus · round 1 of 2');
+  await expect(status(page)).toHaveText('Focusing · round 1 of 2');
   await expect(page.getByRole('heading', { name: 'TAM 212 · Practice problems' })).toBeVisible();
   // Timer only: the lock never shows as closed when nothing is restricted.
-  await expect(page.locator('.lock')).toHaveClass(/is-open/);
-  await expect(page.locator('.lock__time')).toHaveText('25:00');
+  await expect(status(page).locator('.minilock path')).toHaveAttribute('d', /V6\.5/);
+  await expect(numerals(page)).toHaveText('25:00');
+  await expect(numerals(page)).toHaveAttribute('role', 'timer');
   await expect(page.locator('.facts')).toContainText('Next break');
 
   await page.clock.fastForward(25 * MIN + 1000);
-  await expect(page.locator('.tag')).toHaveText('Break · round 1 of 2');
+  await expect(status(page)).toHaveText('On a break · round 1 of 2');
+  await expect(numerals(page)).toHaveClass(/numerals--break/);
   await expect(page.locator('.facts')).toContainText('Focus resumes');
 
   await page.clock.fastForward(4 * MIN + 10_000); // 50 s left in the break
   await expect(page.getByText(/resumes in about a minute/)).toBeVisible();
 
   await page.clock.fastForward(60_000);
-  await expect(page.locator('.tag')).toHaveText('Focus · round 2 of 2');
+  await expect(status(page)).toHaveText('Focusing · round 2 of 2');
 
   await page.clock.fastForward(25 * MIN);
-  await expect(page.locator('.tag')).toHaveText('Session complete');
+  await expect(status(page)).toHaveText('Session complete');
+  await expect(numerals(page)).toHaveText('Done');
   await expect(page.locator('.facts')).toContainText('50 min');
   await expect(page.getByText('Finished as planned.', { exact: false })).toBeVisible();
-  await page.getByRole('button', { name: 'Done' }).click();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Start timer' })).toBeVisible();
   // Last choices are remembered.
-  await expect(page.getByRole('radio', { name: '25 min' })).toHaveAttribute('aria-checked', 'true');
-  await expect(page.getByLabel('Breaks')).toHaveValue('5');
+  await expect(page.getByRole('radio', { name: '25 minutes' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.locator('.rounds')).toContainText('2 rounds · 5 min break between');
 });
 
 test('a custom length equal to a preset selects the preset', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('radio', { name: 'Custom' }).click();
+  await page.getByRole('radio', { name: 'Custom minutes' }).click();
   await page.getByLabel('Custom length').fill('60');
-  await expect(page.getByRole('radio', { name: '60 min' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('radio', { name: '60 minutes' })).toHaveAttribute('aria-checked', 'true');
   await page.getByLabel('Custom length').fill('45');
-  await expect(page.getByRole('radio', { name: 'Custom' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('radio', { name: 'Custom minutes' })).toHaveAttribute('aria-checked', 'true');
 });
 
 test('a running session survives a reload', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('radio', { name: 'Custom' }).click();
+  await page.getByRole('radio', { name: 'Custom minutes' }).click();
   await page.getByLabel('Custom length').fill('10');
+  await rounds(page);
   await page.getByLabel('Breaks').selectOption('0');
   await page.getByRole('button', { name: 'Start timer' }).click();
   await page.clock.fastForward(3 * MIN);
   await page.reload();
-  await expect(page.locator('.tag')).toHaveText('Focus');
-  await expect(page.locator('.lock__time')).toHaveText('07:00');
+  await expect(status(page)).toHaveText('Focusing');
+  await expect(numerals(page)).toHaveText('07:00');
 });
 
 test('unlock for this round waits, can be cancelled, then later rounds start as planned', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('radio', { name: '25 min' }).click();
+  await page.getByRole('radio', { name: '25 minutes' }).click();
+  await rounds(page);
   await page.getByLabel('Breaks').selectOption('5');
   await page.getByRole('button', { name: 'Start timer' }).click();
 
@@ -79,25 +91,28 @@ test('unlock for this round waits, can be cancelled, then later rounds start as 
   await expect(page.getByText(/Unlocking in 01:30/)).toBeVisible();
   await page.getByRole('button', { name: 'Cancel unlock' }).click();
   await page.clock.fastForward(2 * MIN);
-  await expect(page.locator('.tag')).toHaveText('Focus · round 1 of 2');
+  await expect(status(page)).toHaveText('Focusing · round 1 of 2');
 
   await page.getByRole('button', { name: 'Need out?' }).click();
   await page.getByRole('button', { name: 'Start unlock' }).click();
   await page.clock.fastForward(91_000);
-  await expect(page.locator('.tag')).toHaveText('Unlocked · round 1 of 2');
+  await expect(status(page)).toHaveText('Unlocked · round 1 of 2');
 
   await page.clock.fastForward(28 * MIN); // ~31.5 min in: through the break into round 2
-  await expect(page.locator('.tag')).toHaveText('Focus · round 2 of 2');
+  await expect(status(page)).toHaveText('Focusing · round 2 of 2');
 });
 
 test('emergency recovery ends immediately and says how it ended', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Start timer' }).click();
+  // End now lives behind "Need out?" so it never competes with the timer.
+  await expect(page.getByRole('button', { name: 'End now' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Need out?' }).click();
   await page.getByRole('button', { name: 'End now' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Keep going' }).last()).toBeFocused();
   await page.getByRole('button', { name: 'End session now' }).click();
-  await expect(page.locator('.tag')).toHaveText('Session complete');
+  await expect(status(page)).toHaveText('Session complete');
   await expect(page.getByText('Ended with emergency recovery.', { exact: false })).toBeVisible();
 });
 
@@ -160,7 +175,7 @@ test('schedule: days have full accessible names; edit and delete', async ({ page
 
 test('invalid custom length is explained, nothing starts', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('radio', { name: 'Custom' }).click();
+  await page.getByRole('radio', { name: 'Custom minutes' }).click();
   await page.getByLabel('Custom length').fill('500');
   await page.getByRole('button', { name: 'Start timer' }).click();
   await expect(page.getByRole('alert')).toContainText('Focus periods are 1–240 minutes');
@@ -206,7 +221,7 @@ test('keyboard: skip link, then reach and start a session without a mouse', asyn
   }
   await expect(page.getByRole('button', { name: 'Start timer' })).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page.locator('.tag')).toHaveText(/^Focus/);
+  await expect(status(page)).toHaveText(/^Focusing/);
 });
 
 for (const w of [320, 390]) {
@@ -220,5 +235,11 @@ for (const w of [320, 390]) {
         expect(overflow, `${route} at ${size}`).toBeLessThanOrEqual(0);
       }
     }
+    // The running session too: the numerals must fit at 200% text.
+    await page.goto('/#/focus');
+    await page.getByRole('button', { name: 'Start timer' }).click();
+    await page.addStyleTag({ content: 'html { font-size: 200% !important; }' });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow, 'running at 200%').toBeLessThanOrEqual(0);
   });
 }
