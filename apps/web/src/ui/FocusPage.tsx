@@ -30,13 +30,13 @@ export function useNow(active: boolean): number {
 
 export function FocusPage() {
   const active = useStore((s) => s.active);
-  // Phone: when nothing is running, Focus opens on the lock with the time and the next planned
+  // When nothing is running, Focus opens on the lock with the time and the next planned
   // session; the composer opens on request.
   const [composing, setComposing] = useState(false);
   useEffect(() => { if (active) setComposing(false); }, [active]);
   if (active) return <SessionView session={active} />;
-  if (layout === 'android' && !composing) return <Home onNew={() => setComposing(true)} />;
-  return <Setup onCancel={layout === 'android' ? () => setComposing(false) : undefined} />;
+  if (!composing) return <Home onNew={() => setComposing(true)} />;
+  return <Setup onCancel={() => setComposing(false)} />;
 }
 
 /* ------------------------------- Home (phone, idle) ------------------------------- */
@@ -69,6 +69,7 @@ function Home({ onNew }: { onNew: () => void }) {
       <div className="home__go">
         <button type="button" className="button button--primary button--start" onClick={onNew}>New session</button>
       </div>
+      {layout !== 'android' && <footer className="focus__foot home__foot"><DeviceStrip /></footer>}
     </div>
   );
 }
@@ -87,6 +88,9 @@ export function useCanBlock(): boolean {
 /* ------------------------------- Setup ------------------------------- */
 
 function Setup({ onCancel }: { onCancel?: () => void }) {
+  // Opened from the idle lock: start where the questions start.
+  const intentRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (onCancel) intentRef.current?.focus(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const last = useStore((s) => s.last);
   const profiles = useStore((s) => s.profiles);
   const recent = useStore((s) => s.recentIntentions);
@@ -140,7 +144,7 @@ function Setup({ onCancel }: { onCancel?: () => void }) {
           )}
           <div className="q">
             <label className="q__label" htmlFor={ids.intent}>What are you working on?</label>
-            <input id={ids.intent} className="bigfield" value={intention} maxLength={120} list={ids.list}
+            <input id={ids.intent} ref={intentRef} className="bigfield" value={intention} maxLength={120} list={ids.list}
               placeholder="Name it, or leave it blank" autoComplete="off" onChange={(e) => setIntention(e.target.value)} />
             <datalist id={ids.list}>{recent.map((r) => <option key={r.text} value={r.text} />)}</datalist>
           </div>

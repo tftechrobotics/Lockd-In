@@ -28,6 +28,7 @@ test.beforeEach(async ({ page }) => {
 test('desktop layout: switch + menu, no masthead, honest PC status', async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 860 });
   await page.goto(D);
+  await page.getByRole('button', { name: 'New session' }).click();
   await expect(page.getByRole('button', { name: 'Start timer' })).toBeVisible();
   await expect(page.locator('.masthead')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Focus' })).toHaveAttribute('aria-current', 'page');
@@ -56,6 +57,7 @@ test('desktop menu works with the keyboard', async ({ page }) => {
 
 test('desktop: running session says blocking is not set up on this PC', async ({ page }) => {
   await page.goto(D);
+  await page.getByRole('button', { name: 'New session' }).click();
   await page.getByRole('button', { name: 'Start timer' }).click();
   await expect(page.locator('.protection')).toContainText('Apps and websites stay available on this PC');
 });

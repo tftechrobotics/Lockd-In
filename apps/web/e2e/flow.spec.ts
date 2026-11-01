@@ -5,6 +5,10 @@ const MIN = 60_000;
 const status = (page: import('@playwright/test').Page) => page.locator('.timer-status');
 const numerals = (page: import('@playwright/test').Page) => page.locator('.running .clock-lock__time');
 const lock = (page: import('@playwright/test').Page) => page.locator('.running .clock-lock');
+/** Focus opens on the idle lock; the composer is one tap away. */
+async function newSession(page: import('@playwright/test').Page) {
+  await page.getByRole('button', { name: 'New session' }).click();
+}
 async function rounds(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: 'Change rounds and breaks' }).click();
 }
@@ -15,6 +19,7 @@ test.beforeEach(async ({ page }) => {
 
 test('configure → start → focus → break → resume → finish', async ({ page }) => {
   await page.goto('/');
+  await newSession(page);
   await expect(page.getByRole('button', { name: 'Start timer' })).toBeVisible();
   await page.getByLabel('What are you working on?').fill('TAM 212 · Practice problems');
   await page.getByRole('radio', { name: '25 minutes' }).click();
@@ -62,14 +67,27 @@ test('configure → start → focus → break → resume → finish', async ({ p
   await expect(page.locator('.facts')).toContainText('50 min');
   await expect(page.getByText('Finished as planned.', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: 'Done', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Start timer' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New session' })).toBeVisible();
+  await newSession(page);
   // Last choices are remembered.
   await expect(page.getByRole('radio', { name: '25 minutes' })).toHaveAttribute('aria-checked', 'true');
   await expect(page.locator('.rounds')).toContainText('2 rounds · 5 min break between');
 });
 
+test('idle Focus shows the lock with the time and the next planned session', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.home .clock-lock__time')).toHaveText('6:00');
+  await expect(page.locator('.home .clock-lock')).not.toHaveClass(/is-locked/);
+  await expect(page.locator('.home__next')).toContainText('Nothing planned');
+  await newSession(page);
+  await expect(page.getByRole('button', { name: 'Start timer' })).toBeVisible();
+  await page.getByRole('button', { name: 'Back' }).click();
+  await expect(page.getByRole('button', { name: 'New session' })).toBeVisible();
+});
+
 test('a custom length equal to a preset selects the preset', async ({ page }) => {
   await page.goto('/');
+  await newSession(page);
   await page.getByRole('radio', { name: 'Custom minutes' }).click();
   await page.getByLabel('Custom length').fill('60');
   await expect(page.getByRole('radio', { name: '60 minutes' })).toHaveAttribute('aria-checked', 'true');
@@ -79,6 +97,7 @@ test('a custom length equal to a preset selects the preset', async ({ page }) =>
 
 test('a running session survives a reload', async ({ page }) => {
   await page.goto('/');
+  await newSession(page);
   await page.getByRole('radio', { name: 'Custom minutes' }).click();
   await page.getByLabel('Custom length').fill('10');
   await rounds(page);
@@ -92,6 +111,7 @@ test('a running session survives a reload', async ({ page }) => {
 
 test('unlock for this round waits, can be cancelled, then later rounds start as planned', async ({ page }) => {
   await page.goto('/');
+  await newSession(page);
   await page.getByRole('radio', { name: '25 minutes' }).click();
   await rounds(page);
   await page.getByLabel('Breaks').selectOption('5');
@@ -116,6 +136,7 @@ test('unlock for this round waits, can be cancelled, then later rounds start as 
 
 test('emergency recovery ends immediately and says how it ended', async ({ page }) => {
   await page.goto('/');
+  await newSession(page);
   await page.getByRole('button', { name: 'Start timer' }).click();
   // End now lives behind "Session options" so it never competes with the timer.
   await expect(page.getByRole('button', { name: 'End now' })).toHaveCount(0);
@@ -130,6 +151,7 @@ test('emergency recovery ends immediately and says how it ended', async ({ page 
 
 test('the web app never claims to block anything and offers a path to set it up', async ({ page }) => {
   await page.goto('/');
+  await newSession(page);
   await expect(page.locator('.protection')).toContainText('Timer only');
   await page.getByRole('button', { name: 'Start timer' }).click();
   await expect(page.locator('.protection')).toContainText('apps and websites stay available');
@@ -162,13 +184,13 @@ test('schedule: empty state, add weekly and one-time, overlap error, switch off,
   await expect(page.getByRole('heading', { name: 'One-time' })).toBeVisible();
 
   await page.goto('/#/focus');
-  await expect(page.locator('.next')).toContainText('Physics review');
+  await expect(page.locator('.home__next')).toContainText('Physics review');
 
   await page.goto('/#/schedule');
   await page.getByRole('switch', { name: 'Physics review on' }).click();
   await expect(page.getByRole('switch', { name: 'Physics review on' })).toHaveAttribute('aria-checked', 'false');
   await page.goto('/#/focus');
-  await expect(page.locator('.next')).not.toContainText('Physics review');
+  await expect(page.locator('.home__next')).not.toContainText('Physics review');
 });
 
 test('schedule: days have full accessible names; edit and delete', async ({ page }) => {
@@ -187,6 +209,7 @@ test('schedule: days have full accessible names; edit and delete', async ({ page
 
 test('invalid custom length is explained, nothing starts', async ({ page }) => {
   await page.goto('/');
+  await newSession(page);
   await page.getByRole('radio', { name: 'Custom minutes' }).click();
   await page.getByLabel('Custom length').fill('500');
   await page.getByRole('button', { name: 'Start timer' }).click();
@@ -215,6 +238,7 @@ for (const scheme of ['light', 'dark'] as const) {
   test(`axe: active session, ${scheme}`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
     await page.goto('/');
+    await newSession(page);
     await page.getByRole('button', { name: 'Start timer' }).click();
     await page.getByRole('button', { name: 'Session options' }).click();
     const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
@@ -224,14 +248,21 @@ for (const scheme of ['light', 'dark'] as const) {
 
 test('keyboard: skip link, then reach and start a session without a mouse', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Start timer' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New session' })).toBeVisible();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused();
-  for (let i = 0; i < 30; i++) {
-    await page.keyboard.press('Tab');
-    if (await page.getByRole('button', { name: 'Start timer' }).evaluate((el) => el === document.activeElement)) break;
-  }
-  await expect(page.getByRole('button', { name: 'Start timer' })).toBeFocused();
+  const tabTo = async (name: string) => {
+    for (let i = 0; i < 30; i++) {
+      await page.keyboard.press('Tab');
+      if (await page.getByRole('button', { name }).evaluate((el) => el === document.activeElement)) break;
+    }
+    await expect(page.getByRole('button', { name })).toBeFocused();
+  };
+  await tabTo('New session');
+  await page.keyboard.press('Enter');
+  // The composer opens with focus on its first question.
+  await expect(page.getByLabel('What are you working on?')).toBeFocused();
+  await tabTo('Start timer');
   await page.keyboard.press('Enter');
   await expect(status(page)).toHaveText(/^Focusing/);
 });
@@ -249,6 +280,7 @@ for (const w of [320, 390]) {
     }
     // The running session too: the numerals must fit at 200% text.
     await page.goto('/#/focus');
+    await newSession(page);
     await page.getByRole('button', { name: 'Start timer' }).click();
     await page.addStyleTag({ content: 'html { font-size: 200% !important; }' });
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

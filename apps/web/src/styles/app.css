@@ -532,3 +532,11 @@ select.input { appearance: none; padding-right: 36px; cursor: pointer;
 .composer__back { align-self: flex-start; gap: 4px; padding: 0 6px 0 0; min-height: 40px; text-decoration: none; color: var(--ink-muted); font-weight: 600; }
 .composer__back svg { transform: rotate(180deg); }
 .focus--home .clock-lock__time { fill: var(--ink); }
+/* Home on the computer: centred, with the action under the next session rather than pinned. */
+.focus--web.focus--home, .focus--desktop.focus--home { align-items: center; }
+.focus--web .home__go, .focus--desktop .home__go { position: static; margin: 8px 0 0; padding: 0; border: 0; background: none; width: min(320px, 100%); }
+.focus--web .home { padding-top: clamp(16px, 6vh, 64px); }
+.focus--desktop .home { padding-top: 8px; gap: 14px; }
+.focus--web .home .clock-lock { width: clamp(220px, 24vw, 280px); }
+.home__foot { width: 100%; max-width: 640px; align-items: center; }
+.home__foot .devices { justify-content: center; }

@@ -39,6 +39,9 @@ actionlint).
   (browser approximation: `?shell=android`, preview build only), Web. Sample scenes: setup / focusing / break /
   unlock pending / done; theme; 100/200% text; demo toggles "Blocking verified" and "Devices paired", each
   labeled DEMO in the UI. Demo code is compiled out of the production build (checked: no traces in `dist/`).
+- Idle Focus (all layouts, 2026-10-31): opens on the lock showing the time of day and the next planned
+  session; "New session" opens the composer (focus lands on its first question; Back returns). Phone running
+  and recap views show the lock plus one line, with details behind a disclosure.
 - Status: owner approved the circular lock direction (R36); it is in the web/Windows/Android previews with a
   "Timer & wordmark" sheet. Next: owner sign-off on Focus, then Schedule → Profiles → Devices → Settings.
 - Not yet carried to native (deferred to the native batch): Android `wordmark.xml`/`lock_mark.xml`
