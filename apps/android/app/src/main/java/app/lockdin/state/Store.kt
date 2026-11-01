@@ -55,6 +55,13 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
 
     fun finish() = update { it.copy(active = null) }
 
+    /** Counts one covered attempt for the session's recap. Ignored if that session isn't running. */
+    fun recordBlocked(sessionId: String, key: String) = update { s ->
+        val a = s.active
+        if (a == null || a.id != sessionId || (key !in a.blocked && a.blocked.size >= 100)) s
+        else s.copy(active = a.copy(blocked = a.blocked + (key to ((a.blocked[key] ?: 0) + 1))))
+    }
+
     fun clearAll() = update { AppState() }
 
     companion object {

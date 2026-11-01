@@ -155,5 +155,15 @@ class EnforcementRulesTest {
         assertEquals(setOf("youtube.com"), StateCodec.decode(raw).profiles.single().rules.sites)
     }
 
+    @Test fun blockedAttemptsAreCountedForTheRunningSessionOnly() {
+        val store = Store(AppState()) {}
+        store.startSession(0, Session.roundsPlan(1, 25, 5), null, "study", LastChoice(25, 5, 1, "study"))
+        val id = assertNotNullAnd(store.state.active).id
+        store.recordBlocked(id, "com.video.app"); store.recordBlocked(id, "com.video.app"); store.recordBlocked(id, "site:youtube.com")
+        store.recordBlocked("another-session", "com.video.app")
+        assertEquals(mapOf("com.video.app" to 2, "site:youtube.com" to 1), store.state.active!!.blocked)
+        assertEquals(store.state, StateCodec.decode(StateCodec.encode(store.state)))
+    }
+
     private fun <T> assertNotNullAnd(v: T?): T { assertNotNull(v); return v!! }
 }

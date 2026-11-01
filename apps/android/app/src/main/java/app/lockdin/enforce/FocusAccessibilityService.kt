@@ -96,6 +96,7 @@ class FocusAccessibilityService : AccessibilityService() {
         lastCover = key to t
         try {
             startActivity(BlockActivity.intent(this, pkg, site))
+            Store.get(this).state.active?.let { Store.get(this).recordBlocked(it.id, if (site != null) "site:$site" else pkg) }
             Log.i(TAG, "cover_requested source=a11y kind=${if (site == null) "app" else "site"} detect_ms=${latencyMs ?: -1}")
         } catch (e: Exception) {
             Log.w(TAG, "cover_failed: ${e.javaClass.simpleName}")

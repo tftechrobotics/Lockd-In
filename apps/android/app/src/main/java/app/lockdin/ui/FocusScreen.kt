@@ -657,40 +657,73 @@ private fun Recap(store: Store, session: ActiveSession, snap: Snapshot, clock: A
         add("Time" to "${Fmt.clock(session.start, zone)}–${Fmt.clock(endedAt, zone)}")
         store.state.profiles.firstOrNull { it.id == session.profileId }?.let { add("Profile" to it.name) }
     }
-    var more by rememberSaveable { mutableStateOf(false) }
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Dim.gutter).padding(top = Dim.s4, bottom = Dim.s6),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(session.intention ?: "Focus session", style = TimerType.task, color = c.ink, textAlign = TextAlign.Center,
-            modifier = Modifier.semantics { heading() })
-        Spacer(Modifier.height(Dim.s1))
-        Text("Session complete", style = TimerType.status, color = c.inkMuted)
-        Spacer(Modifier.height(Dim.s4))
-        ClockLock(TimerState.DONE, 0, 1, locked = false, label = "Session complete", caption = "complete", width = 220.dp)
-        Spacer(Modifier.height(Dim.s4))
-        Text(
-            buildAnnotatedString {
-                append("Focused ")
-                withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = c.ink)) { append("$focusedMin min") }
-            },
-            style = UiType.body, color = c.inkMuted,
-        )
-        Spacer(Modifier.height(Dim.s3))
-        MoreToggle("Summary and options", more) { more = !more }
-        if (more) {
-            Column(Modifier.fillMaxWidth().padding(top = Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s4)) {
-                SessionRail(occ.phases, endedAt, zone)
-                FactList(facts)
-                Column(verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
-                    Text(how, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
-                    if (snap.status == SessionStatus.COMPLETED) message(store.state.tone, Moment.DONE)?.let { Text(it, style = UiType.body, color = c.inkMuted) }
-                }
-                MainButton("Same again", onClick = {
-                    store.startSession(clock.now(), session.segments, session.intention, session.profileId, store.state.last)
-                })
-                SecondaryButton("Done", { store.finish() }, modifier = Modifier.fillMaxWidth())
-            }
+    val focusPhases = occ.phases.filter { it.kind == PhaseKind.FOCUS }
+    val roundsDone = focusPhases.count { it.end <= endedAt }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    // Blocked attempts, most frequent first, with readable names.
+    val blocked = remember(session.blocked) {
+        session.blocked.entries.sortedByDescending { it.value }.map { (k, n) ->
+            (if (k.startsWith("site:")) k.removePrefix("site:") else app.lockdin.enforce.InstalledApps.label(ctx, k)) to n
         }
     }
+    val totalBlocked = blocked.sumOf { it.second }
+    // Back to the idle lock 30 seconds after the recap appears, unless the person moves on first.
+    val shownAt = remember(session.id) { clock.now() }
+    val now = rememberNow(clock, true)
+    val left = ((AUTO_HOME_MS - (now - shownAt)) / 1000).coerceAtLeast(0)
+    LaunchedEffect(left) { if (left == 0L) store.finish() }
+
+    WithActionBar(
+        content = {
+            Column(Modifier.fillMaxWidth().padding(top = Dim.s3), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(session.intention ?: "Focus session", style = TimerType.task, color = c.ink, textAlign = TextAlign.Center,
+                    modifier = Modifier.semantics { heading() })
+                Spacer(Modifier.height(Dim.s1))
+                Text("Session complete", style = TimerType.status, color = c.inkMuted)
+                Spacer(Modifier.height(Dim.s4))
+                ClockLock(TimerState.DONE, 0, 1, locked = false, label = "Session complete", caption = "complete", width = 150.dp)
+                Spacer(Modifier.height(Dim.s3))
+                Text(
+                    buildAnnotatedString {
+                        append("Focused ")
+                        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = c.ink)) { append("$focusedMin min") }
+                    },
+                    style = UiType.body, color = c.inkMuted,
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+                SectionLabel("Blocked during this session")
+                when {
+                    !session.rules.restrictsAnything -> Text("Timer only: nothing was blocked on this phone.", style = UiType.body, color = c.inkMuted)
+                    blocked.isEmpty() -> Text("You didn’t open any blocked apps or sites.", style = UiType.body, color = c.inkMuted)
+                    else -> {
+                        FactList(blocked.take(8).map { (name, n) -> name to "$n ${if (n == 1) "time" else "times"}" })
+                        if (blocked.size > 8) Text("and ${blocked.size - 8} more", style = UiType.caption, color = c.inkMuted)
+                        Text("The block screen came up $totalBlocked ${if (totalBlocked == 1) "time" else "times"} in all.",
+                            style = UiType.caption, color = c.inkMuted)
+                    }
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+                SectionLabel("Activity")
+                SessionRail(occ.phases, endedAt, zone)
+                FactList(buildList {
+                    add("Time" to "${Fmt.clock(session.start, zone)}–${Fmt.clock(endedAt, zone)}")
+                    add("Focus rounds" to "$roundsDone of ${focusPhases.size}")
+                    store.state.profiles.firstOrNull { it.id == session.profileId }?.let { add("Profile" to it.name) }
+                })
+                Text(how, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
+                if (snap.status == SessionStatus.COMPLETED) message(store.state.tone, Moment.DONE)?.let { Text(it, style = UiType.body, color = c.inkMuted) }
+            }
+        },
+        actions = {
+            Text("Back to home in $left s", style = UiType.caption, color = c.inkMuted)
+            MainButton("Done", { store.finish() })
+            SecondaryButton("Same again", {
+                store.startSession(clock.now(), session.segments, session.intention, session.profileId, store.state.last)
+            }, modifier = Modifier.fillMaxWidth())
+        },
+    )
 }
+
+private const val AUTO_HOME_MS = 30_000L

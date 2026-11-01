@@ -70,7 +70,8 @@ class AppTest {
     }
 
     private fun openDetails() = rule.onNodeWithText("Details and options").performScrollTo().performClick()
-    private fun openSummary() = rule.onNodeWithText("Summary and options").performScrollTo().performClick()
+    /** The recap shows its summary directly now; kept as a no-op step for readability. */
+    private fun openSummary() = rule.waitForIdle()
 
     /** Menus open in a popup; wait until the item exists before tapping it. */
     private fun pickMenuItem(text: String) {
@@ -128,7 +129,9 @@ class AppTest {
         rule.onNodeWithText("Focused 50 min").assertIsDisplayed()
         openSummary()
         rule.onNodeWithText("Finished as planned.").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("Done").performScrollTo().performClick()
+        rule.onNodeWithText("You didn’t open any blocked apps or sites.").assertDoesNotExist()
+        rule.onNodeWithText("Timer only: nothing was blocked on this phone.").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Done").performClick()
         // Back to the idle lock.
         rule.onNodeWithText("New session").assertExists()
     }
@@ -307,8 +310,6 @@ class AppTest {
         rule.onNodeWithText("Start timer").performClick()
         clock.advanceMinutes(120); tick(store)
         shot("13-recap")
-        openSummary()
-        shot("14-recap-summary")
     }
     @Test fun screenshotSchedule() {
         launch()
@@ -330,6 +331,21 @@ class AppTest {
         rule.onNodeWithText("Start timer").assertExists()
         rule.onNodeWithText("Back").performClick()
         rule.onNodeWithText("New session").assertExists()
+    }
+    @Test fun recapListsBlockedAttemptsAndReturnsHomeAfter30s() {
+        val rules = app.lockdin.enforce.AppRules(sites = setOf("youtube.com"))
+        val s0 = AppState()
+        val store = launch(s0.copy(profiles = s0.profiles.map { if (it.id == "study") it.copy(rules = rules) else it }))
+        rule.onNodeWithText("Start timer").performClick()
+        val id = store.state.active!!.id
+        rule.runOnIdle { repeat(3) { store.recordBlocked(id, "site:youtube.com") } }
+        clock.advanceMinutes(41); tick(store)
+        rule.onNodeWithText("Blocked during this session").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("youtube.com").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("3 times").assertExists()
+        rule.onNodeWithText("Back to home in 30 s").assertExists()
+        clock.advanceMinutes(1); tick(store)
+        rule.onNodeWithText("New session").assertIsDisplayed()
     }
     @Test fun screenshotHome() { launch(home = true); shot("00-home-light") }
     @Test fun screenshotHomeDark() { launch(AppState(theme = ThemeChoice.DARK), dark = true, home = true); shot("00-home-dark") }

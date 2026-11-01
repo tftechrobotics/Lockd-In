@@ -203,6 +203,7 @@ class FocusService : Service() {
         lastCoverElapsed = t
         try {
             startActivity(BlockActivity.intent(this, pkg))
+            Store.get(this).state.active?.let { Store.get(this).recordBlocked(it.id, pkg) }
             // Time from the app coming to the front (as Android recorded it) to our request.
             Log.i(TAG, "cover_requested detect_ms=${System.currentTimeMillis() - currentTopAt}")
         } catch (e: Exception) {

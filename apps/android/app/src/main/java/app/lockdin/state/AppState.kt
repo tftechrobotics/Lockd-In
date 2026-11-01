@@ -37,6 +37,11 @@ data class ActiveSession(
     /** The profile's rules when the session started: editing a profile never changes a running session. */
     val rules: AppRules = AppRules(),
     val commitment: Commitment = Commitment.DELAYED,
+    /**
+     * Blocked attempts during this session, kept on this phone only for the recap: app package
+     * names, or "site:<domain>" for websites, with how many times each was covered.
+     */
+    val blocked: Map<String, Int> = emptyMap(),
 )
 
 data class AppState(
@@ -87,6 +92,7 @@ object StateCodec {
                 .put("segments", JSONArray(a.segments.map { JSONObject().put("kind", it.kind.name).put("minutes", it.minutes) }))
                 .put("intention", a.intention ?: JSONObject.NULL).put("profileId", a.profileId)
                 .put("rules", rulesJson(a.rules)).put("commitment", a.commitment.name)
+                .put("blocked", JSONObject().apply { a.blocked.forEach { (k, v) -> put(k, v) } })
                 .put("emergencyRecoveryAt", a.controls.emergencyRecoveryAt ?: JSONObject.NULL)
                 .put("overrides", JSONArray(a.controls.overrides.map {
                     JSONObject().put("id", it.id).put("scope", it.scope.name).put("phaseIndex", it.phaseIndex)
@@ -157,10 +163,18 @@ object StateCodec {
             SessionControls(overrides, if (a.isNull("emergencyRecoveryAt")) null else a.getLong("emergencyRecoveryAt")),
             rulesOf(a.optJSONObject("rules")),
             enumOr(a.optString("commitment"), Commitment.DELAYED),
+            a.optJSONObject("blocked")?.let { o ->
+                o.keys().asSequence().take(MAX_BLOCKED_KEYS)
+                    .filter { it.length <= 260 }
+                    .associateWith { o.optInt(it, 0).coerceIn(0, 100_000) }
+                    .filterValues { it > 0 }
+            } ?: emptyMap(),
         )
     } catch (e: Exception) {
         null
     }
+
+    private const val MAX_BLOCKED_KEYS = 100
 
     private fun rulesJson(r: AppRules): JSONObject =
         JSONObject().put("mode", r.mode.name).put("packages", JSONArray(r.packages.sorted())).put("sites", JSONArray(r.sites.sorted()))
