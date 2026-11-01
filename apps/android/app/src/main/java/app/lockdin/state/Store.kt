@@ -26,16 +26,24 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
     var state by mutableStateOf(initial)
         private set
 
+    /** Called after every change (main thread). The app uses it to start the blocking service. */
+    var onChange: ((AppState) -> Unit)? = null
+
     fun update(fn: (AppState) -> AppState) {
         state = fn(state)
         persist(StateCodec.encode(state))
+        onChange?.invoke(state)
     }
 
     fun startSession(now: Long, segments: List<Segment>, intention: String?, profileId: String, last: LastChoice) = update { s ->
         val text = intention?.trim()?.take(120)?.takeIf { it.isNotEmpty() }
         s.copy(
             last = last,
-            active = ActiveSession(newId(), now, segments, text, profileId, SessionControls()),
+            active = ActiveSession(
+                newId(), now, segments, text, profileId, SessionControls(),
+                rules = s.profiles.firstOrNull { it.id == profileId }?.rules ?: app.lockdin.enforce.AppRules(),
+                commitment = s.commitment,
+            ),
             recentIntentions = if (text == null) s.recentIntentions else (listOf(text) + s.recentIntentions.filter { it != text }).take(8),
         )
     }
@@ -51,12 +59,24 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
 
     companion object {
         private const val PREFS = "lockdin"
-        private const val KEY = "state.v1"
+        private const val KEY_V1 = "state.v1"
+        private const val KEY_V2 = "state.v2"
 
-        fun open(context: Context): Store {
-            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            return Store(StateCodec.decode(prefs.getString(KEY, null))) { prefs.edit().putString(KEY, it).apply() }
+        @Volatile private var shared: Store? = null
+
+        /**
+         * The one store for this process, shared by the UI and the blocking service, so a change
+         * in either is seen by the other at once. Writes are committed synchronously: a session
+         * must survive the process being killed right after it starts. Main thread only.
+         */
+        fun get(context: Context): Store = shared ?: synchronized(this) {
+            shared ?: run {
+                val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                val raw = prefs.getString(KEY_V2, null) ?: prefs.getString(KEY_V1, null)
+                Store(StateCodec.decode(raw)) { prefs.edit().putString(KEY_V2, it).commit() }.also { shared = it }
+            }
         }
+
 
         fun newId(): String = UUID.randomUUID().toString()
     }

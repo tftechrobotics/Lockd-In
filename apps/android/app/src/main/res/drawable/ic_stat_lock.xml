@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon: the lock mark as a single white silhouette. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M12,2a5,5 0,0 0,-5,5v3.2a7,7 0,1 0,10,0V7a5,5 0,0 0,-5,-5zM9.2,7a2.8,2.8 0,0 1,5.6,0v1.8a7,7 0,0 0,-5.6,0zM12,12.2a4,4 0,1 1,0,8a4,4 0,1 1,0,-8z" />
+</vector>

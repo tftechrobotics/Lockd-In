@@ -35,7 +35,9 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.lockdin.enforce.Commitment
 import app.lockdin.state.Profile
+import androidx.compose.foundation.clickable
 import app.lockdin.state.Store
 import app.lockdin.state.ThemeChoice
 import app.lockdin.state.Tone
@@ -52,28 +54,29 @@ fun ScrollScreen(content: @Composable () -> Unit) {
 // ---------------- Profiles ----------------
 
 @Composable
-fun ProfilesScreen(store: Store) {
+fun ProfilesScreen(store: Store, onEdit: (Profile) -> Unit = {}) {
     val c = LocalColors.current
     var name by rememberSaveable { mutableStateOf("") }
     ScrollScreen {
         Column(verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
             ScreenTitle("Profiles")
-            Text("Apps that stay available during focus. Each device keeps its own list.", style = UiType.caption, color = c.inkMuted)
+            Text("Which apps are blocked during focus. Each device keeps its own list; this is this phone’s.", style = UiType.caption, color = c.inkMuted)
         }
         SettingsGroup {
             store.state.profiles.forEachIndexed { i, p ->
                 if (i > 0) GroupDivider()
-                Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = Dim.s4, vertical = Dim.s3), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable(role = Role.Button, onClickLabel = "Choose apps") { onEdit(p) }
+                    .padding(horizontal = Dim.s4, vertical = Dim.s3), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}) {
                         Text(p.name, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
                         Text(p.description, style = UiType.caption, color = c.inkMuted)
-                        Text("No apps chosen on this phone yet", style = UiType.caption, color = c.inkMuted)
+                        Text(rulesSummary(p.rules), style = UiType.caption, color = c.ink)
                     }
                     if (!p.builtIn) TextAction("Delete", { store.update { s -> s.copy(profiles = s.profiles.filter { it.id != p.id }) } }, danger = true)
                 }
             }
         }
-        Text("Choosing apps arrives with blocking on this phone. Until then, profiles name what you plan to use.", style = UiType.caption, color = c.inkMuted)
+        Text("Tap a profile to choose its apps. Phone, Settings, your keyboard and Lockd In are never blocked.", style = UiType.caption, color = c.inkMuted)
         Column(verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
             SectionLabel("New profile")
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s2)) {
@@ -99,8 +102,12 @@ fun DevicesScreen() {
         Column {
             SectionLabel("This phone")
             SettingsGroup {
-                SettingRow("Blocking", "Off", icon = LIcon.Phone, supporting = "Not in this version yet. The timer and schedule work; apps stay available.")
+                SettingRow("Blocking", phoneBlockingValue(), icon = LIcon.Phone, supporting = "Covers blocked apps with a block screen during focus. Apps aren’t closed.", chevron = null)
             }
+        }
+        Column {
+            SectionLabel("Set up blocking")
+            BlockingSetup()
         }
         Column {
             SectionLabel("Other devices")
@@ -110,8 +117,6 @@ fun DevicesScreen() {
                 SettingRow("Browser", "Not paired", icon = LIcon.Devices, supporting = "Plans and times sessions; can’t restrict apps")
             }
         }
-        Text("When blocking is available, the Android app covers apps outside your profile with a block screen during focus. Nothing is closed or deleted.",
-            style = UiType.caption, color = c.inkMuted)
     }
 }
 
@@ -141,6 +146,23 @@ fun SettingsScreen(store: Store) {
             Spacer(Modifier.height(Dim.s2))
             Text(message(store.state.tone, Moment.BREAK_ENDING, "TAM 212")?.let { "Example: “$it”" } ?: "No messages during sessions.", style = UiType.caption, color = c.inkMuted,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+        }
+        Column {
+            SectionLabel("Ending a session early")
+            SettingsGroup {
+                Column(Modifier.selectableGroup()) {
+                    listOf(
+                        Commitment.FLEXIBLE to "Flexible: unlock right away",
+                        Commitment.DELAYED to "Delayed: a ${Commitment.DELAYED.overrideDelaySeconds}-second countdown first",
+                        Commitment.LOCKED to "Locked: no unlocking",
+                    ).forEachIndexed { i, (v, l) ->
+                        if (i > 0) GroupDivider()
+                        RadioRow(l, store.state.commitment == v) { store.update { it.copy(commitment = v) } }
+                    }
+                }
+            }
+            Spacer(Modifier.height(Dim.s2))
+            Text("Applies to new sessions. Emergency recovery always ends a session immediately, at every level.", style = UiType.caption, color = c.inkMuted)
         }
         Column {
             SectionLabel("Data")

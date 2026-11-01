@@ -77,14 +77,12 @@ import app.lockdin.state.AppClock
 import app.lockdin.state.LastChoice
 import app.lockdin.state.Store
 import kotlinx.coroutines.delay
+import app.lockdin.enforce.AppRules
+import app.lockdin.enforce.EnforcerStatus
+import app.lockdin.enforce.FocusService
+import app.lockdin.enforce.Protection
 import java.time.ZoneId
 
-/**
- * Whether this build can restrict apps on this phone. False until the blocking service
- * from the probe is built into the app: the UI then says "Start timer" and never claims
- * protection. Flip only with verified enforcement (see docs/device-test-checklist.md).
- */
-const val PHONE_BLOCKING_AVAILABLE = false
 
 /** Re-reads the clock every second while something counts; never the source of truth. */
 @Composable
@@ -149,6 +147,11 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
     val total = segments.sumOf { it.minutes }
     val valid = Session.validatePlan(segments) == null
     val planText = if (effectiveRounds > 1) "$effectiveRounds rounds · $breakMin min break between" else "One round, no breaks"
+    val profile = s.profiles.firstOrNull { it.id == profileId }
+    val profileName = profile?.name ?: "Profile"
+    val rules = profile?.rules ?: AppRules()
+    val missing = rememberMissing()
+    val blockingReady = rules.restrictsAnything && missing.isEmpty()
 
     WithActionBar(
         content = {
@@ -202,8 +205,11 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
             }
         },
         note = {
-            if (PHONE_BLOCKING_AVAILABLE) ProtectionLine("Apps outside ${s.profiles.firstOrNull { it.id == profileId }?.name ?: "your profile"} are blocked during focus", true, null) {}
-            else ProtectionLine("Timer only. Apps stay available on this phone.", false, "Set up blocking", openDevices)
+            when {
+                !rules.restrictsAnything -> ProtectionLine("Timer only. Apps stay available on this phone.", false, "Set up blocking", openDevices)
+                missing.isNotEmpty() -> ProtectionLine("Blocking needs ${FocusService.describe(missing)}. Until then, it’s a timer only.", false, "Set up blocking", openDevices)
+                else -> ProtectionLine("${profileName}: ${rulesSummary(rules)}", true, null) {}
+            }
         },
         actions = {
             if (valid) {
@@ -215,7 +221,7 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
                     style = UiType.caption.copy(fontFeatureSettings = "tnum"), color = c.inkMuted,
                 )
             }
-            MainButton(if (PHONE_BLOCKING_AVAILABLE) "Start focus" else "Start timer", onClick = {
+            MainButton(if (blockingReady) "Start focus" else "Start timer", onClick = {
                 val problem = Session.validatePlan(segments)
                 if (problem != null) error = problem
                 else {
@@ -360,7 +366,10 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
     val next = occ.phases.getOrNull(phase.index + 1)
     val tone = store.state.tone
     val task = session.intention
-    val protected = PHONE_BLOCKING_AVAILABLE && snap.restricting
+    val report by liveReport()
+    // Closed lock and "blocking" wording only from a fresh, verified report by the service.
+    val protected = snap.restricting && EnforcerStatus.protecting(session.id, report)
+    val permissionNeeded = report?.sessionId == session.id && report?.protection == Protection.PERMISSION_NEEDED
     val round = if (focusCount > 1) " · round $focusIndex of $focusCount" else ""
     val isBreak = phase.kind == PhaseKind.BREAK
     val state = if (isBreak) TimerState.BREAK else TimerState.FOCUS
@@ -387,10 +396,14 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
         if (next != null) add("Session ends" to Fmt.clock(occ.end, zone))
         store.state.profiles.firstOrNull { it.id == session.profileId }?.let { add("Profile" to it.name) }
     }
+    val blocks = session.rules.restrictsAnything
     val protection = when {
-        protected -> "Apps outside your profile are blocked"
-        isBreak && PHONE_BLOCKING_AVAILABLE -> "Apps are available until focus resumes"
-        else -> "Timer only. Apps stay available on this phone."
+        protected -> "Blocking on this phone · ${rulesSummary(session.rules).replace(" during focus", "")}"
+        !blocks -> "Timer only. Apps stay available on this phone."
+        isBreak -> "Apps are available until focus resumes"
+        lifted -> "Apps are available this round"
+        permissionNeeded -> "Blocking paused: turn on ${FocusService.describe(report?.missing ?: emptySet())}"
+        else -> "Blocking isn’t running on this phone right now"
     }
 
     WithActionBar(
@@ -400,7 +413,7 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
                 remaining = remaining, label = label, phases = occ.phases, now = now, zone = zone, facts = facts,
             ) { nudge?.let { Text(it, style = UiType.body, color = c.inkMuted) } }
         },
-        note = { ProtectionLine(protection, protected, if (protected) null else "Set up blocking", openDevices) },
+        note = { ProtectionLine(protection, protected, if (protected || (blocks && (isBreak || lifted))) null else "Set up blocking", openDevices) },
         actions = { OutPanel(store, session, snap, now, clock) },
     )
 }
@@ -435,6 +448,8 @@ private fun OutPanel(store: Store, session: ActiveSession, snap: Snapshot, now: 
     var confirmEmergency by rememberSaveable { mutableStateOf(false) }
     val pending = snap.overrideState as? OverrideState.Pending
     val inFocus = snap.phase?.kind == PhaseKind.FOCUS && snap.overrideState !is OverrideState.ActiveForFocusPeriod
+    // The session's commitment, fixed when it started: null = locked (emergency recovery only).
+    val unlockDelay = session.commitment.overrideDelaySeconds
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
         when {
@@ -458,7 +473,7 @@ private fun OutPanel(store: Store, session: ActiveSession, snap: Snapshot, now: 
                 }
             }
             open -> {
-                Text("Unlock after a ${Session.DEFAULT_OVERRIDE_DELAY_SECONDS}-second wait", style = UiType.caption, color = c.inkMuted)
+                Text(if (unlockDelay == 0) "Unlocks right away" else "Unlock after a ${unlockDelay ?: 0}-second wait", style = UiType.caption, color = c.inkMuted)
                 Column(Modifier.fillMaxWidth().selectableGroup()) {
                     if (inFocus) ScopeOption("This round", scope == OverrideScope.CURRENT_FOCUS_PERIOD) { scope = OverrideScope.CURRENT_FOCUS_PERIOD }
                     ScopeOption("Rest of this session", !inFocus || scope == OverrideScope.REST_OF_SESSION) { scope = OverrideScope.REST_OF_SESSION }
@@ -467,7 +482,7 @@ private fun OutPanel(store: Store, session: ActiveSession, snap: Snapshot, now: 
                     val phase = snap.phase ?: return@MainButton
                     val t = clock.now()
                     store.setControls(session.id) { ctl ->
-                        ctl.copy(overrides = ctl.overrides + OverrideRecord(Store.newId(), if (inFocus) scope else OverrideScope.REST_OF_SESSION, phase.index, t, Session.DEFAULT_OVERRIDE_DELAY_SECONDS))
+                        ctl.copy(overrides = ctl.overrides + OverrideRecord(Store.newId(), if (inFocus) scope else OverrideScope.REST_OF_SESSION, phase.index, t, unlockDelay ?: Session.DEFAULT_OVERRIDE_DELAY_SECONDS))
                     }
                     open = false
                 })
@@ -476,6 +491,11 @@ private fun OutPanel(store: Store, session: ActiveSession, snap: Snapshot, now: 
                     Spacer(Modifier.weight(1f))
                     TextAction("End now", { confirmEmergency = true }, danger = true)
                 }
+            }
+            // Locked: no unlock; emergency recovery stays one deliberate step away.
+            unlockDelay == null -> {
+                Text("Locked session: it ends early only with emergency recovery.", style = UiType.caption, color = c.inkMuted)
+                SecondaryButton("Emergency recovery", { confirmEmergency = true }, modifier = Modifier.fillMaxWidth())
             }
             // Default: one quiet action. End now lives inside, so it never competes with the timer.
             else -> SecondaryButton("Need out?", { open = true }, modifier = Modifier.fillMaxWidth())

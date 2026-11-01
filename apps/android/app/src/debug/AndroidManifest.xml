@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only: adb-driven control for the CI emulator enforcement test. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <receiver
+            android:name="app.lockdin.debug.TestControl"
+            android:exported="true"
+            android:permission="android.permission.DUMP">
+            <intent-filter>
+                <action android:name="app.lockdin.debug.CONTROL" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

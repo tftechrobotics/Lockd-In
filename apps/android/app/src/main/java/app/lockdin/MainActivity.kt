@@ -6,14 +6,16 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
+import app.lockdin.enforce.FocusService
 import app.lockdin.state.Store
 import app.lockdin.ui.LockdInApp
+import app.lockdin.ui.Resumes
 import app.lockdin.ui.isDark
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val store = Store.open(this)
+        val store = Store.get(this)
         setContent {
             val dark = isDark(store.state.theme)
             // System bar icons follow the app's own theme choice, not only the system's.
@@ -24,5 +26,13 @@ class MainActivity : ComponentActivity() {
             }
             LockdInApp(store, dark = dark)
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Permissions may have changed in Settings; a session may need its service restarted
+        // (for example after the user force-stopped the app).
+        Resumes.bump()
+        FocusService.sync(this)
     }
 }

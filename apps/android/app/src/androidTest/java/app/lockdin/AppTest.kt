@@ -147,7 +147,8 @@ class AppTest {
         launch()
         rule.onNodeWithText("Timer only. Apps stay available on this phone.").assertIsDisplayed()
         rule.onNodeWithText("Set up blocking").performClick()
-        rule.onNodeWithText("Not in this version yet", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Usage access").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Display over other apps").performScrollTo().assertIsDisplayed()
         rule.onNodeWithContentDescription("Back").performClick()
         rule.onNodeWithTag("tab-schedule").performClick()
         rule.onNodeWithText("No sessions planned yet").assertIsDisplayed()
@@ -157,6 +158,33 @@ class AppTest {
         rule.onNodeWithText("Appearance").assertIsDisplayed()
         rule.onNodeWithContentDescription("Back").performClick()
         rule.onNodeWithText("Study").assertIsDisplayed()
+    }
+
+    @Test fun lockedCommitmentOffersOnlyEmergencyRecovery() {
+        launch(AppState(commitment = app.lockdin.enforce.Commitment.LOCKED))
+        rule.onNodeWithText("Start timer").performClick()
+        rule.onNodeWithText("Need out?").assertDoesNotExist()
+        rule.onNodeWithText("Emergency recovery").performScrollTo().performClick()
+        rule.onNodeWithText("End session now").performClick()
+        rule.onNodeWithText("Ended with emergency recovery.").assertIsDisplayed()
+    }
+
+    @Test fun profileAppsEditorOpensAndSavesMode() {
+        launch()
+        rule.onNodeWithTag("tab-profiles").performClick()
+        rule.onNodeWithText("Study").performClick()
+        rule.onNodeWithText("Allow only these").performClick()
+        rule.onNodeWithText("Save").performClick()
+        rule.onNodeWithText("Only essential apps", substring = true).assertIsDisplayed()
+    }
+
+    @Test fun approvedOnlyProfileWithoutPermissionsStaysTimerOnly() {
+        // The test device has not granted usage access: the app must not claim blocking.
+        val rules = app.lockdin.enforce.AppRules(app.lockdin.enforce.RuleMode.APPROVED_ONLY, emptySet())
+        val s = AppState()
+        launch(s.copy(profiles = s.profiles.map { if (it.id == "study") it.copy(rules = rules) else it }))
+        rule.onNodeWithText("Blocking needs", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Start timer").assertIsDisplayed()
     }
 
     @Test fun invalidCustomLengthExplained() {

@@ -64,10 +64,12 @@ fun LockdInApp(store: Store, clock: AppClock = AppClock.System, zone: ZoneId = Z
         var route by rememberSaveable { mutableStateOf(Route.FOCUS) }
         var lastTab by rememberSaveable { mutableStateOf(Route.FOCUS) }
         var editing by remember { mutableStateOf<ScheduledSession?>(null) }
+        var editingProfile by remember { mutableStateOf<String?>(null) }
         fun go(r: Route) { if (r.tab) lastTab = r; route = r }
-        BackHandler(enabled = editing != null || !route.tab || route != Route.FOCUS) {
+        BackHandler(enabled = editing != null || editingProfile != null || !route.tab || route != Route.FOCUS) {
             when {
                 editing != null -> editing = null
+                editingProfile != null -> editingProfile = null
                 !route.tab -> go(lastTab)
                 else -> go(Route.FOCUS)
             }
@@ -79,6 +81,14 @@ fun LockdInApp(store: Store, clock: AppClock = AppClock.System, zone: ZoneId = Z
                 Modifier.fillMaxSize().background(c.ground)
                     .windowInsetsPadding(WindowInsets.safeDrawing).semantics { contentDescription = "Schedule editor" },
             ) { ScheduleEditor(store, e, zone, clock.now(), onClose = { editing = null }) }
+            return@LockdInTheme
+        }
+        // Choosing a profile's apps is also its own full screen.
+        store.state.profiles.firstOrNull { it.id == editingProfile }?.let { p ->
+            Box(
+                Modifier.fillMaxSize().background(c.ground)
+                    .windowInsetsPadding(WindowInsets.safeDrawing).semantics { contentDescription = "Profile apps" },
+            ) { ProfileEditor(store, p, onClose = { editingProfile = null }) }
             return@LockdInTheme
         }
 
@@ -134,7 +144,7 @@ fun LockdInApp(store: Store, clock: AppClock = AppClock.System, zone: ZoneId = Z
                     when (route) {
                         Route.FOCUS -> FocusScreen(store, clock, zone, openDevices = { go(Route.DEVICES) }, openSchedule = { go(Route.SCHEDULE) })
                         Route.SCHEDULE -> ScheduleScreen(store, clock.now(), zone, onEdit = { editing = it })
-                        Route.PROFILES -> ProfilesScreen(store)
+                        Route.PROFILES -> ProfilesScreen(store, onEdit = { editingProfile = it.id })
                         Route.DEVICES -> DevicesScreen()
                         Route.SETTINGS -> SettingsScreen(store)
                     }
