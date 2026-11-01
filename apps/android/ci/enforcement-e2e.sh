@@ -201,6 +201,23 @@ adb shell appops set $A GET_USAGE_STATS allow
 adb shell appops set $A SYSTEM_ALERT_WINDOW allow
 adb shell pm grant $A android.permission.POST_NOTIFICATIONS || true
 adb logcat -c
+if [ "${ONLY:-}" = site ]; then
+  # Diagnostics for website blocking in Chrome only.
+  adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2; home
+  adb shell settings put secure enabled_accessibility_services "$A/$A.enforce.FocusAccessibilityService"
+  adb shell settings put secure accessibility_enabled 1; sleep 4
+  ctl --es cmd start --ei focus 4 --ei break 1 --ei rounds 1 --es block "$T" --es sites example.com
+  adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 3; home
+  adb shell am set-debug-app --persistent com.android.chrome >/dev/null 2>&1 || true
+  adb shell "echo 'chrome --disable-fre --no-default-browser-check --no-first-run' > /data/local/tmp/chrome-command-line"
+  adb shell am force-stop com.android.chrome
+  adb shell am start -a android.intent.action.VIEW -d "https://www.example.com/" com.android.chrome >/dev/null 2>&1
+  r=$(wait_top "${BLOCK//./\\.}" 15000) && record a11y-site-block pass "covered (${r} ms)" || record a11y-site-block FAIL "$r"
+  adb exec-out uiautomator dump /dev/tty > "$OUT/chrome.xml" 2>/dev/null
+  ids=$(grep -oE 'resource-id="[^"]*(url|location|omnibox|toolbar)[^"]*"[^>]*' "$OUT/chrome.xml" | sed -E 's/ (class|package|checkable|checked|clickable|enabled|focusable|long-clickable|password|scrollable|selected|bounds|index|NAF|drawing-order|hint)="[^"]*"//g' | head -15)
+  echo "::notice title=Chrome diagnostics (EMULATOR)::$( (adb shell dumpsys package com.android.chrome | grep -m1 versionName; echo "$ids"; adb logcat -d -s LockdInFocus | tail -25) | sed 's/%/%25/g' | tr '\n' '\r' | sed 's/\r/%0A/g' | cut -c1-6000)"
+  cat "$RESULTS"; exit $FAILED
+fi
 if [ "${ONLY:-}" = intro ]; then
   adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2; home
   intro_phase

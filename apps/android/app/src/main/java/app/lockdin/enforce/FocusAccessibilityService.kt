@@ -148,6 +148,8 @@ class FocusAccessibilityService : AccessibilityService() {
         return pkg in browsers && pkg !in essentials(System.currentTimeMillis())
     }
 
+    private val debuggable by lazy { (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0 }
+
     private var browsers: Set<String> = emptySet()
     private var browsersAt = 0L
 
@@ -166,8 +168,10 @@ class FocusAccessibilityService : AccessibilityService() {
             // Don't act while the address bar is being edited: that text is what the user is typing.
             val editing = bar?.isFocused == true
             nodes.forEach { it.recycleCompat() }
-            if (editing) return
-            val host = BlockPolicy.domainOf(text) ?: return
+            val host = BlockPolicy.domainOf(text)
+            // Debug builds only: what the address check saw (domain only). Release builds log nothing here.
+            if (debuggable) Log.d(TAG, "url_check pkg=$pkg bar=${bar != null} editing=$editing host=$host")
+            if (editing || host == null) return
             if (BlockPolicy.isSiteRestricted(host, rules)) cover(pkg, host, null)
         } finally {
             root.recycleCompat()
