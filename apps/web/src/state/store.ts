@@ -11,11 +11,32 @@ export const SCHEMA_VERSION = 1;
 export type ThemeChoice = 'system' | 'light' | 'dark';
 export type Tone = 'calm' | 'direct' | 'playful' | 'quiet';
 
+/**
+ * This device's app rules for a profile (state is per device, so a PC's rules live only on
+ * that PC). Windows apps are named by their program file, e.g. "Discord.exe".
+ */
+export interface AppRules { mode: 'block_list' | 'approved_only'; apps: string[] }
+
 export interface Profile {
   id: string;
   name: string;
   description: string;
   builtIn: boolean;
+  rules?: AppRules;
+}
+
+/** Same rule as the Windows agent (LockdIn.Enforcement.Policy.IsValidAppId). */
+export const isAppId = (s: string): boolean =>
+  s.length > 4 && s.length <= 128 && /\.exe$/i.test(s) && !/[\\/:*?"<>|]/.test(s) && s.trim() === s;
+
+export const restrictsAnything = (r?: AppRules): boolean => !!r && (r.mode === 'approved_only' || r.apps.length > 0);
+
+function parseRules(v: unknown): AppRules | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const r = v as Record<string, unknown>;
+  const mode = r.mode === 'approved_only' ? 'approved_only' : 'block_list';
+  const apps = Array.isArray(r.apps) ? [...new Set(r.apps.filter((a): a is string => typeof a === 'string' && isAppId(a)))].slice(0, 500) : [];
+  return { mode, apps };
 }
 
 /** What the user is working on, e.g. "TAM 212 · Practice problems". Optional, free text. */
@@ -46,6 +67,8 @@ export interface ActiveSession {
   intention: Intention | null;
   profileId: string;
   controls: SessionControls;
+  /** The profile's rules when the session started; editing the profile doesn't change a running session. */
+  rules?: AppRules;
 }
 
 export interface LastChoice { focusMinutes: number; breakMinutes: number; rounds: number; profileId: string }
@@ -98,10 +121,12 @@ export function parseState(raw: string | null): State {
       ...base,
       theme,
       tone,
-      profiles: Array.isArray(v.profiles) && v.profiles.length ? v.profiles.filter((p) => p && typeof p.id === 'string' && typeof p.name === 'string') : base.profiles,
+      profiles: Array.isArray(v.profiles) && v.profiles.length
+        ? v.profiles.filter((p) => p && typeof p.id === 'string' && typeof p.name === 'string').map((p) => ({ ...p, rules: parseRules(p.rules) }))
+        : base.profiles,
       schedule: Array.isArray(v.schedule) ? v.schedule.filter((s) => s && typeof s.id === 'string' && Array.isArray(s.days) && (s.days.length > 0 || typeof s.date === 'string')) : [],
       last: v.last && typeof v.last.focusMinutes === 'number' ? v.last : base.last,
-      active: v.active && typeof v.active.start === 'number' && Array.isArray(v.active.segments) ? v.active : null,
+      active: v.active && typeof v.active.start === 'number' && Array.isArray(v.active.segments) ? { ...v.active, rules: parseRules(v.active.rules) } : null,
       recentIntentions: Array.isArray(v.recentIntentions) ? v.recentIntentions.filter((i) => i && typeof i.text === 'string').slice(0, 8) : [],
     };
   } catch {
@@ -166,7 +191,10 @@ export function startQuick(now = Date.now()): boolean {
   if (state.active) return false;
   update((s) => ({
     ...s,
-    active: { id: newId(), start: now, segments: [{ kind: 'focus', minutes: 10 }], intention: null, profileId: s.last.profileId, controls: { overrides: [] } },
+    active: {
+      id: newId(), start: now, segments: [{ kind: 'focus', minutes: 10 }], intention: null, profileId: s.last.profileId, controls: { overrides: [] },
+      rules: s.profiles.find((p) => p.id === s.last.profileId)?.rules,
+    },
   }));
   return true;
 }

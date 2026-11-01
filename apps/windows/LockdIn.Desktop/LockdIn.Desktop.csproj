@@ -32,6 +32,9 @@
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\LockdIn.Enforcement\LockdIn.Enforcement.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <Content Include="Assets\**" CopyToOutputDirectory="PreserveNewest" />
     <!-- The shared interface, built by `npm run build` in apps/web. Bundled so the app works offline. -->
     <Content Include="..\..\web\dist\**" Link="ui\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\..\web\dist\index.html')" />

@@ -172,3 +172,26 @@ export function evaluate(occ: Occurrence, controls: SessionControls, now: number
 
   return { status, phase, restricting, releaseReason, overrideState, nextTransition };
 }
+
+/**
+ * The absolute intervals, from `now` on, during which restriction is due: focus periods minus
+ * breaks, unlocked rounds, a pending end-of-session unlock once it takes effect, and anything
+ * after emergency recovery. Handed to the Windows agent, which keeps enforcing them when the
+ * window is closed. Recomputed whenever the session's controls change.
+ */
+export function restrictionIntervals(occ: Occurrence, controls: SessionControls, now: number): [number, number][] {
+  const out: [number, number][] = [];
+  let t = Math.max(now, occ.start);
+  for (let guard = 0; guard < 500; guard++) {
+    const snap = evaluate(occ, controls, t);
+    if (snap.status !== 'active' && snap.status !== 'upcoming') break;
+    const next = snap.nextTransition ?? occ.end;
+    if (snap.restricting) {
+      const last = out[out.length - 1];
+      if (last && last[1] === t) last[1] = next; else out.push([t, next]);
+    }
+    if (next <= t) break;
+    t = next;
+  }
+  return out;
+}

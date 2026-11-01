@@ -98,3 +98,41 @@ test('bridge: reports session state and theme; tray command starts a 10-minute f
   await page.evaluate(() => (window as unknown as { __host: (d: unknown) => void }).__host({ v: 1, type: 'host.command', command: 'end_session' }));
   await expect(page.locator('.timer-status')).toHaveText('Focusing');
 });
+
+test('windows blocking: choose an app, hand the plan to the agent, show protection only when the agent confirms it', async ({ page }) => {
+  await page.setViewportSize({ width: 640, height: 860 });
+  await page.goto(D + '#/profiles');
+  const host = (d: unknown) => page.evaluate((x) => (window as unknown as { __host: (d: unknown) => void }).__host(x), d);
+  await host({ v: 1, type: 'host.hello', appVersion: '0.1.0', agent: 'stopped' });
+  const study = page.locator('.profile').filter({ hasText: 'Study' });
+  await study.getByText('Choose apps on this PC').click();
+  await study.getByRole('button', { name: 'Show open apps' }).click();
+  await host({ v: 1, type: 'host.apps', apps: [{ exe: 'Discord.exe', name: 'Discord' }] });
+  await study.getByRole('listitem').filter({ hasText: 'Discord' }).getByRole('button', { name: 'Add' }).click();
+  await expect(study.locator('dd').first()).toHaveText('1 app blocked');
+  await study.getByLabel('Or type a program').fill('not a program');
+  await study.getByRole('button', { name: 'Add', exact: true }).last().click();
+  await expect(study.getByRole('alert')).toContainText('Discord.exe');
+
+  await page.goto(D + '#/focus');
+  await host({ v: 1, type: 'host.hello', appVersion: '0.1.0', agent: 'stopped' });
+  await page.getByRole('button', { name: 'New session' }).click();
+  await page.getByRole('button', { name: 'Start focus' }).click();
+  const plan = await page.evaluate(() => (window as unknown as { __sent: { type: string; plan?: { sessionId: string; intervals: number[][]; apps: string[]; mode: string } }[] }).__sent
+    .filter((m) => m.type === 'ui.restriction').pop()!.plan!);
+  expect(plan.apps).toEqual(['Discord.exe']);
+  expect(plan.mode).toBe('block_list');
+  expect(plan.intervals.length).toBe(1);
+
+  // Not confirmed yet: no closed lock, no "Blocking active", an honest line instead.
+  await expect(page.locator('.guard')).toHaveCount(0);
+  await expect(page.locator('.protection')).toContainText('isn’t confirmed');
+  await host({ v: 1, type: 'host.agent_status', sessionId: plan.sessionId, protection: 'protecting', fresh: true, elevatedSkipped: 0 });
+  await expect(page.locator('.guard')).toContainText('Blocking active');
+  // The agent stops reporting: protection is withdrawn at once.
+  await host({ v: 1, type: 'host.agent_status', sessionId: plan.sessionId, protection: 'protecting', fresh: false, elevatedSkipped: 0 });
+  await expect(page.locator('.guard')).toHaveCount(0);
+  // A report for another session never counts.
+  await host({ v: 1, type: 'host.agent_status', sessionId: 'other', protection: 'protecting', fresh: true, elevatedSkipped: 0 });
+  await expect(page.locator('.guard')).toHaveCount(0);
+});

@@ -12,7 +12,8 @@ public sealed record AgentStatus(
     DateTimeOffset At,
     int ElevatedSkipped,
     int Minimized,
-    int Muted)
+    int Muted,
+    string? LastApp = null)
 {
     /// <summary>The agent writes at least every second; older than this means it isn't running.</summary>
     public static readonly TimeSpan Fresh = TimeSpan.FromSeconds(5);
@@ -37,6 +38,7 @@ public static class StatusCodec
         elevatedSkipped = s.ElevatedSkipped,
         minimized = s.Minimized,
         muted = s.Muted,
+        lastApp = s.LastApp,
     });
 
     public static AgentStatus? Parse(string json)
@@ -58,7 +60,8 @@ public static class StatusCodec
             } : null;
             if (p is null || !r.TryGetProperty("at", out var at) || !at.TryGetInt64(out var ms) || ms < 0) return null;
             int N(string k) => r.TryGetProperty(k, out var x) && x.TryGetInt32(out var n) && n >= 0 ? n : 0;
-            return new AgentStatus(sid, p.Value, DateTimeOffset.FromUnixTimeMilliseconds(ms), N("elevatedSkipped"), N("minimized"), N("muted"));
+            string? last = r.TryGetProperty("lastApp", out var la) && la.ValueKind == JsonValueKind.String && Policy.IsValidAppId(la.GetString()!) ? la.GetString() : null;
+            return new AgentStatus(sid, p.Value, DateTimeOffset.FromUnixTimeMilliseconds(ms), N("elevatedSkipped"), N("minimized"), N("muted"), last);
         }
         catch (JsonException) { return null; }
         catch (InvalidOperationException) { return null; }

@@ -58,8 +58,22 @@ Check("unknown mode refused", PlanCodec.Parse(PlanJson(twoRounds, "kill_all")) i
 Check("wrong version refused", PlanCodec.Parse(PlanJson(twoRounds).Replace("\"v\":1", "\"v\":2")) is null);
 Check("garbage refused", PlanCodec.Parse("{") is null && PlanCodec.Parse("[]") is null && PlanCodec.Parse("") is null);
 
+var restr = Bridge.Parse($$"""{"v":1,"type":"ui.restriction","plan":{{PlanJson(twoRounds)}}}""") as UiMessage.Restriction;
+Check("bridge: restriction plan", restr is { Plan.SessionId: "s1" } && restr.Plan.Intervals.Count == 2);
+Check("bridge: invalid plan refused", Bridge.Parse($$"""{"v":1,"type":"ui.restriction","plan":{{PlanJson(twoRounds, "kill_all")}}}""") is null);
+var bigApps = "[" + string.Join(",", Enumerable.Range(0, 400).Select(i => $"\"app{i}.exe\"")) + "]";
+Check("bridge: long app list allowed in a plan", Bridge.Parse($$"""{"v":1,"type":"ui.restriction","plan":{{PlanJson(twoRounds, apps: bigApps)}}}""") is UiMessage.Restriction);
+Check("bridge: list apps", Bridge.Parse("""{"v":1,"type":"ui.list_apps"}""") is UiMessage.ListApps);
+Check("bridge: apps message filters system apps",
+    Bridge.AppsMessage([("Discord.exe", "Discord"), ("explorer.exe", "File Explorer"), ("discord.exe", "Discord"), ("bad", "x")])
+    == """{"v":1,"type":"host.apps","apps":[{"exe":"Discord.exe","name":"Discord"}]}""");
+var fresh = new AgentStatus("s1", AgentProtection.Protecting, t0, 0, 1, 0, "Discord.exe");
+Check("bridge: agent status fresh", Bridge.AgentStatusMessage(fresh, t0.AddSeconds(1)).Contains("\"protection\":\"protecting\",\"fresh\":true"));
+Check("bridge: agent status stale", Bridge.AgentStatusMessage(fresh, t0.AddSeconds(30)).Contains("\"fresh\":false"));
+Check("bridge: no agent", Bridge.AgentStatusMessage(null, t0).Contains("\"protection\":\"idle\",\"fresh\":false"));
+
 var st = new AgentStatus("s1", AgentProtection.Protecting, t0, 1, 3, 2);
-Check("status round-trips", StatusCodec.Parse(StatusCodec.Serialize(st)) == st);
+Check("status round-trips", StatusCodec.Parse(StatusCodec.Serialize(st)) == st && StatusCodec.Parse(StatusCodec.Serialize(fresh)) == fresh);
 Check("status freshness", st.IsFresh(t0.AddSeconds(4)) && !st.IsFresh(t0.AddSeconds(6)) && !st.IsFresh(t0.AddSeconds(-6)));
 Check("status garbage refused", StatusCodec.Parse("""{"v":1,"protection":"maybe","at":1}""") is null);
 

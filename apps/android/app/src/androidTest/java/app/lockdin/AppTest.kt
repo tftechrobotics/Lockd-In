@@ -96,7 +96,9 @@ class AppTest {
         rule.onNodeWithContentDescription("25 minutes").assertIsSelected()
         pickRounds("Breaks", "5 min")
         rule.onNodeWithText("2 rounds · 5 min break between").assertIsDisplayed()
-        rule.onNodeWithText("Ends at 6:55 PM", substring = true).assertIsDisplayed()
+        // The menu's popup closes with an animation; wait for it before checking the pinned bar.
+        rule.waitForIdle()
+        rule.onNodeWithText("Ends at 6:55", substring = true, useUnmergedTree = true).assertIsDisplayed()
         // Typed last: the test activity doesn't resize for the keyboard, which would cover the
         // pinned bar here (the app's activity uses adjustResize + imePadding).
         rule.onNodeWithContentDescription("What are you working on?").performTextInput("TAM 212 · Practice problems")

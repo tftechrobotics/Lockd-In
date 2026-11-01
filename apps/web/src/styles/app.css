@@ -548,3 +548,15 @@ select.input { appearance: none; padding-right: 36px; cursor: pointer;
 
 /* Hide the browser's suggestion arrow on the task field (recent tasks still suggest as you type). */
 .bigfield::-webkit-calendar-picker-indicator { display: none !important; }
+
+/* Profile rules on this PC (Windows app) */
+.rules { grid-column: 1 / -1; border-top: 1px dashed var(--line); padding-top: 10px; }
+.rules summary { cursor: pointer; font-weight: 600; font-size: 0.9375rem; min-height: 40px; display: flex; align-items: center; }
+.rules__mode { border: 0; margin: 8px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 20px; }
+.rules__mode legend { font-weight: 600; font-size: 0.875rem; margin-bottom: 4px; }
+.rules__mode label { display: inline-flex; gap: 8px; align-items: center; min-height: 40px; }
+.rules__note { margin: 4px 0 8px; color: var(--ink-muted); font-size: 0.875rem; }
+.rules__apps, .rules__open { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.rules__apps li, .rules__open li { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 40px; border-bottom: 1px solid var(--line); }
+.rules__open small { color: var(--ink-muted); margin-left: 6px; }
+.rules__add { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }

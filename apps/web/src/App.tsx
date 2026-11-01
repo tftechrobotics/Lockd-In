@@ -8,8 +8,8 @@ import { Icon } from './ui/Icon';
 import { RunningClock } from './ui/RunningClock';
 import { DesktopBar } from './ui/DesktopBar';
 import { initBridge, layout, onHostCommand, sendToHost } from './platform';
-import { occurrenceFrom } from './engine/session';
-import { startQuick, useStore as useStoreSel } from './state/store';
+import { occurrenceFrom, restrictionIntervals } from './engine/session';
+import { restrictsAnything, startQuick, useStore as useStoreSel } from './state/store';
 
 const ROUTES = {
   focus: { label: 'Focus', page: FocusPage },
@@ -61,6 +61,26 @@ export function App() {
     sendToHost(session
       ? { type: 'ui.session_state', active: true, endsAt: occurrenceFrom(session.start, session.segments).end, label: session.intention?.text ?? '' }
       : { type: 'ui.session_state', active: false, endsAt: null, label: '' });
+  }, [session]);
+  // Windows: hand the running session's restriction intervals and app rules to the blocking
+  // agent, which keeps enforcing them after this window closes. Resent whenever the session
+  // or its controls change (unlocks, emergency recovery); an empty plan releases everything.
+  useEffect(() => {
+    if (layout !== 'desktop') return;
+    const now = Date.now();
+    const rules = session?.rules;
+    sendToHost({
+      type: 'ui.restriction',
+      plan: {
+        v: 1,
+        sessionId: session?.id ?? 'none',
+        issuedAt: now,
+        intervals: session && restrictsAnything(rules)
+          ? restrictionIntervals(occurrenceFrom(session.start, session.segments), session.controls, now) : [],
+        mode: rules?.mode ?? 'block_list',
+        apps: rules?.apps ?? [],
+      },
+    });
   }, [session]);
   const Page = ROUTES[route].page;
 

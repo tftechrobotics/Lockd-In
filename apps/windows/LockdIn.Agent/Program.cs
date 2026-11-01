@@ -23,6 +23,7 @@ internal static class Program
     private static uint mainThread;
     private static bool restricting;
     private static int minimized, muted, elevatedSkipped;
+    private static string? lastApp;
     private static DateTimeOffset lastDegradedAt = DateTimeOffset.MinValue;
     private static Process? guardian;
     private static Native.WinEventDelegate? hookProc;
@@ -133,7 +134,7 @@ internal static class Program
         Native.ShowWindowAsync(hwnd, Native.SW_MINIMIZE);
         bool ok = false;
         for (int i = 0; i < 10 && !ok; i++) { Thread.Sleep(15); ok = Native.IsIconic(hwnd) || !Native.IsWindowVisible(hwnd); }
-        if (ok) { minimized++; Log($"minimized {exe}"); }
+        if (ok) { minimized++; lastApp = exe; Log($"minimized {exe}"); }
         else
         {
             // Usually an app running as administrator: Windows doesn't let us touch it.
@@ -201,7 +202,7 @@ internal static class Program
         try
         {
             var tmp = AgentPaths.Status + ".tmp";
-            File.WriteAllText(tmp, StatusCodec.Serialize(new AgentStatus(sessionId, p, now, elevatedSkipped, minimized, muted)));
+            File.WriteAllText(tmp, StatusCodec.Serialize(new AgentStatus(sessionId, p, now, elevatedSkipped, minimized, muted, lastApp)));
             File.Move(tmp, AgentPaths.Status, overwrite: true);
         }
         catch (IOException) { }

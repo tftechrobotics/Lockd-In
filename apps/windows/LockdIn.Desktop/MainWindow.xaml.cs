@@ -22,6 +22,9 @@ public sealed partial class MainWindow : Window
     private readonly ShellSettings settings = ShellSettings.Load();
     private bool quitting;
     private UiMessage.SessionState? session;
+    private string? lastAgentMessage;
+    private int lastMinimized = -1;
+    private DateTimeOffset lastBlockNotice = DateTimeOffset.MinValue;
 
     public MainWindow()
     {
@@ -58,6 +61,13 @@ public sealed partial class MainWindow : Window
         var timer = DispatcherQueue.CreateTimer();
         timer.Interval = TimeSpan.FromSeconds(30);
         timer.Tick += (_, _) => RefreshTray();
+        // Restores sound a crashed earlier run left muted, and resumes a session's blocking
+        // if the PC restarted mid-session and the app was opened again.
+        AgentHost.EnsureRunning();
+        var agentTimer = DispatcherQueue.CreateTimer();
+        agentTimer.Interval = TimeSpan.FromSeconds(1);
+        agentTimer.Tick += (_, _) => PollAgent();
+        agentTimer.Start();
         timer.Start();
     }
 
@@ -177,22 +187,43 @@ public sealed partial class MainWindow : Window
             case UiMessage.Theme th:
                 ApplyTheme(th.Dark);
                 break;
+            case UiMessage.Restriction r:
+                AgentHost.Apply(r.Plan);
+                PollAgent();
+                break;
+            case UiMessage.ListApps:
+                sender.PostWebMessageAsJson(Bridge.AppsMessage(AgentHost.OpenApps()));
+                break;
         }
     }
 
     private void RefreshTray() =>
         tray.SetStatus(Bridge.TrayStatus(session, DateTimeOffset.Now, t => t.ToLocalTime().ToString("t")));
 
-    /// <summary>The blocking agent/service (ADR-0007) exposes this pipe when running. Not built yet.</summary>
-    private static AgentState DetectAgent()
+    /// <summary>The per-user blocking agent installed next to the app (ADR-0007, minimize + mute).</summary>
+    private static AgentState DetectAgent() =>
+        !AgentHost.Installed ? AgentState.NotInstalled : AgentHost.Running ? AgentState.Running : AgentState.Stopped;
+
+    /// <summary>Passes the agent's report to the interface (only when it changes) and explains blocks.</summary>
+    private void PollAgent()
     {
-        try
+        var st = AgentHost.ReadStatus();
+        var msg = Bridge.AgentStatusMessage(st, DateTimeOffset.UtcNow);
+        if (msg != lastAgentMessage)
         {
-            return Directory.EnumerateFiles(@"\\.\pipe\").Any(p => p.EndsWith(@"\lockdin-agent", StringComparison.OrdinalIgnoreCase))
-                ? AgentState.Running : AgentState.NotInstalled;
+            lastAgentMessage = msg;
+            View?.CoreWebView2?.PostWebMessageAsJson(msg);
         }
-        catch (IOException) { return AgentState.Unknown; }
-        catch (UnauthorizedAccessException) { return AgentState.Unknown; }
+        if (st is null) return;
+        // Say what happened when an app is minimized: it is still open, nothing was closed.
+        if (lastMinimized >= 0 && st.Minimized > lastMinimized && st.LastApp is { } app && st.IsFresh(DateTimeOffset.UtcNow)
+            && DateTimeOffset.UtcNow - lastBlockNotice > TimeSpan.FromMinutes(1))
+        {
+            lastBlockNotice = DateTimeOffset.UtcNow;
+            tray.Notify($"{Path.GetFileNameWithoutExtension(app)} is blocked during focus",
+                "Lockd In minimized it and muted its sound. It's still open; nothing was closed.");
+        }
+        lastMinimized = st.Minimized;
     }
 
     // ---- Cream & Ink chrome colors (design/tokens.json) ----

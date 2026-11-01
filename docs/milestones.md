@@ -48,6 +48,19 @@ with a signed build; **E-vm** = disposable Windows VM.
 - M1.15 Onboarding requests each permission with a one-sentence reason, re-checks it on resume, and shows a denied state with a Settings shortcut.
 - M1.16 Signed Windows installer and Play internal-testing build install, update and uninstall cleanly, leaving no policy or service behind. Needs the owner's accounts (audit §5).
 
+### M1 evidence so far (2026-11-01)
+
+| Criterion | Evidence | Environment | Status |
+|---|---|---|---|
+| M1.2 rules snapshot, M1.3 commitment, M1.4 v1→v2 migration | `EnforcementRulesTest` (10 JVM tests); web `restriction.test.ts`; Compose UI tests for the Locked level, the app editor and the timer-only fallback | JVM, Chromium, API 35 emulator | Logic **met**; device UI not checked |
+| M1.5 block screen | 20/20 trials. adb start→block on top: p50 2.6 s. On-device "app in front → block requested": p50 1.4 s, p95 3.6 s (n=28). **Above the 1.5 s p95 target on the emulator.** Usage events reach us late there; must be measured on phones | E-emu (`enforcement-e2e.sh`, run 41274464866) | Emulator **pass with slow detection**; phone **not tested** |
+| M1.6 essentials | Settings opened during focus, not covered; decision table unit-tested | E-emu, JVM | Emulator **pass** |
+| M1.7 break / resume / end | Target opened 3/3 in the break; blocked again in round 2; opens after the end; service and notification gone | E-emu | Emulator **pass** |
+| M1.8 process kill, reboot | Back 12 s after `kill -9` (sticky restart); back 119 s after `adb reboot`, including boot | E-emu | Emulator **pass**; swipe-away and screen-off not yet scripted |
+| M1.9 permission loss | "Blocking paused" notification about 2 s after usage access was revoked; blocking resumed after re-grant in 1 of 2 runs within 6 s (timeout raised to 10 s) | E-emu | Emulator **pass / flaky** |
+| M1.10 never closes apps | Target alive after 20 covers; no kill APIs in the app | E-emu | Emulator **pass** |
+| M1.11–M1.13 Windows agent | Agent and rules written; 40+ rule and bridge checks pass on Linux; `agent-e2e.ps1` added to CI | Linux; windows-2025 runner pending | **Unverified** |
+
 **M1 closes when** M1.1–M1.16 have evidence, with M1.5–M1.9 on E-phone and M1.11–M1.13 on E-pc.
 
 ## M2 — Connected devices

@@ -37,7 +37,18 @@ export function setPreviewAgentRunning(on: boolean): void {
   if (import.meta.env.MODE === 'preview') previewAgentRunning = on;
 }
 
+/** The Windows agent's latest report. `fresh` false = not running (stale): never show protection. */
+export interface AgentStatus {
+  sessionId: string | null;
+  protection: 'idle' | 'not_restricting' | 'protecting' | 'degraded';
+  fresh: boolean;
+  elevatedSkipped: number;
+}
+export interface OpenApp { exe: string; name: string }
+
 let host: HostInfo | null = null;
+let agentStatus: AgentStatus | null = null;
+let openApps: OpenApp[] | null = null;
 const listeners = new Set<() => void>();
 export type HostCommand = 'start_quick';
 const commandHandlers = new Set<(c: HostCommand) => void>();
@@ -65,6 +76,27 @@ export function parseHostMessage(data: unknown): HostInfo | null {
   return { platform: 'windows', appVersion: m.appVersion, agent };
 }
 
+export function parseAgentStatus(data: unknown): AgentStatus | null {
+  if (!data || typeof data !== 'object') return null;
+  const m = data as Record<string, unknown>;
+  if (m.v !== 1 || m.type !== 'host.agent_status') return null;
+  const p = m.protection;
+  if (p !== 'idle' && p !== 'not_restricting' && p !== 'protecting' && p !== 'degraded') return null;
+  if (typeof m.fresh !== 'boolean') return null;
+  const sid = typeof m.sessionId === 'string' && m.sessionId.length <= 64 ? m.sessionId : null;
+  const skipped = typeof m.elevatedSkipped === 'number' && m.elevatedSkipped >= 0 ? m.elevatedSkipped : 0;
+  return { sessionId: sid, protection: p, fresh: m.fresh, elevatedSkipped: skipped };
+}
+
+export function parseOpenApps(data: unknown): OpenApp[] | null {
+  if (!data || typeof data !== 'object') return null;
+  const m = data as Record<string, unknown>;
+  if (m.v !== 1 || m.type !== 'host.apps' || !Array.isArray(m.apps)) return null;
+  return m.apps.slice(0, 200).filter((a): a is OpenApp =>
+    !!a && typeof a === 'object' && typeof (a as OpenApp).exe === 'string' && typeof (a as OpenApp).name === 'string'
+    && /\.exe$/i.test((a as OpenApp).exe) && (a as OpenApp).exe.length <= 128 && (a as OpenApp).name.length <= 80);
+}
+
 export function initBridge(): void {
   const wv = webview();
   if (!wv && import.meta.env.MODE === 'preview' && layout === 'desktop') {
@@ -77,6 +109,10 @@ export function initBridge(): void {
   wv.addEventListener('message', (e) => {
     const info = parseHostMessage(e.data);
     if (info) { host = info; listeners.forEach((l) => l()); return; }
+    const st = parseAgentStatus(e.data);
+    if (st) { agentStatus = st; listeners.forEach((l) => l()); return; }
+    const apps = parseOpenApps(e.data);
+    if (apps) { openApps = apps; listeners.forEach((l) => l()); return; }
     const cmd = parseHostCommand(e.data);
     if (cmd) commandHandlers.forEach((h) => h(cmd));
   });
@@ -85,9 +121,31 @@ export function initBridge(): void {
 
 /** Ask the shell to do something native. No-op in a browser. */
 export function sendToHost(
-  msg: { type: 'ui.session_state'; active: boolean; endsAt: number | null; label: string } | { type: 'ui.theme'; dark: boolean },
+  msg: { type: 'ui.session_state'; active: boolean; endsAt: number | null; label: string } | { type: 'ui.theme'; dark: boolean }
+    | { type: 'ui.restriction'; plan: RestrictionPlan } | { type: 'ui.list_apps' },
 ): void {
   webview()?.postMessage({ v: 1, ...msg });
+}
+
+/** What the Windows agent enforces (validated again by the shell and the agent). */
+export interface RestrictionPlan {
+  v: 1;
+  sessionId: string;
+  issuedAt: number;
+  intervals: [number, number][];
+  mode: 'block_list' | 'approved_only';
+  apps: string[];
+}
+
+const subscribe = (l: () => void) => { listeners.add(l); return () => listeners.delete(l); };
+
+export function useAgentStatus(): AgentStatus | null {
+  return useSyncExternalStore(subscribe, () => agentStatus);
+}
+
+/** Apps with an open window on this PC (asked of the shell on demand). */
+export function useOpenApps(): OpenApp[] | null {
+  return useSyncExternalStore(subscribe, () => openApps);
 }
 
 export function useHost(): HostInfo | null {

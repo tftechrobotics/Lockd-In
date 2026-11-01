@@ -3,6 +3,7 @@
 // shapes are dropped, strings are length-limited, numbers range-checked.
 // Pure code (no Windows APIs) so it is unit-tested on any OS.
 using System.Text.Json;
+using LockdIn.Enforcement;
 
 namespace LockdIn.Desktop;
 
@@ -11,6 +12,10 @@ public abstract record UiMessage
     public sealed record Ready : UiMessage;
     public sealed record SessionState(bool Active, DateTimeOffset? EndsAt, string Label) : UiMessage;
     public sealed record Theme(bool Dark) : UiMessage;
+    /// <summary>What the agent must enforce for the running session (empty intervals = release).</summary>
+    public sealed record Restriction(Plan Plan) : UiMessage;
+    /// <summary>The interface wants the list of open apps, to choose apps for a profile.</summary>
+    public sealed record ListApps : UiMessage;
 }
 
 public enum AgentState { NotInstalled, Stopped, Running, Unknown }
@@ -23,16 +28,24 @@ public static class Bridge
 
     public static UiMessage? Parse(string json)
     {
-        if (string.IsNullOrEmpty(json) || json.Length > MaxMessageBytes) return null;
+        if (string.IsNullOrEmpty(json) || json.Length > PlanCodec.MaxBytes + 256) return null;
         try
         {
-            using var doc = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 4 });
+            using var doc = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 6 });
             var root = doc.RootElement;
             if (root.ValueKind != JsonValueKind.Object) return null;
             if (!root.TryGetProperty("v", out var v) || v.ValueKind != JsonValueKind.Number || !v.TryGetInt32(out var ver) || ver != Version) return null;
             if (!root.TryGetProperty("type", out var t) || t.ValueKind != JsonValueKind.String) return null;
-            switch (t.GetString())
+            var type = t.GetString();
+            // Only a restriction plan may be large (a long app list); everything else stays small and shallow.
+            if (type != "ui.restriction" && (json.Length > MaxMessageBytes || Depth(root) > 3)) return null;
+            switch (type)
             {
+                case "ui.restriction":
+                    return root.TryGetProperty("plan", out var plan) && plan.ValueKind == JsonValueKind.Object
+                        && PlanCodec.Parse(plan.GetRawText()) is { } pl ? new UiMessage.Restriction(pl) : null;
+                case "ui.list_apps":
+                    return new UiMessage.ListApps();
                 case "ui.ready":
                     return new UiMessage.Ready();
                 case "ui.theme":
@@ -60,6 +73,42 @@ public static class Bridge
             return null;
         }
     }
+
+    private static int Depth(JsonElement e) => e.ValueKind switch
+    {
+        JsonValueKind.Object => 1 + e.EnumerateObject().Select(p => Depth(p.Value)).DefaultIfEmpty(0).Max(),
+        JsonValueKind.Array => 1 + e.EnumerateArray().Select(Depth).DefaultIfEmpty(0).Max(),
+        _ => 0,
+    };
+
+    /// <summary>
+    /// The agent's latest report, for the interface. `fresh` is false when the report is stale
+    /// (agent not running): the interface must then not show blocking as active.
+    /// </summary>
+    public static string AgentStatusMessage(AgentStatus? s, DateTimeOffset now) => JsonSerializer.Serialize(new
+    {
+        v = Version,
+        type = "host.agent_status",
+        sessionId = s?.SessionId,
+        protection = s is null ? "idle" : s.Protection switch
+        {
+            AgentProtection.Protecting => "protecting",
+            AgentProtection.NotRestricting => "not_restricting",
+            AgentProtection.Degraded => "degraded",
+            _ => "idle",
+        },
+        fresh = s is not null && s.IsFresh(now),
+        elevatedSkipped = s?.ElevatedSkipped ?? 0,
+    });
+
+    public static string AppsMessage(IEnumerable<(string Exe, string Name)> apps) => JsonSerializer.Serialize(new
+    {
+        v = Version,
+        type = "host.apps",
+        apps = apps.Where(a => Policy.IsValidAppId(a.Exe) && !Policy.AlwaysAllowed.Contains(a.Exe))
+            .DistinctBy(a => a.Exe.ToLowerInvariant()).OrderBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase).Take(200)
+            .Select(a => new { exe = a.Exe, name = a.Name.Length > 80 ? a.Name[..80] : a.Name }),
+    });
 
     public static string Hello(string appVersion, AgentState agent) => JsonSerializer.Serialize(new
     {

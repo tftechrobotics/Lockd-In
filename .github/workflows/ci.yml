@@ -207,6 +207,9 @@ jobs:
         shell: pwsh
         run: |
           dotnet publish apps/windows/LockdIn.Desktop -c Release -r ${{ matrix.rid }} -p:Platform=${{ matrix.platform }} -o out/lockdin-windows-${{ matrix.rid }}
+          # The blocking agent ships next to the app (separate process: blocking outlives the window).
+          dotnet publish apps/windows/LockdIn.Agent -c Release -r ${{ matrix.rid }} --self-contained true -o out/lockdin-windows-${{ matrix.rid }}
+          if (-not (Test-Path out/lockdin-windows-${{ matrix.rid }}/LockdIn.Agent.exe)) { Write-Host "::error::Agent missing"; exit 1 }
           Get-ChildItem out/lockdin-windows-${{ matrix.rid }} -Recurse -Filter *.pdb | Remove-Item
           if (-not (Test-Path out/lockdin-windows-${{ matrix.rid }}/ui/index.html)) { Write-Host "::error::Bundled interface missing"; exit 1 }
           $res = (Get-ChildItem out/lockdin-windows-${{ matrix.rid }} -Recurse -Include *.pri, *.xbf | ForEach-Object { $_.Name }) -join ', '
@@ -276,6 +279,12 @@ jobs:
             exit 1
           }
           if (-not (Select-String -Path $log -SimpleMatch 'ui.ready' -Quiet)) { Write-Host "::error::Interface never reported ready"; exit 1 }
+      - name: Blocking agent end-to-end (x64, runner only)
+        if: matrix.rid == 'win-x64'
+        shell: pwsh
+        run: |
+          dotnet publish probes/windows/Target -c Release -r win-x64 --self-contained true -o out/target
+          ./apps/windows/scripts/agent-e2e.ps1 -Agent "out/lockdin-windows-win-x64/LockdIn.Agent.exe" -Target "out/target/LockdInTarget.exe"
       - name: Screenshots of the real window (x64)
         if: matrix.rid == 'win-x64'
         shell: pwsh

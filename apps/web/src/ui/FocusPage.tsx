@@ -7,13 +7,13 @@ import {
   type OverrideScope, type Snapshot,
 } from '../engine/session';
 import { nextUp } from '../engine/schedule';
-import { getState, newId, update, useStore, type ActiveSession } from '../state/store';
+import { getState, newId, restrictsAnything, update, useStore, type ActiveSession } from '../state/store';
 import { DeviceStrip } from './DeviceStrip';
 import { clockTime, countdown, dayLabel, durationLabel, spokenRemaining } from './format';
 import { Icon } from './Icon';
 import { message } from './messages';
 import { CircleLock, MiniLock, SessionRail, TimerStatus } from './Timer';
-import { layout, useHost } from '../platform';
+import { layout, useAgentStatus, useHost } from '../platform';
 
 /** Re-render every second while something is counting; never the source of truth. */
 export function useNow(active: boolean): number {
@@ -78,11 +78,25 @@ const LENGTHS = [25, 40, 60];
 const BREAKS = [5, 10, 15, 20];
 const ROUNDS = [1, 2, 3, 4, 5, 6];
 
-/** Whether this surface can restrict apps right now (only a running Windows blocking service can). */
+/**
+ * Whether this surface has blocking available (Windows: the agent is installed next to the
+ * app). Whether a session actually blocks also needs the profile's rules; whether it is
+ * blocking right now needs the agent's fresh report (useVerified).
+ */
 export function useCanBlock(): boolean {
   const host = useHost();
   if (layout === 'android') return DEMO?.protect === true; // preview only; the web build never blocks
-  return layout === 'desktop' && host?.agent === 'running';
+  if (layout !== 'desktop') return false;
+  if (DEMO) return host?.agent === 'running'; // design preview stand-in
+  return host?.agent === 'running' || host?.agent === 'stopped';
+}
+
+/** True only when the agent reports, freshly, that it is protecting this session. */
+function useVerified(sessionId: string): boolean {
+  const canBlock = useCanBlock();
+  const agent = useAgentStatus();
+  if (DEMO) return canBlock;
+  return layout === 'desktop' && agent?.fresh === true && agent.protection === 'protecting' && agent.sessionId === sessionId;
 }
 
 /* ------------------------------- Setup ------------------------------- */
@@ -95,7 +109,7 @@ function Setup({ onCancel }: { onCancel?: () => void }) {
   const profiles = useStore((s) => s.profiles);
   const recent = useStore((s) => s.recentIntentions);
   const schedule = useStore((s) => s.schedule);
-  const canBlock = useCanBlock();
+  const blockingAvailable = useCanBlock();
   const [intention, setIntention] = useState('');
   const [focus, setFocus] = useState(last.focusMinutes);
   const [customOpen, setCustomOpen] = useState(!LENGTHS.includes(last.focusMinutes));
@@ -104,6 +118,8 @@ function Setup({ onCancel }: { onCancel?: () => void }) {
   const [roundsOpen, setRoundsOpen] = useState(false);
   const [profileId, setProfileId] = useState(last.profileId);
   const [error, setError] = useState<string | null>(null);
+  // Blocks only when this device has apps chosen for the profile (the demo preview has none).
+  const canBlock = blockingAvailable && (!!DEMO || restrictsAnything(profiles.find((p) => p.id === profileId)?.rules));
   const ids = { intent: useId(), len: useId(), custom: useId(), brk: useId(), rnd: useId(), prof: useId(), list: useId(), err: useId() };
   const now = useNow(true);
   const upcoming = nextUp(schedule, now);
@@ -127,6 +143,7 @@ function Setup({ onCancel }: { onCancel?: () => void }) {
       active: {
         id: newId(), start: Date.now(), segments, profileId,
         intention: text ? { text } : null, controls: { overrides: [] },
+        rules: s.profiles.find((p) => p.id === profileId)?.rules,
       },
       recentIntentions: text ? [{ text }, ...s.recentIntentions.filter((i) => i.text !== text)].slice(0, 8) : s.recentIntentions,
     }));
@@ -239,7 +256,15 @@ function Setup({ onCancel }: { onCancel?: () => void }) {
 }
 
 /** One honest line about blocking, with a way to set it up when it isn't available. */
-function Protection({ canBlock, during = false, restricting = true, extra = '' }: { canBlock: boolean; during?: boolean; restricting?: boolean; extra?: string }) {
+function Protection({ canBlock, during = false, restricting = true, stalled = false, extra = '' }: { canBlock: boolean; during?: boolean; restricting?: boolean; stalled?: boolean; extra?: string }) {
+  if (stalled) {
+    return (
+      <p className={`protection ${extra}`}>
+        <span className="dot" aria-hidden="true" />
+        <span>Blocking isn’t confirmed on this {layout === 'android' ? 'phone' : 'PC'} right now, so apps may be available. <a href="#/devices">Check blocking</a></span>
+      </p>
+    );
+  }
   if (canBlock && during && !restricting) {
     // Breaks and unlocked rounds: blocking exists but isn't applied right now.
     return (
@@ -254,7 +279,9 @@ function Protection({ canBlock, during = false, restricting = true, extra = '' }
     return (
       <p className={`protection protection--on ${extra}`}>
         <span className="dot dot--ok" aria-hidden="true" />
-        <span>{during ? 'Apps outside your profile are restricted.' : 'Apps outside your profile are restricted during focus.'}</span>
+        <span>{layout === 'desktop'
+          ? 'Apps you chose are minimized and muted during focus. Nothing is closed.'
+          : 'Apps you chose are covered by a block screen during focus. Nothing is closed.'}</span>
         {DEMO?.protect && <span className="demo-tag">Demo</span>}
       </p>
     );
@@ -287,7 +314,9 @@ function NextRow({ upcoming }: { upcoming: ReturnType<typeof nextUp> }) {
 function SessionView({ session }: { session: ActiveSession }) {
   const tone = useStore((s) => s.tone);
   const profiles = useStore((s) => s.profiles);
-  const canBlock = useCanBlock();
+  const canBlock = useCanBlock() && (!!DEMO || restrictsAnything(session.rules));
+  const verified = useVerified(session.id);
+  const agent = useAgentStatus();
   const occ = occurrenceFrom(session.start, session.segments);
   const firstSnap = evaluate(occ, session.controls, Date.now());
   const ended = firstSnap.status !== 'active' && firstSnap.status !== 'upcoming';
@@ -306,7 +335,9 @@ function SessionView({ session }: { session: ActiveSession }) {
   const nextPhase = occ.phases[phase.index + 1];
   const task = session.intention?.text;
   const lifted = snap.overrideState.type === 'active_for_focus_period';
-  const protectedNow = canBlock && snap.restricting;
+  const protectedNow = canBlock && verified && snap.restricting;
+  // Due but not confirmed by the agent: say so instead of implying protection.
+  const stalled = canBlock && snap.restricting && !protectedNow;
   const round = focusCount > 1 ? ` · round ${focusIndex} of ${focusCount}` : '';
   const state = phase.kind === 'break' ? 'break' : 'focus';
   const status = phase.kind === 'break' ? `On a break${round}` : lifted ? `Unlocked${round}` : `Focusing${round}`;
@@ -329,7 +360,11 @@ function SessionView({ session }: { session: ActiveSession }) {
             {facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
           </dl>
           {note && <p className="nudge" aria-live="polite">{note}</p>}
-          {!protectedNow && <Protection canBlock={canBlock} during restricting={snap.restricting} />}
+          {!protectedNow && <Protection canBlock={canBlock} during restricting={snap.restricting} stalled={stalled} />}
+          {protectedNow && !DEMO && agent?.protection === 'protecting' && agent.elevatedSkipped > 0 && (
+            <p className="protection"><span className="dot" aria-hidden="true" />
+              <span>{agent.elevatedSkipped} window{agent.elevatedSkipped > 1 ? 's' : ''} couldn’t be minimized (apps running as administrator).</span></p>
+          )}
         </div>
         <OverridePanel session={session} snap={snap} now={now} />
       </div>
@@ -477,7 +512,7 @@ function Recap({ session, snap }: { session: ActiveSession; snap: Snapshot }) {
   const finish = () => update((s) => ({ ...s, active: null }));
   const again = () => getState().active && update((s) => ({
     ...s,
-    active: { ...session, id: newId(), start: Date.now(), controls: { overrides: [] } },
+    active: { ...session, id: newId(), start: Date.now(), controls: { overrides: [] }, rules: s.profiles.find((p) => p.id === session.profileId)?.rules ?? session.rules },
   }));
   const note = snap.status === 'completed' ? message(tone, 'done') : null;
   const profile = profiles.find((p) => p.id === session.profileId);

@@ -1,32 +1,24 @@
 # Handoff — read this first
 
-**Last session:** 2026-10-31 (design pass 4) · **Milestone:** 1 — **OPEN**; M2 (design + main flow) **in progress**
-**Read first:** `docs/product-spec.md` (v2, owner direction) and `docs/backlog.md`.
+**Last session:** 2026-11-01 (functional development, R37) · **Milestone:** M1 reliable single-device focus — **IN PROGRESS**
+**Read first:** `docs/audit-2026-11.md` (inventory, Freedom, platform limits, architecture) and `docs/milestones.md` (new M1–M5 criteria + evidence table).
 **Repository:** github.com/tftechrobotics/Lockd-In (private).
-**Next:** owner sets up Azure Artifact Signing (Windows app + probe) and
-Google Play (Android probe) so builds can run on real devices (R18). Developer:
-Android Compose shell in Cream & Ink, then presets/resources (C2–C3), then the
-Windows blocking agent (B4) and pairing relay (B6, needs hosting approval).
-Owner wants architecture built before device setup; Azure (pay-as-you-go,
-not free trial — Artifact Signing doesn't support trials) and Play wait.
 
-## Status by evidence level
-
-| Component | Implemented | Compiled / checked (where) | Tested on device / VM | Still proposed |
-|---|---|---|---|---|
-| `lockdin-core` | Yes, incl. `clock`; `examples/parity_vectors.rs` | 35 tests (3 property tests), fmt, clippy — Ubuntu 24.04, Rust 1.97.0 | n/a (pure logic) | Heartbeat transport (M5); native clock sources (M3/M4) |
-| **Web app** (`apps/web`) | Yes: Cream & Ink; Focus (setup → focus → break → resume → recap, unlock countdown, emergency), Schedule, Profiles, Devices, Settings; local storage only | 19 unit tests incl. 773 Rust parity samples; 23 Playwright tests (flow on a simulated clock, axe A/AA × 2 themes × all pages, keyboard, 200% text, 320/390 px) — Chromium, Linux | n/a (blocks nothing, by design) | Pairing/relay (U12), presets, study timing, nudges UI beyond tone |
-| **Windows app** (`apps/windows`) | Yes: WinUI 3 shell (Windows App SDK 2.5.1, .NET 10) hosting the shared UI in WebView2 (desktop layout); title bar, tray menu, close-to-tray, single instance, min size, offline bundle, validated bridge | Builds x64 + ARM64 in CI; 19 bridge tests (Linux + CI); **launch test passes on windows-2025** (window, tray, WebView2 loads bundled UI, handshake, clean quit) | **Not on a person's PC** (unsigned → Smart App Control) | Blocking agent (B4); launch at sign-in setting; installer (B7) |
-| **Android app** (`apps/android`) | Yes: Compose shell in Cream & Ink — bottom nav, Focus flow, unlock/emergency, recap, Schedule (system time picker), Profiles, Devices, Settings; Kotlin engine + schedule + state | 7 JVM unit tests (773 parity samples, DST, state codec) locally and in CI; lint; 10 Compose UI tests on API 35 emulator; screenshots on branch `ci-screenshots` (`git show origin/ci-screenshots:android/01-setup-light.png`) | **Not on a phone** (Play pending) | Blocking (from probe), notifications, clock port |
-| Cream & Ink design system | `design/tokens.json` + contrast check; wordmark, lock mark, library edge SVGs | Contrast check passes (24 pairs + control borders) | — | Windows (XAML) and Android (Compose) token outputs |
-| Windows probe + target + guardian | Yes | CI x64/ARM64 builds; headless runner sanity run passes | **No** — Smart App Control blocks unsigned build on owner PC | — |
-| Windows signing in CI | Yes (Azure Artifact Signing via OIDC, gated on repo variables, verifies every signature) | actionlint clean; unsigned path runs green | n/a | Needs owner's Azure account |
-| Android probe + target | Yes. Play (release) build omits accessibility detector | Debug APKs + signed-bundle job in CI | **Emulator only** (API 35, CI): notification, block screen, release all pass. **Not on a phone** — Auto Blocker blocks sideload | — |
-| Play submission kit | `docs/play/` (guide, form answers, privacy policy page) | — | — | Needs Play account, privacy-policy URL, contact email |
-| App Control compiler spike | `probes/windows/AppControlSpike` (no deployment) | 20 self-tests (Linux); Windows CI: same parsed content as `ConvertFrom-CIPolicy`, bytes differ (header version) | **No** enforcement test (VM only) | — |
-| VM policy scripts | Yes | Parse + PSScriptAnalyzer clean | **No** | — |
-| Earlier design canvas ("Quiet instrument") | Superseded by Cream & Ink (R20) | — | — | — |
-| Windows service, product UI, pairing, calendar | No | — | — | ADR-0007, M2–M6 |
+**Where things stand**
+- **Android blocking is in the real app** (`apps/android/app/src/main/java/app/lockdin/enforce/`): `FocusService`
+  (specialUse FGS, usage events, 500 ms poll), `BlockActivity`, `BlockPolicy` (pure, tested), `Capabilities`,
+  `BootReceiver`; state v2 (per-profile rules, commitment, session snapshot) with v1 migration; Store is a process
+  singleton shared by UI and service. Lock closes only on a fresh PROTECTING report (`EnforcerStatus`).
+  Emulator E2E: `apps/android/ci/enforcement-e2e.sh` (job "Blocking end-to-end"); debug-only adb control in `src/debug`.
+- **Windows agent** (`apps/windows/LockdIn.Agent`, rules in `LockdIn.Enforcement`): minimize + mute after launch,
+  mute ledger + guardian, plan/status files in `%LOCALAPPDATA%\LockdIn\agent`. Shell writes the plan from the UI's
+  `ui.restriction` message, starts the agent, relays `host.agent_status`; Profiles page has a PC app picker
+  (`host.apps`). Runner E2E: `apps/windows/scripts/agent-e2e.ps1`. **Not yet observed working on any Windows machine.**
+- **Known gaps:** Android Compose screens still use the pre-R36 numerals timer (port the circular lock); emulator
+  detection p95 3.6 s (measure on phones); scheduled starts (alarms) not implemented; Windows launch at sign-in to
+  resume after reboot not implemented (agent resumes when the app is opened); no website rules yet.
+- **Owner setup needed for real-device evidence:** Google Play developer account (internal testing) and Azure
+  Artifact Signing. Relay hosting only for M2. None started.
 
 `tools/sandbox-checks.sh` reruns every Linux-side check (core, .NET builds,
 spike self-test, Kotlin type-check with an R stand-in, VM script lint,

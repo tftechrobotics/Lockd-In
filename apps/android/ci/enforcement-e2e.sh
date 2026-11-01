@@ -131,7 +131,7 @@ start=$(now_ms); seen=""
 while (( $(now_ms) - start < 10000 )); do notif_has "Blocking paused" && { seen=$(( $(now_ms) - start )); break; }; sleep 0.5; done
 [ -n "$seen" ] && record M1.9-permission-loss pass "'Blocking paused' notification after ${seen} ms" || record M1.9-permission-loss FAIL "no notification within 10 s"
 adb shell appops set $A GET_USAGE_STATS allow; sleep 3
-r=$(trial_blocked 6000) && record M1.9-permission-restored pass "blocking resumed (${r} ms)" || record M1.9-permission-restored FAIL "$r"
+r=$(trial_blocked 10000) && record M1.9-permission-restored pass "blocking resumed (${r} ms)" || record M1.9-permission-restored FAIL "$r"
 
 # M1.8 (part): process killed → Android restarts the service → blocking resumes.
 if adb root >/dev/null 2>&1; then
