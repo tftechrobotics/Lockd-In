@@ -85,6 +85,16 @@ class BlockActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        showing = true
+    }
+
+    override fun onPause() {
+        showing = false
+        super.onPause()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -114,6 +124,10 @@ class BlockActivity : ComponentActivity() {
     }
 
     companion object {
+        /** The block screen is in front right now (process-local). */
+        @Volatile var showing = false
+            private set
+
         private const val EXTRA_PKG = "pkg"
         private const val EXTRA_SITE = "site"
 

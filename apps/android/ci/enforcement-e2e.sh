@@ -193,6 +193,15 @@ T0=$(date +%s)
 adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 3; home
 pass=0
 for i in $(seq 1 10); do r=$(trial_blocked 5000) && pass=$((pass+1)); note "  a11y trial $i: $r"; done
+# Owner report 2026-11-01: opening a blocked app three times quickly let the third through.
+# Re-open straight after leaving the block screen, with no pause.
+rapid=0
+for i in $(seq 1 8); do
+  launch_target
+  r=$(wait_top "${BLOCK//./\\.}" 4000) && rapid=$((rapid+1))
+  adb shell input keyevent KEYCODE_HOME
+done
+[ "$rapid" = 8 ] && record a11y-rapid-reopen pass "8/8 quick re-opens covered" || record a11y-rapid-reopen FAIL "$rapid/8 quick re-opens covered"
 [ "$pass" = 10 ] && record a11y-block-screen pass "10/10 covered with only Accessibility on" || record a11y-block-screen FAIL "$pass/10 covered with only Accessibility on"
 
 # Website blocking in Chrome, if this emulator image has it.

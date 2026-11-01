@@ -199,7 +199,7 @@ class FocusService : Service() {
 
     private fun cover(pkg: String) {
         val t = SystemClock.elapsedRealtime()
-        if (t - lastCoverElapsed < COVER_DEBOUNCE_MS) return
+        if (BlockActivity.showing || t - lastCoverElapsed < COVER_DEBOUNCE_MS) return
         lastCoverElapsed = t
         try {
             startActivity(BlockActivity.intent(this, pkg))
@@ -281,7 +281,7 @@ class FocusService : Service() {
         private const val ALERT_ID = 2
         private const val POLL_MS = 500L
         private const val IDLE_MS = 2_000L
-        private const val COVER_DEBOUNCE_MS = 1_500L
+        private const val COVER_DEBOUNCE_MS = 400L
         private const val LOOKBACK_MS = 30 * 60_000L
         private const val OVERLAP_MS = 10_000L
         const val ACTION_TICK = "app.lockdin.TICK"

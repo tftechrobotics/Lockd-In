@@ -28,19 +28,51 @@ class FocusAccessibilityService : AccessibilityService() {
     private var lastCover: Pair<String, Long>? = null
     private var lastUrlCheck = 0L
 
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /**
+     * Safety net: Android doesn't send a window event for every way an app returns to the
+     * front (some recents and gesture paths). Once a second during focus, look at which app owns
+     * the active window and cover it if it's blocked.
+     */
+    private val check = object : Runnable {
+        override fun run() {
+            try {
+                val session = Store.get(this@FocusAccessibilityService).state.active
+                val now = System.currentTimeMillis()
+                if (session != null && session.rules.restrictsApps && FocusService.evaluate(session, now).restricting && !BlockActivity.showing) {
+                    val root = rootInActiveWindow
+                    val pkg = root?.packageName?.toString()
+                    root?.recycleCompat()
+                    if (pkg != null && pkg != packageName && BlockPolicy.isRestricted(pkg, session.rules, essentials(now))) {
+                        Log.i(TAG, "safety_net_cover")
+                        cover(pkg, null, null)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "check_failed: ${e.javaClass.simpleName}")
+            }
+            handler.postDelayed(this, CHECK_MS)
+        }
+    }
+
     override fun onServiceConnected() {
+        handler.removeCallbacks(check)
+        handler.postDelayed(check, CHECK_MS)
         connected = true
         Log.i(TAG, "connected")
         FocusService.sync(this)
     }
 
     override fun onUnbind(intent: android.content.Intent?): Boolean {
+        handler.removeCallbacks(check)
         connected = false
         Log.i(TAG, "disconnected")
         return super.onUnbind(intent)
     }
 
     override fun onDestroy() {
+        handler.removeCallbacks(check)
         connected = false
         super.onDestroy()
     }
@@ -92,6 +124,9 @@ class FocusAccessibilityService : AccessibilityService() {
     private fun cover(pkg: String, site: String?, latencyMs: Long?) {
         val key = site ?: pkg
         val t = SystemClock.elapsedRealtime()
+        // Only skip duplicate events for the same opening: the block screen is already up, or
+        // was asked for a moment ago. Opening the app again later is always covered again.
+        if (BlockActivity.showing) return
         lastCover?.let { (k, at) -> if (k == key && t - at < DEBOUNCE_MS) return }
         lastCover = key to t
         try {
@@ -116,7 +151,8 @@ class FocusAccessibilityService : AccessibilityService() {
     companion object {
         private const val TAG = "LockdInFocus"
         private const val URL_CHECK_MS = 400L
-        private const val DEBOUNCE_MS = 1_500L
+        private const val DEBOUNCE_MS = 400L
+        private const val CHECK_MS = 1_000L
 
         /** The service is bound by Android right now (process-local; reset by process death). */
         @Volatile var connected = false
