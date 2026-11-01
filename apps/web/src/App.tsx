@@ -5,6 +5,7 @@ import { FocusPage } from './ui/FocusPage';
 import { SchedulePage } from './ui/SchedulePage';
 import { DevicesPage, ProfilesPage, SettingsPage } from './ui/OtherPages';
 import { Icon } from './ui/Icon';
+import { RunningClock } from './ui/RunningClock';
 import { DesktopBar } from './ui/DesktopBar';
 import { initBridge, layout, onHostCommand, sendToHost } from './platform';
 import { occurrenceFrom } from './engine/session';
@@ -80,7 +81,9 @@ export function App() {
           {tabs.map(([r, label, icon]) => (
             <a key={r} href={`#/${r}`} aria-current={route === r ? 'page' : undefined} className="droid__tab">
               <span className="droid__pill"><Icon name={icon} size={22} /></span>
-              <span>{label}</span>
+              {r === 'focus' && active && route !== 'focus'
+                ? <span><span className="sr-only">{label} </span><RunningClock /></span>
+                : <span>{label}</span>}
             </a>
           ))}
         </nav>
@@ -113,7 +116,7 @@ export function App() {
                   <a href={`#/${r}`} aria-current={route === r ? 'page' : undefined} className={r === 'settings' ? 'nav__icon' : undefined}
                     aria-label={r === 'settings' ? 'Settings' : undefined}>
                     {r === 'settings' ? <Icon name="gear" size={22} /> : ROUTES[r].label}
-                    {r === 'focus' && active && route !== 'focus' && <span className="nav__live" role="img" aria-label="session running" title="Session running" />}
+                    {r === 'focus' && active && route !== 'focus' && <RunningClock />}
                   </a>
                 </li>
               ))}

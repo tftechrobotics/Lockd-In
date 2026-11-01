@@ -503,3 +503,21 @@ select.input { appearance: none; padding-right: 36px; cursor: pointer;
 .rail { container-type: inline-size; }
 @container (max-width: 22em) { .rail__min { display: none; } .rail__name--break { visibility: hidden; } }
 .focus--android .running__info { flex: none; }
+/* Time left on the Focus tab while you're elsewhere. */
+.run-clock { margin-left: 6px; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 0.8125rem; opacity: 0.85; }
+.run-clock--break { opacity: 0.65; }
+.droid__tab .run-clock { margin: 0; font-size: 0.6875rem; }
+/* Phone running view: timer and what's next; details on request. */
+.running__next { margin: 2px 0 0; align-self: center; display: flex; gap: 8px; align-items: baseline; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.running__next strong { color: var(--ink); font: 600 1.125rem/1.2 'Outfit Variable', sans-serif; }
+.running__more { margin-top: 8px; }
+.running__more > summary {
+  display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; cursor: pointer; list-style: none;
+  font-weight: 600; font-size: 0.875rem; color: var(--ink-muted); border-radius: 8px;
+}
+.running__more > summary::-webkit-details-marker { display: none; }
+.running__more > summary:hover { color: var(--ink); }
+.running__more > summary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.running__more[open] > summary svg { transform: rotate(180deg); }
+.running__more[open] > .rail { margin-top: 8px; }
+.running__more .running__foot { margin-top: 16px; }

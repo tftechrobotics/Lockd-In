@@ -16,7 +16,7 @@ import { CircleLock, MiniLock, SessionRail, TimerStatus } from './Timer';
 import { layout, useHost } from '../platform';
 
 /** Re-render every second while something is counting; never the source of truth. */
-function useNow(active: boolean): number {
+export function useNow(active: boolean): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!active) return;
@@ -271,6 +271,22 @@ function SessionView({ session }: { session: ActiveSession }) {
     ...(profile ? [['Profile', profile.name] as [string, string]] : []),
   ];
 
+  const details = (
+    <>
+      <SessionRail phases={occ.phases} now={now} />
+      <div className="running__foot">
+        <div className="running__info">
+          <dl className="facts">
+            {facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+          </dl>
+          {note && <p className="nudge" aria-live="polite">{note}</p>}
+          {!protectedNow && <Protection canBlock={canBlock} during restricting={snap.restricting} />}
+        </div>
+        <OverridePanel session={session} snap={snap} now={now} />
+      </div>
+    </>
+  );
+
   return (
     <div className={`page focus focus--${layout} focus--running`}>
       <div className="running">
@@ -282,17 +298,16 @@ function SessionView({ session }: { session: ActiveSession }) {
         <CircleLock state={state} remainingMs={remaining} totalMs={phase.end - phase.start} locked={protectedNow}
           label={`${phase.kind === 'break' ? 'Break' : 'This round'}: ${spokenRemaining(remaining)}`}
           caption={phase.kind === 'break' ? 'left in break' : 'left this round'} />
-        <SessionRail phases={occ.phases} now={now} />
-        <div className="running__foot">
-          <div className="running__info">
-            <dl className="facts">
-              {facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
-            </dl>
-            {note && <p className="nudge" aria-live="polite">{note}</p>}
-            {!protectedNow && <Protection canBlock={canBlock} during restricting={snap.restricting} />}
-          </div>
-          <OverridePanel session={session} snap={snap} now={now} />
-        </div>
+        {layout === 'android' ? (
+          // Phone: just the timer and what's next; everything else is one tap away.
+          <>
+            <p className="running__next"><span>{facts[0][0]}</span> <strong>{facts[0][1]}</strong></p>
+            <details className="running__more" open={snap.overrideState.type === 'pending' ? true : undefined}>
+              <summary>Details and options<Icon name="chevronDown" size={16} /></summary>
+              {details}
+            </details>
+          </>
+        ) : details}
       </div>
     </div>
   );

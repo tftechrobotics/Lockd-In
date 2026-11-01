@@ -3,6 +3,7 @@
 // No sidebar, no website navigation.
 import { useEffect, useId, useRef, useState } from 'react';
 import { Icon } from './Icon';
+import { RunningClock } from './RunningClock';
 
 type Route = 'focus' | 'schedule' | 'profiles' | 'devices' | 'settings';
 const MENU: [Route, string][] = [['profiles', 'Profiles'], ['devices', 'Devices'], ['settings', 'Settings']];
@@ -40,8 +41,8 @@ export function DesktopBar({ route, sessionRunning }: { route: Route; sessionRun
         {(['focus', 'schedule'] as const).map((r) => (
           <a key={r} href={`#/${r}`} className="switch__item" aria-current={route === r ? 'page' : undefined}>
             {r === 'focus' ? 'Focus' : 'Schedule'}
-            {/* Marks a running session while you're elsewhere; on Focus itself the session is already on screen. */}
-            {r === 'focus' && sessionRunning && route !== 'focus' && <span className="nav__live" role="img" aria-label="session running" title="Session running" />}
+            {/* While you're elsewhere, the Focus tab carries the time left; on Focus the timer is already on screen. */}
+            {r === 'focus' && sessionRunning && route !== 'focus' && <RunningClock />}
           </a>
         ))}
       </nav>
