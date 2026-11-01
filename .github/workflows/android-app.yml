@@ -15,6 +15,10 @@ on:
         description: "Also run the emulator UI tests and the blocking end-to-end test"
         type: boolean
         default: true
+      only:
+        description: "Run only one part of the blocking test (e.g. plan); empty = all"
+        type: string
+        default: ""
 permissions:
   contents: read
 jobs:
@@ -60,7 +64,7 @@ jobs:
 
   ui:
     # Emulator jobs are the costly part: run only when asked (Actions › Android app › Run workflow).
-    if: github.event_name == 'workflow_dispatch' && inputs.emulator
+    if: github.event_name == 'workflow_dispatch' && inputs.emulator && inputs.only == ''
     name: UI tests on emulator (API 35)
     needs: app
     runs-on: ubuntu-24.04
@@ -163,7 +167,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: apps/android/ci/enforcement-e2e.sh apps/android/app/build/outputs/apk/debug/app-debug.apk probes/android/target/build/outputs/apk/debug/target-debug.apk out/enforcement
+          script: ONLY="${{ inputs.only }}" apps/android/ci/enforcement-e2e.sh apps/android/app/build/outputs/apk/debug/app-debug.apk probes/android/target/build/outputs/apk/debug/target-debug.apk out/enforcement
       - uses: actions/upload-artifact@v4
         if: always()
         continue-on-error: true
