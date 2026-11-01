@@ -10,6 +10,11 @@ on:
   pull_request:
     paths: ["apps/android/**"]
   workflow_dispatch:
+    inputs:
+      emulator:
+        description: "Also run the emulator UI tests and the blocking end-to-end test"
+        type: boolean
+        default: true
 permissions:
   contents: read
 jobs:
@@ -54,6 +59,8 @@ jobs:
           retention-days: 7
 
   ui:
+    # Emulator jobs are the costly part: run only when asked (Actions › Android app › Run workflow).
+    if: github.event_name == 'workflow_dispatch' && inputs.emulator
     name: UI tests on emulator (API 35)
     needs: app
     runs-on: ubuntu-24.04
@@ -124,6 +131,7 @@ jobs:
           echo "::notice title=Screenshots::$(ls android | tr '\n' ' ')"
 
   enforcement:
+    if: github.event_name == 'workflow_dispatch' && inputs.emulator
     # Milestone M1.5–M1.10 on environment E-emu: the real app's blocking service and block
     # screen against the probe's harmless target app. EMULATOR ONLY — not phone evidence.
     name: Blocking end-to-end on emulator (API 35)

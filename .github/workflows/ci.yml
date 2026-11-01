@@ -8,9 +8,8 @@
 # probes/android/gradle/libs.versions.toml.
 name: ci
 
+# Paused with Windows and web work (R40): runs only when started by hand, to save Actions minutes.
 on:
-  push:
-  pull_request:
   workflow_dispatch:
 
 permissions:
