@@ -2,7 +2,9 @@
 // show sample sessions and *demo* connected/protected states without any backend. In every other
 // build `PREVIEW` is false at compile time, so none of this can make the real app claim blocking
 // or pairing.
+import { useSyncExternalStore } from 'react';
 import { getState, newId, update } from './state/store';
+import { setPreviewAgentRunning } from './platform';
 import { previewParams } from './previewParams';
 
 export const PREVIEW = import.meta.env.MODE === 'preview';
@@ -20,23 +22,53 @@ export const DEMO: Demo | null = PREVIEW
   ? { protect: params().get('protect') === '1', paired: params().get('paired') === '1' }
   : null;
 
+const demoListeners = new Set<() => void>();
+let demoVersion = 0;
+/** Changes a demo state (preview only); the preview root remounts the app so every screen agrees. */
+export function setDemo(change: Partial<Demo>): void {
+  if (!DEMO) return;
+  Object.assign(DEMO, change);
+  setPreviewAgentRunning(DEMO.protect);
+  demoVersion++;
+  demoListeners.forEach((l) => l());
+}
+export function useDemoVersion(): number {
+  return useSyncExternalStore((l) => { demoListeners.add(l); return () => demoListeners.delete(l); }, () => demoVersion);
+}
+
 export type Scene = 'setup' | 'focus' | 'break' | 'pending' | 'done';
 const MIN = 60_000;
 
-/** Seeds this frame's (separately stored) state for the requested sample scene. */
+/** Seeds the sample state from the address (or packaged defaults). */
 export function applyPreviewScene(): void {
   if (!PREVIEW) return;
   const p = params();
   const theme = p.get('theme');
-  if (theme === 'light' || theme === 'dark') { update((s) => ({ ...s, theme })); document.documentElement.dataset.theme = theme; }
-  if (p.get('text') === '200') {
-    document.documentElement.dataset.text = '200';
-    const st = document.createElement('style');
-    st.textContent = 'html { font-size: 200% !important; }';
-    document.head.appendChild(st);
-  }
+  if (theme === 'light' || theme === 'dark') setPreviewTheme(theme);
+  if (p.get('text') === '200') setPreviewText(true);
   const scene = (p.get('scene') ?? '') as Scene | '';
-  if (!scene) return;
+  if (scene) applyScene(scene);
+}
+
+export function setPreviewTheme(theme: 'light' | 'dark'): void {
+  update((s) => ({ ...s, theme }));
+  document.documentElement.dataset.theme = theme;
+}
+
+let textStyle: HTMLStyleElement | null = null;
+export function setPreviewText(large: boolean): void {
+  if (large) {
+    document.documentElement.dataset.text = '200';
+    if (!textStyle) { textStyle = document.createElement('style'); textStyle.textContent = 'html { font-size: 200% !important; }'; document.head.appendChild(textStyle); }
+  } else {
+    delete document.documentElement.dataset.text;
+    textStyle?.remove(); textStyle = null;
+  }
+}
+
+/** Puts the app into one of the sample moments (setup, focusing, break, unlock pending, done). */
+export function applyScene(scene: Scene): void {
+  if (!PREVIEW) return;
   const now = Date.now();
   // Sample plan so the idle screen has a next session to show (local data, like a user's own).
   const at = new Date(now + 2 * 60 * MIN);

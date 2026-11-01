@@ -543,4 +543,8 @@ select.input { appearance: none; padding-right: 36px; cursor: pointer;
 .home__foot { width: 100%; max-width: 640px; align-items: center; }
 .home__foot .devices { justify-content: center; }
 /* A packaged phone demo opened in a wide window stays phone-sized. */
-@media (min-width: 600px) { :root[data-layout="android"] body { max-width: 430px; margin: 0 auto; box-shadow: 0 0 0 1px var(--line); } }
+@media (min-width: 600px) { :root[data-layout="android"]:not([data-studio]) body { max-width: 430px; margin: 0 auto; box-shadow: 0 0 0 1px var(--line); } }
+.device-list li .button { margin-top: 10px; }
+
+/* Hide the browser's suggestion arrow on the task field (recent tasks still suggest as you type). */
+.bigfield::-webkit-calendar-picker-indicator { display: none !important; }

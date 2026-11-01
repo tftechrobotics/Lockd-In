@@ -1,4 +1,5 @@
 import { layout, useHost } from '../platform';
+import { DEMO, setDemo } from '../demo';
 import { useId, useRef, useState } from 'react';
 import { clearAll, newId, storageAvailable, update, useStore, type ThemeChoice, type Tone } from '../state/store';
 import { Icon } from './Icon';
@@ -47,16 +48,51 @@ export function ProfilesPage() {
 export function DevicesPage() {
   const host = useHost();
   const pcStatus = !host ? 'Checking…' : host.agent === 'running' ? 'Blocking on' : host.agent === 'stopped' ? 'Blocking off' : host.agent === 'unknown' ? 'Status unknown' : 'Not set up';
+  // Design preview only: demo switches stand in for setup and pairing, clearly labelled.
+  const demo = DEMO;
+  const blockingDemo = (on: boolean) => demo && (
+    <button type="button" className="button" onClick={() => setDemo({ protect: !on })}>
+      {on ? 'Turn off blocking' : 'Turn on blocking'} <span className="demo-tag">Demo</span>
+    </button>
+  );
+  const pairDemo = demo && (
+    <button type="button" className="button" onClick={() => setDemo({ paired: !demo.paired })}>
+      {demo.paired ? 'Unpair' : 'Pair'} <span className="demo-tag">Demo</span>
+    </button>
+  );
+  const pairStatus = demo?.paired ? <span className="pill-status pill-status--ok">In sync</span> : <span className="pill-status">Not paired</span>;
   return (
     <div className="page">
       <header className="pagehead"><h1>Devices</h1><p>Where Lockd In runs, and what each device can do today.</p></header>
       <ul className="device-list">
         {layout === 'desktop' ? (
-          <li id="windows">
-            <Icon name="laptop" size={22} />
-            <div><h2>This PC</h2><p>The blocking service restricts apps outside your profile during focus. It runs separately from this window. It isn’t included in this test build yet, so sessions here are timer only.</p></div>
-            <span className={`pill-status ${host?.agent === 'running' ? 'pill-status--ok' : ''}`}>{pcStatus}</span>
-          </li>
+          <>
+            <li id="windows">
+              <Icon name="laptop" size={22} />
+              <div><h2>This PC</h2><p>The blocking service restricts apps outside your profile during focus. It runs separately from this window.{demo ? '' : ' It isn’t included in this test build yet, so sessions here are timer only.'}</p>
+                {blockingDemo(host?.agent === 'running')}</div>
+              <span className={`pill-status ${host?.agent === 'running' ? 'pill-status--ok' : ''}`}>{pcStatus}</span>
+            </li>
+            <li id="android">
+              <Icon name="phone" size={22} />
+              <div><h2>Android phone</h2><p>Paired devices share session timing and keep working offline.</p>{pairDemo}</div>
+              {pairStatus}
+            </li>
+          </>
+        ) : layout === 'android' ? (
+          <>
+            <li id="android">
+              <Icon name="phone" size={22} />
+              <div><h2>This phone</h2><p>Covers apps outside your profile with a block screen during focus.{demo ? '' : ' Blocking isn’t in the current test build.'}</p>
+                {blockingDemo(demo?.protect === true)}</div>
+              <span className={`pill-status ${demo?.protect ? 'pill-status--ok' : ''}`}>{demo?.protect ? 'Blocking on' : 'Timer only'}</span>
+            </li>
+            <li id="windows">
+              <Icon name="laptop" size={22} />
+              <div><h2>Windows PC</h2><p>Paired devices share session timing and keep working offline.</p>{pairDemo}</div>
+              {pairStatus}
+            </li>
+          </>
         ) : (
           <>
             <li>
@@ -66,18 +102,18 @@ export function DevicesPage() {
             </li>
             <li id="windows">
               <Icon name="laptop" size={22} />
-              <div><h2>Windows PC</h2><p>The Windows app restricts apps outside your profile during focus. It isn’t released yet.</p></div>
-              <span className="pill-status">Not paired</span>
+              <div><h2>Windows PC</h2><p>The Windows app restricts apps outside your profile during focus.</p>{pairDemo}</div>
+              {pairStatus}
+            </li>
+            <li id="android">
+              <Icon name="phone" size={22} />
+              <div><h2>Android phone</h2><p>The Android app covers restricted apps with a block screen during focus.</p></div>
+              {pairStatus}
             </li>
           </>
         )}
-        <li id="android">
-          <Icon name="phone" size={22} />
-          <div><h2>Android phone</h2><p>The Android app will cover restricted apps with a block screen during focus. Blocking isn’t in the current test build.</p></div>
-          <span className="pill-status">Not paired</span>
-        </li>
       </ul>
-      <p className="hint">Pairing isn’t available yet. Once it is, paired devices share session timing and keep working offline.</p>
+      {!demo && <p className="hint">Pairing isn’t available yet. Once it is, paired devices share session timing and keep working offline.</p>}
     </div>
   );
 }

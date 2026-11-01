@@ -33,15 +33,16 @@ spike self-test, Kotlin type-check with an R stand-in, VM script lint,
 actionlint).
 
 ## Current phase — UI design and prototyping only (R35, 2026-10-31)
-- Review tool: **design preview** (`apps/web/preview.html`, `src/preview/`, `src/demo.ts`). Run `npm run preview:dev`
-  and open `/preview.html`, or `npm run build:preview` → `dist-preview/` (publish with index.html = preview.html,
-  app.html = index.html; see the "Lockd In Preview" artifact). Frames: Windows (desktop layout), Android
-  (browser approximation: `?shell=android`, preview build only), Web. Sample scenes: setup / focusing / break /
-  unlock pending / done; theme; 100/200% text; demo toggles "Blocking verified" and "Devices paired", each
-  labeled DEMO in the UI. Demo code is compiled out of the production build (checked: no traces in `dist/`).
-- Idle Focus (all layouts, 2026-10-31): opens on the lock showing the time of day and the next planned
-  session; "New session" opens the composer (focus lands on its first question; Back returns). Phone running
-  and recap views show the lock plus one line, with details behind a disclosure.
+- Review tool: **design preview studio** (`src/preview/Studio.tsx`, `src/demo.ts`): one live copy of the app in
+  a Windows window / Android phone / web page, in a single document (the earlier iframe shell is retired —
+  pointer input into nested frames was unreliable in the artifact viewer). `npm run build:preview` then
+  `node scripts/stage-preview.mjs <dir>` → publish as the "Lockd In Preview" artifact (opens the studio).
+  Dev: `npm run preview:dev`, open `/?studio=1`. Samples: idle / focusing / break / unlock pending / done; theme;
+  100/200% text; demo switches (also on the Devices page: "Turn on blocking", "Pair", each labelled Demo).
+  Phone demo file: `npx vite build --config vite.phone.config.ts --mode preview && node scripts/build-phone-demo.mjs out.html`.
+  Demo code is compiled out of the production build.
+- Lock timer: 60 clock ticks (elapsed dims clockwise from 12); shackle is its own shape behind the body and
+  slides shut (520 ms) when blocking is verified, starting open on first appearance so locking is visible.
 - Status: owner approved the circular lock direction (R36); it is in the web/Windows/Android previews with a
   "Timer & wordmark" sheet. Next: owner sign-off on Focus, then Schedule → Profiles → Devices → Settings.
 - Not yet carried to native (deferred to the native batch): Android `wordmark.xml`/`lock_mark.xml`

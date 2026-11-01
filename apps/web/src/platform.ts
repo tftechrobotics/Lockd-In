@@ -20,10 +20,22 @@ const webview = (): WebView | undefined =>
   typeof window === 'undefined' ? undefined : (window as unknown as { chrome?: { webview?: WebView } }).chrome?.webview;
 
 const shellParam = previewParams().get('shell');
-export const layout: Layout =
+export let layout: Layout =
   webview() || shellParam === 'desktop' ? 'desktop'
     : shellParam === 'android' && import.meta.env.MODE === 'preview' ? 'android'
     : 'web';
+
+/** Design preview only: switch the layout in place (the preview remounts the app afterwards). */
+export function setPreviewLayout(next: Layout): void {
+  if (import.meta.env.MODE !== 'preview' || webview()) return;
+  layout = next;
+}
+
+/** Design preview only: whether the stand-in Windows shell reports blocking as running (demo). */
+let previewAgentRunning = previewParams().get('protect') === '1';
+export function setPreviewAgentRunning(on: boolean): void {
+  if (import.meta.env.MODE === 'preview') previewAgentRunning = on;
+}
 
 let host: HostInfo | null = null;
 const listeners = new Set<() => void>();
@@ -57,8 +69,7 @@ export function initBridge(): void {
   const wv = webview();
   if (!wv && import.meta.env.MODE === 'preview' && layout === 'desktop') {
     // Design preview: stand in for the Windows shell. "running" only with the demo toggle.
-    const protect = previewParams().get('protect') === '1';
-    host = { platform: 'windows', appVersion: 'preview', agent: protect ? 'running' : 'not_installed' };
+    host = { platform: 'windows', appVersion: 'preview', agent: previewAgentRunning ? 'running' : 'not_installed' };
     listeners.forEach((l) => l());
     return;
   }

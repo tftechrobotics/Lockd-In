@@ -10,9 +10,8 @@ export default defineConfig(({ mode }) => ({
   resolve: { alias: { '@design': design } },
   server: { fs: { allow: ['.', design] } },
   build: mode === 'preview'
-    // Design preview: the shell page plus the app it frames, with relative paths so it can be
-    // published as one static bundle. Never the production build.
-    ? { outDir: 'dist-preview', sourcemap: false, rollupOptions: { input: { app: 'index.html', preview: 'preview.html' } } }
+    // Design preview: relative paths so it can be published as a static bundle. Never the production build.
+    ? { outDir: 'dist-preview', sourcemap: false }
     : { sourcemap: true },
   base: mode === 'preview' ? './' : '/',
   test: { include: ['src/**/*.test.ts'], environment: 'node' },
