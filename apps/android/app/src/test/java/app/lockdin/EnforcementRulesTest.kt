@@ -157,7 +157,7 @@ class EnforcementRulesTest {
 
     @Test fun blockedAttemptsAreCountedForTheRunningSessionOnly() {
         val store = Store(AppState()) {}
-        store.startSession(0, Session.roundsPlan(1, 25, 5), null, "study", LastChoice(25, 5, 1, "study"))
+        store.startSession(1_793_300_000_000, Session.roundsPlan(1, 25, 5), null, "study", LastChoice(25, 5, 1, "study"))
         val id = assertNotNullAnd(store.state.active).id
         store.recordBlocked(id, "com.video.app"); store.recordBlocked(id, "com.video.app"); store.recordBlocked(id, "site:youtube.com")
         store.recordBlocked("another-session", "com.video.app")
