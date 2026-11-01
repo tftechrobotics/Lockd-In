@@ -2,7 +2,7 @@
 
 **Last session:** 2026-11-01 (functional development, R37) · **Milestone:** M1 reliable single-device focus — **IN PROGRESS**
 **Read first:** `docs/audit-2026-11.md` (inventory, Freedom, platform limits, architecture) and `docs/milestones.md` (new M1–M5 criteria + evidence table).
-**Repository:** github.com/tftechrobotics/Lockd-In (private).
+**Repository:** github.com/tftechrobotics/Lockd-In (public since 2026-11-01).
 
 **Where things stand (2026-11-01, Android-only — R40)**
 - Owner paused Windows and web; the Android backlog map is in `docs/android-backlog.md`.
@@ -14,6 +14,10 @@
   exact alarm and blocks, the 'starts now' notice is posted for non-automatic plans, and nothing starts without the
   person. Code: `engine/Planner.kt` (pure, `PlannerTest`), `sched/` (Scheduler, PlanReceiver, PlanActions, Notifier).
   Not yet checked on the phone: reminders before a session, the missed follow-up, quiet hours, a reboot before a plan.
+- **Profiles pass (R41, commit 26e40d3):** allow-only websites (`AppRules.siteMode`, `BlockPolicy.isSiteRestricted`;
+  unsupported browsers blocked whole in allow-only), wallets/NFC default/clock/camera/contacts never blocked, covers
+  only for the app owning the active window (Wallet panel bug), app icons in the editor (`InstalledApps.icon`),
+  delete moved into the editor, Profiles list simplified. Needs the owner's phone check (Wallet + home screen).
 
 - **Android blocking is in the real app** (`apps/android/app/src/main/java/app/lockdin/enforce/`): `FocusService`
   (specialUse FGS, usage events, 500 ms poll), `BlockActivity`, `BlockPolicy` (pure, tested), `Capabilities`,
@@ -31,7 +35,7 @@
   minimal running/recap with 'Details/Summary and options').
 - **Known gaps:** emulator
   detection p95 3.6 s (measure on phones); scheduled starts (alarms) not implemented; Windows launch at sign-in to
-  resume after reboot not implemented (agent resumes when the app is opened); no website rules yet.
+  resume after reboot not implemented (agent resumes when the app is opened); website rules need Accessibility.
 - **Test APK (R39):** every push to apps/android builds `lockd-in-test.apk` on branch `test-apk`
   (`git show origin/test-apk:lockd-in-test.apk > x.apk`). Debug build, public test key.
 - **Owner setup needed for real-device evidence:** Google Play developer account (internal testing) and Azure
