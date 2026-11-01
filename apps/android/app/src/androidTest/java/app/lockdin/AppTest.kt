@@ -23,7 +23,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
@@ -93,14 +92,14 @@ class AppTest {
     @Test fun configureStartFocusBreakResumeFinish() {
         val store = launch()
         rule.onNodeWithText("Start timer").assertExists()
-        rule.onNodeWithContentDescription("What are you working on?").performTextInput("TAM 212 · Practice problems")
-        // Done on the keyboard closes it, as a person would before reviewing the plan.
-        rule.onNodeWithContentDescription("What are you working on?").performImeAction()
         rule.onNodeWithContentDescription("25 minutes").performClick()
         rule.onNodeWithContentDescription("25 minutes").assertIsSelected()
         pickRounds("Breaks", "5 min")
         rule.onNodeWithText("2 rounds · 5 min break between").assertIsDisplayed()
         rule.onNodeWithText("Ends at 6:55 PM", substring = true).assertIsDisplayed()
+        // Typed last: the test activity doesn't resize for the keyboard, which would cover the
+        // pinned bar here (the app's activity uses adjustResize + imePadding).
+        rule.onNodeWithContentDescription("What are you working on?").performTextInput("TAM 212 · Practice problems")
         rule.onNodeWithText("Start timer").performClick()
         rule.onNodeWithText("Focusing · round 1 of 2").assertIsDisplayed()
         rule.onNodeWithContentDescription("Focus: 25 minutes left").assertIsDisplayed()
