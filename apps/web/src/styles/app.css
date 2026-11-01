@@ -428,10 +428,7 @@ select.input { appearance: none; padding-right: 36px; cursor: pointer;
 .focus--android .go { margin-top: auto; }
 .focus--android .running { flex: 1 0 auto; display: flex; flex-direction: column; }
 .focus--android .running__foot { flex: 1 0 auto; }
-.focus--android .running__foot > .out__actions {
-  position: sticky; bottom: 0; z-index: 1; margin: auto -20px 0; padding: 12px 20px;
-  flex-direction: column; align-items: stretch; gap: 8px; background: var(--ground); border-top: 1px solid var(--line);
-}
+.focus--android .running__foot > .out__actions { flex-direction: column; align-items: stretch; gap: 8px; margin: 8px 0 24px; }
 .focus--android .running__foot > .out__actions .button { width: 100%; min-height: 48px; }
 
 /* ---------- Circular lock timer (approved 2026-10-31; one-piece silhouette) ---------- */

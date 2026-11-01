@@ -440,6 +440,24 @@ function Recap({ session, snap }: { session: ActiveSession; snap: Snapshot }) {
     ...(unlockedEarly > 0 ? [['Unlocked early', `${unlockedEarly} round${unlockedEarly > 1 ? 's' : ''}`] as [string, string]] : []),
   ];
 
+  const summary = (
+    <>
+      <SessionRail phases={occ.phases} now={endedAt} />
+      <div className="running__foot">
+        <div className="running__info">
+          <dl className="facts">
+            {facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+          </dl>
+          <p className="nudge">{how}{note ? ` ${note}` : ''}</p>
+        </div>
+        <div className="out__actions">
+          <button type="button" className="button button--primary" onClick={again}>Same again</button>
+          <button type="button" className="button" onClick={finish}>Done</button>
+        </div>
+      </div>
+    </>
+  );
+
   return (
     <div className={`page focus focus--${layout} focus--running`}>
       <div className="running">
@@ -448,19 +466,16 @@ function Recap({ session, snap }: { session: ActiveSession; snap: Snapshot }) {
           <TimerStatus state="done" closed={false} text="Session complete" icon={false} />
         </header>
         <CircleLock state="done" remainingMs={0} totalMs={1} locked={false} label="Session complete" caption="complete" />
-        <SessionRail phases={occ.phases} now={endedAt} />
-        <div className="running__foot">
-          <div className="running__info">
-            <dl className="facts">
-              {facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
-            </dl>
-            <p className="nudge">{how}{note ? ` ${note}` : ''}</p>
-          </div>
-          <div className="out__actions">
-            <button type="button" className="button button--primary" onClick={again}>Same again</button>
-            <button type="button" className="button" onClick={finish}>Done</button>
-          </div>
-        </div>
+        {layout === 'android' ? (
+          // Phone: the finished lock first; the summary and next steps are one tap away.
+          <>
+            <p className="running__next"><span>Focused</span> <strong>{facts[0][1]}</strong></p>
+            <details className="running__more">
+              <summary>Summary and options<Icon name="chevronDown" size={16} /></summary>
+              {summary}
+            </details>
+          </>
+        ) : summary}
       </div>
     </div>
   );
