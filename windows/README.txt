@@ -1,1 +1,1 @@
-Screenshots from commit 89d84fe (GitHub windows-2025 runner, 100% scaling, real WinUI window).
+Screenshots from commit 12342d4 (GitHub windows-2025 runner, 100% scaling, real WinUI window).
