@@ -81,16 +81,16 @@ plan_phase() {
   mins=$((10#$h * 60 + 10#$m + 2)); T1=$(printf '%02d:%02d' $(( (mins / 60) % 24 )) $(( mins % 60 )))
   mins2=$((mins + 1)); T2=$(printf '%02d:%02d' $(( (mins2 / 60) % 24 )) $(( mins2 % 60 )))
   wait1=$(( (2 * 60 - 10#$sec) ))
-  ctl --es cmd plan --es at "$T1" --es title "Manual plan" --ez auto false --es block "$T"
-  ctl --es cmd plan --es at "$T2" --es title "Auto plan" --ez auto true --es block "$T" --ei focus 2
+  ctl --es cmd plan --es at "$T1" --es title ManualPlan --ez auto false --es block "$T"
+  ctl --es cmd plan --es at "$T2" --es title AutoPlan --ez auto true --es block "$T" --ei focus 2
   note "  planned $T1 (manual) and $T2 (automatic) at phone time $ph"
   sleep $(( wait1 + 15 ))
-  notif_has "Manual plan starts now" && record A-start-reminder pass "'starts now' notice with Start now for a non-automatic plan" \
+  notif_has "ManualPlan starts now" && record A-start-reminder pass "'starts now' notice with Start now for a non-automatic plan" \
     || record A-start-reminder FAIL "no 'starts now' notice at $T1"
   service_up && record A-manual-not-started FAIL "a session started without the person" || record A-manual-not-started pass "nothing started without the person"
   sleep 60
   service_up && record A-auto-start pass "automatic plan started the blocking service at $T2" || record A-auto-start FAIL "service not running after $T2"
-  notif_has "Auto plan started" && record A-auto-notice pass "'Auto plan started' notice" || record A-auto-notice FAIL "no start notice"
+  notif_has "AutoPlan started" && record A-auto-notice pass "AutoPlan started notice" || record A-auto-notice FAIL "no start notice"
   r=$(trial_blocked 6000) && record A-auto-blocks pass "target covered during the automatic session (${r} ms)" || record A-auto-blocks FAIL "$r"
   ctl --es cmd emergency; sleep 3
   # Diagnostics for this phase (annotations are the only way to read CI output from here).
