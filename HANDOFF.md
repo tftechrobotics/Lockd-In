@@ -4,7 +4,13 @@
 **Read first:** `docs/audit-2026-11.md` (inventory, Freedom, platform limits, architecture) and `docs/milestones.md` (new M1–M5 criteria + evidence table).
 **Repository:** github.com/tftechrobotics/Lockd-In (private).
 
-**Where things stand**
+**Where things stand (2026-11-01, Android-only — R40)**
+- Owner paused Windows and web; the Android backlog map is in `docs/android-backlog.md`.
+- **Milestone A (automatic schedules + reminders) is written, commit bd2cd55, but NOT built.** GitHub Actions stopped
+  starting jobs ("recent account payments have failed or your spending limit needs to be increased"). Local
+  checks only: Kotlin type-check of non-UI code, PlannerTest 10/11 (the codec test needs real org.json, i.e. CI).
+  Compose UI, lint, emulator E2E (planned-session phase added) and the test APK wait on CI billing.
+
 - **Android blocking is in the real app** (`apps/android/app/src/main/java/app/lockdin/enforce/`): `FocusService`
   (specialUse FGS, usage events, 500 ms poll), `BlockActivity`, `BlockPolicy` (pure, tested), `Capabilities`,
   `BootReceiver`; state v2 (per-profile rules, commitment, session snapshot) with v1 migration; Store is a process
