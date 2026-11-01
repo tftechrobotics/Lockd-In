@@ -43,8 +43,9 @@ test('configure → start → focus → break → resume → finish', async ({ p
   await expect(page.locator('.rail__name')).toHaveText(['Focus · 25 min', 'Break', 'Focus · 25 min']);
   // No blocking badge unless blocking is verified.
   await expect(page.locator('.guard')).toHaveCount(0);
-  // The ring starts full and follows the countdown.
-  await expect(lock(page).locator('.clock-lock__arc')).toHaveAttribute('stroke-dasharray', '1000.0 1000');
+  // Clock ticks: all 60 lit at the start; elapsed time dims them clockwise from 12.
+  await expect(lock(page).locator('.clock-lock__tick')).toHaveCount(60);
+  await expect(lock(page).locator('.clock-lock__tick.is-left')).toHaveCount(60);
   await expect(page.locator('.facts')).toContainText('Next break');
 
   await page.clock.fastForward(25 * MIN + 1000);
@@ -54,7 +55,7 @@ test('configure → start → focus → break → resume → finish', async ({ p
   await expect(page.locator('.facts')).toContainText('Focus resumes');
 
   await page.clock.fastForward(2.5 * MIN); // halfway through the 5-minute break
-  await expect(lock(page).locator('.clock-lock__arc')).toHaveAttribute('stroke-dasharray', /^(49\d|50\d)\.\d 1000$/);
+  await expect(lock(page).locator('.clock-lock__tick.is-left')).toHaveCount(30);
   await page.clock.fastForward(1.5 * MIN + 10_000); // 50 s left in the break
   await expect(page.getByText(/resumes in about a minute/)).toBeVisible();
 

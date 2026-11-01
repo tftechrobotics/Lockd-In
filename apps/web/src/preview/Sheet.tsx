@@ -17,6 +17,17 @@ function Live() {
   return <CircleLock state="focus" remainingMs={left} totalMs={total} locked={false} label="Live sample" caption="remaining" size="200px" />;
 }
 
+function Toggle() {
+  // Watch the shackle drop shut and lift open (Demo: locking needs verified blocking in the app).
+  const [locked, setLocked] = useState(true);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
+      <CircleLock state={locked ? 'focus' : 'break'} remainingMs={26 * MIN} totalMs={TOTAL} locked={locked} label="Lock animation" caption={locked ? 'left this round' : 'left in break'} size="200px" />
+      <button type="button" className="button" onClick={() => setLocked((l) => !l)}>{locked ? 'Unlock' : 'Lock'}</button>
+    </div>
+  );
+}
+
 const cell = (title: string, note: string, el: React.ReactNode) => (
   <figure className="sheet-cell"><div className="sheet-cell__art">{el}</div><figcaption><strong>{title}</strong><span>{note}</span></figcaption></figure>
 );
@@ -46,6 +57,7 @@ export function Sheet() {
           {cell('Halfway', '20:00 of 40:00', lock('focus', TOTAL / 2))}
           {cell('Nearly finished', '0:45 of 40:00', lock('focus', 45_000))}
           {cell('Live', 'one-minute loop', <Live />)}
+          {cell('Lock / unlock', 'Demo: tap to watch the shackle', <Toggle />)}
         </div>
       </section>
       <section>

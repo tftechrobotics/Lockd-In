@@ -434,27 +434,29 @@ select.input { appearance: none; padding-right: 36px; cursor: pointer;
 /* ---------- Circular lock timer (approved 2026-10-31; one-piece silhouette) ---------- */
 :root {
   --lock-frame: #ABA095; --lock-body: #ECE5DA;
-  --lock-track: rgba(48,42,37,0.08); --lock-arc: #8E8175; --lock-arc-break: #B8AC9F;
+  --lock-track: rgba(48,42,37,0.13); --lock-arc: #74685D; --lock-arc-break: #B8AC9F;
 }
 :root[data-theme="dark"] {
   --lock-frame: #6F655B; --lock-body: #2B251F;
-  --lock-track: rgba(240,232,219,0.09); --lock-arc: #B9AB9B; --lock-arc-break: #85796D;
+  --lock-track: rgba(240,232,219,0.14); --lock-arc: #D2C4B3; --lock-arc-break: #85796D;
 }
 .clock-lock { width: clamp(200px, 26vw, 300px); max-width: 100%; margin: 0 auto; }
 .clock-lock svg { display: block; width: 100%; height: auto; overflow: visible; }
 .clock-lock__frame { fill: var(--lock-frame); }
 .clock-lock__body { fill: var(--lock-body); }
-.clock-lock__track { stroke: var(--lock-track); stroke-width: 8; }
-.clock-lock__arc { stroke: var(--lock-arc); stroke-width: 8; stroke-linecap: round; transition: stroke-dasharray 900ms linear; }
-.clock-lock--break .clock-lock__arc { stroke: var(--lock-arc-break); }
+.clock-lock__shackle { transition: transform 520ms cubic-bezier(.5, 0, .2, 1.35); }
+.clock-lock__tick { stroke: var(--lock-track); stroke-width: 2.5; stroke-linecap: round; transition: stroke 400ms ease; }
+.clock-lock__tick.is-hour { stroke-width: 3.5; }
+.clock-lock__tick.is-left { stroke: var(--lock-arc); }
+.clock-lock--break .clock-lock__tick.is-left { stroke: var(--lock-arc-break); }
 .clock-lock__time { fill: var(--ink); font: 500 52px 'Outfit Variable', sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -1px; }
 .clock-lock__caption { fill: var(--ink-muted); font: 500 14px 'Figtree Variable', sans-serif; letter-spacing: 0.04em; }
 .clock-lock--ready .clock-lock__time, .clock-lock--done .clock-lock__time { fill: var(--ink-muted); }
 .clock-lock--break .clock-lock__body { fill: color-mix(in srgb, var(--lock-body) 70%, var(--ground)); }
-@media (prefers-reduced-motion: reduce) { .clock-lock__arc { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .clock-lock__shackle, .clock-lock__tick { transition: none; } }
 @media (forced-colors: active) {
-  .clock-lock__frame { fill: CanvasText; } .clock-lock__body { fill: Canvas; } .clock-lock__arc { stroke: CanvasText; }
-  .clock-lock__track { stroke: GrayText; } .clock-lock__time, .clock-lock__caption { fill: CanvasText; }
+  .clock-lock__frame { fill: CanvasText; } .clock-lock__body { fill: Canvas; } .clock-lock__tick { stroke: GrayText; } .clock-lock__tick.is-left { stroke: CanvasText; }
+  .clock-lock__time, .clock-lock__caption { fill: CanvasText; }
 }
 /* Running: task, status and the lock centred as one group; rail and details below. */
 .focus--running .running__task, .focus--running .timer-status { align-self: center; text-align: center; }

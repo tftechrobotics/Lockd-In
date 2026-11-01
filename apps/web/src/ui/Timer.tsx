@@ -1,9 +1,9 @@
 // The running-session timer identity (design pass 4, direction B): display numerals with a
 // small lock detail, and a session rail. The lock closes only when restriction is verified
 // on this device (`closed`), never just because a focus round is running.
+import { useEffect, useState } from 'react';
 import type { Phase } from '../engine/session';
 import { clockTime, countdown } from './format';
-import { lockSilhouette } from './lockPath';
 
 export type TimerState = 'ready' | 'focus' | 'break' | 'done';
 
@@ -35,10 +35,33 @@ export function TimerStatus({ state, closed, text, live = false, icon = true }: 
  * `locked` closes the shackle. Pass it only when restriction is verified and applied right now;
  * timer-only focus, breaks and unlocked rounds show it open.
  */
-const LK = { w: 240, cx: 120, cy: 232, r: 108, rim: 7, ring: 84 };
-const SHACKLE = { ro: 74.5, stroke: 21, top: 36, lift: 28 };
-const GEO = { cx: LK.cx, cy: LK.cy, r: LK.r, ro: SHACKLE.ro, stroke: SHACKLE.stroke, top: SHACKLE.top };
-const SILHOUETTE = { closed: lockSilhouette(GEO, false), open: lockSilhouette(GEO, true, SHACKLE.lift) };
+const LK = { w: 240, cx: 120, cy: 232, r: 108, rim: 7 };
+const SHACKLE = { ro: 74.5, stroke: 21, top: 40, lift: 36 };
+const TICKS = 60;
+
+/**
+ * The shackle as one filled shape in its closed position. The left leg runs deep into the body
+ * so it stays seated when the shackle lifts; the right leg ends in a rounded tip just inside the
+ * body. Body and shackle share one fill and no outline, so where they overlap there is no seam.
+ */
+const SHACKLE_PATH = (() => {
+  const { cx, cy, r } = LK, { ro, stroke, top } = SHACKLE;
+  const ri = ro - stroke, cap = stroke / 2, arcY = top + ro;
+  const yo = cy - Math.sqrt(r * r - ro * ro);
+  const tip = yo + cap;
+  return `M${cx - ro} ${cy}V${arcY}A${ro} ${ro} 0 0 1 ${cx + ro} ${arcY}V${tip}A${cap} ${cap} 0 0 1 ${cx + ri} ${tip}`
+    + `V${arcY}A${ri} ${ri} 0 0 0 ${cx - ri} ${arcY}V${cy}Z`;
+})();
+
+/** Clock ticks: 60 around the face, every fifth one longer (the hours). */
+const TICK_PATHS = Array.from({ length: TICKS }, (_, i) => {
+  const a = (i / TICKS) * Math.PI * 2;
+  const hour = i % 5 === 0;
+  const r1 = hour ? 75 : 81, r2 = 91;
+  const sx = Math.sin(a), sy = -Math.cos(a);
+  const p = (rr: number) => `${(LK.cx + sx * rr).toFixed(2)} ${(LK.cy + sy * rr).toFixed(2)}`;
+  return { d: `M${p(r1)}L${p(r2)}`, hour };
+});
 
 export function CircleLock({ state, remainingMs, totalMs, locked, label, caption, size, text }: {
   state: TimerState; remainingMs: number; totalMs: number; locked: boolean;
@@ -52,20 +75,31 @@ export function CircleLock({ state, remainingMs, totalMs, locked, label, caption
   text?: string;
 }) {
   const f = state === 'done' ? 0 : totalMs > 0 ? Math.max(0, Math.min(1, remainingMs / totalMs)) : 0;
-  // The frame hugs the shape: an open shackle sits higher, so it needs a little more room.
-  const minY = (locked ? SHACKLE.top : SHACKLE.top - SHACKLE.lift) - 4;
+  // Like a clock: time passing sweeps clockwise from 12, dimming ticks; the ticks still lit are
+  // the time left in this round. Idle (no total) shows plain clock ticks.
+  const idle = text !== undefined && state === 'ready';
+  // The shackle starts open and drops shut a moment after the lock appears, so locking is seen
+  // happening (session start, end of a break); after that it follows `locked` with the same motion.
+  const [settled, setSettled] = useState(false);
+  useEffect(() => { const id = window.setTimeout(() => setSettled(true), 350); return () => window.clearTimeout(id); }, []);
+  const closed = locked && settled;
+  const elapsedTicks = Math.min(TICKS, Math.floor((1 - f) * TICKS + 1e-9));
+  const minY = SHACKLE.top - SHACKLE.lift - 4;
   const h = LK.cy + LK.r + 4 - minY;
   return (
     <div className={`clock-lock clock-lock--${state}${locked ? ' is-locked' : ''}`} role="timer" aria-label={label} style={size ? { width: size } : undefined}>
       <svg viewBox={`0 ${minY} ${LK.w} ${h}`} aria-hidden="true" focusable="false">
-        {/* One continuous silhouette (body ∪ shackle); the face is inset so the rim and shackle read as one piece. */}
-        <path className="clock-lock__frame" d={locked ? SILHOUETTE.closed : SILHOUETTE.open} fillRule="evenodd" />
+        {/* The shackle slides down to lock and lifts to unlock; the body covers its seated legs. */}
+        <g className="clock-lock__shackle" style={{ transform: `translateY(${closed ? 0 : -SHACKLE.lift}px)` }}>
+          <path className="clock-lock__frame" d={SHACKLE_PATH} />
+        </g>
+        <circle className="clock-lock__frame" cx={LK.cx} cy={LK.cy} r={LK.r} />
         <circle className="clock-lock__body" cx={LK.cx} cy={LK.cy} r={LK.r - LK.rim} />
-        <circle className="clock-lock__track" cx={LK.cx} cy={LK.cy} r={LK.ring} fill="none" />
-        {f > 0.0005 && (
-          <circle className="clock-lock__arc" cx={LK.cx} cy={LK.cy} r={LK.ring} fill="none" pathLength={1000}
-            strokeDasharray={`${(f * 1000).toFixed(1)} 1000`} transform={`rotate(-90 ${LK.cx} ${LK.cy})`} />
-        )}
+        <g className="clock-lock__ticks">
+          {TICK_PATHS.map((t, i) => (
+            <path key={i} d={t.d} className={`clock-lock__tick${t.hour ? ' is-hour' : ''}${idle || i >= elapsedTicks ? ' is-left' : ''}`} />
+          ))}
+        </g>
         <text className="clock-lock__time" x={LK.cx} y={LK.cy + 14} textAnchor="middle">{text ?? (state === 'done' ? 'Done' : countdown(remainingMs))}</text>
         <text className="clock-lock__caption" x={LK.cx} y={LK.cy + 44} textAnchor="middle">{caption}</text>
       </svg>
