@@ -23,8 +23,8 @@ a { color: inherit; }
 main:focus { outline: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .icon { flex-shrink: 0; }
-.skip { position: absolute; left: 12px; top: -60px; z-index: 10; background: var(--ink); color: var(--on-ink); padding: 10px 16px; border-radius: 8px; }
-.skip:focus { top: 12px; }
+.skip { position: absolute; left: 12px; top: 12px; transform: translateY(calc(-100% - 24px)); z-index: 10; background: var(--ink); color: var(--on-ink); padding: 10px 16px; border-radius: 8px; }
+.skip:focus { transform: none; }
 
 /* ---------- Web masthead: branded, compact ---------- */
 .masthead { position: relative; z-index: 2; background: var(--taupe); border-bottom: 1px solid var(--line); }
@@ -368,3 +368,72 @@ select.input { appearance: none; padding-right: 36px; cursor: pointer;
   opacity: calc(var(--grain) * 0.6); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.19 0 0 0 0 0.16 0 0 0 0 0.14 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); background-attachment: fixed;
 }
 :root[data-theme="dark"] .focus--desktop .go::before { mix-blend-mode: screen; }
+
+/* ---------- Design preview only: demo labels and the Android approximation ---------- */
+.demo-tag {
+  display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 4px; vertical-align: 1px;
+  font: 600 0.6875rem/1.5 'Figtree Variable', sans-serif; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--ink); background: var(--taupe-soft); border: 1px dashed var(--control-line);
+}
+.droid { height: 100dvh; display: flex; flex-direction: column; }
+.droid__bar { flex: none; display: flex; align-items: center; justify-content: space-between; height: 56px; padding: 0 8px 0 20px; }
+.droid__mark { display: block; width: 92px; color: var(--ink); }
+.droid__mark svg { display: block; width: 100%; height: auto; }
+.droid__icon { display: grid; place-items: center; width: 48px; height: 48px; color: var(--ink); border-radius: 50%; }
+.droid__main { flex: 1 1 auto; overflow-y: auto; container-type: inline-size; scrollbar-width: none; }
+.focus--android .composer-layout { padding-top: 8px; }
+.droid__main:focus { outline: none; }
+.droid__nav { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); padding: 10px 0 14px; background: var(--ground); }
+.droid__tab { display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: var(--ink-muted); font-size: 0.75rem; }
+.droid__pill { display: grid; place-items: center; width: 64px; height: 32px; border-radius: 16px; }
+.droid__tab[aria-current="page"] { color: var(--ink); font-weight: 600; }
+.droid__tab[aria-current="page"] .droid__pill { background: var(--taupe-soft); }
+:root[data-layout="android"] .page { padding: 8px 20px 0; max-width: none; }
+.focus--android .composer-layout { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.focus--android .composer { gap: 24px; }
+.focus--android .q__label { font-size: 1.125rem; }
+.focus--android .bigfield { font-size: 1.375rem; }
+.focus--android .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+:root[data-text="200"] .focus--android .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.focus--android .tile { min-height: 68px; }
+/* Pinned action bar, as in the Compose app: note, plan line, then the button. */
+.focus--android .go {
+  position: sticky; bottom: 0; z-index: 1; flex-direction: column-reverse; align-items: stretch; gap: 8px;
+  margin: 0 -20px; padding: 12px 20px; background: var(--ground); border-top: 1px solid var(--line);
+}
+.focus--android .go__row { flex-direction: column-reverse; align-items: stretch; gap: 8px; width: 100%; }
+.focus--android .go__row > .button--start { flex: none; width: 100%; min-height: 52px; border-radius: 12px; }
+.focus--android .go__summary { display: block; font-size: 0.8125rem; }
+.focus--android .focus__foot { display: none; }
+.focus--android .running { padding-top: 16px; gap: 12px; max-width: none; }
+.focus--android .numerals { font-size: min(6.5rem, 31cqi); }
+.focus--android .facts { display: block; }
+.focus--android .facts > div { display: flex; justify-content: space-between; align-items: center; min-height: 48px; border-bottom: 1px solid var(--line); }
+.focus--android .facts > div:first-child { border-top: 1px solid var(--line); }
+.focus--android .facts dd { margin: 0; font: 600 0.9375rem/1.3 'Figtree Variable', sans-serif; font-variant-numeric: tabular-nums; }
+.focus--android .facts dt { color: var(--ink-muted); font-size: 1rem; }
+.focus--android .running__foot { flex-direction: column; align-items: stretch; }
+.focus--android .out {
+  position: sticky; bottom: 0; z-index: 1; margin: 0 -20px; padding: 12px 20px;
+  background: var(--ground); border-top: 1px solid var(--line);
+}
+.focus--android .out > .button, .focus--android .out__actions .button--primary { width: 100%; }
+.focus--android .running__foot { border-top: 0; padding-top: 0; margin-top: 4px; }
+/* Android preview: width comes from the negative margins, not 100%. At large text the status note
+   scrolls with the content (as in the Compose app) so the pinned bar stays small. */
+.focus--android .go, .focus--android .out { width: auto; }
+.protection--content { display: none; }
+:root[data-text="200"] .focus--android .go > .protection { display: none; }
+:root[data-text="200"] .focus--android .protection--content { display: flex; }
+/* Android preview: the action bar sits at the bottom even when the content is short. */
+:root[data-layout="android"] .droid__main > .page { min-height: 100%; display: flex; flex-direction: column; }
+.focus--android .composer-layout { flex: 1 0 auto; align-items: stretch; }
+.focus--android .go { margin-top: auto; }
+.focus--android .running { flex: 1 0 auto; display: flex; flex-direction: column; }
+.focus--android .running__foot { flex: 1 0 auto; }
+.focus--android .out { margin-top: auto; }
+.focus--android .running__foot > .out__actions {
+  position: sticky; bottom: 0; z-index: 1; margin: auto -20px 0; padding: 12px 20px;
+  flex-direction: column; align-items: stretch; gap: 8px; background: var(--ground); border-top: 1px solid var(--line);
+}
+.focus--android .running__foot > .out__actions .button { width: 100%; min-height: 48px; }

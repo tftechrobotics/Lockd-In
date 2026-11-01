@@ -3,7 +3,8 @@
 // desktop layout for development and tests in an ordinary browser.
 import { useSyncExternalStore } from 'react';
 
-export type Layout = 'web' | 'desktop';
+/** 'android' exists only in the design preview: a browser approximation of the Compose screens. */
+export type Layout = 'web' | 'desktop' | 'android';
 
 /** What the native host has told us. Never trusted for anything but display. */
 export interface HostInfo {
@@ -17,9 +18,11 @@ interface WebView { postMessage(m: unknown): void; addEventListener(t: 'message'
 const webview = (): WebView | undefined =>
   typeof window === 'undefined' ? undefined : (window as unknown as { chrome?: { webview?: WebView } }).chrome?.webview;
 
+const shellParam = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('shell') : null;
 export const layout: Layout =
-  webview() || (typeof location !== 'undefined' && new URLSearchParams(location.search).get('shell') === 'desktop')
-    ? 'desktop' : 'web';
+  webview() || shellParam === 'desktop' ? 'desktop'
+    : shellParam === 'android' && import.meta.env.MODE === 'preview' ? 'android'
+    : 'web';
 
 let host: HostInfo | null = null;
 const listeners = new Set<() => void>();
@@ -51,6 +54,13 @@ export function parseHostMessage(data: unknown): HostInfo | null {
 
 export function initBridge(): void {
   const wv = webview();
+  if (!wv && import.meta.env.MODE === 'preview' && layout === 'desktop') {
+    // Design preview: stand in for the Windows shell. "running" only with the demo toggle.
+    const protect = new URLSearchParams(location.search).get('protect') === '1';
+    host = { platform: 'windows', appVersion: 'preview', agent: protect ? 'running' : 'not_installed' };
+    listeners.forEach((l) => l());
+    return;
+  }
   if (!wv) return;
   wv.addEventListener('message', (e) => {
     const info = parseHostMessage(e.data);

@@ -1,5 +1,6 @@
 // Focus (design pass 4): a question-led session composer for setup, and a numerals-and-rail
 // timer while running. Session logic (engine, store, override rules) is unchanged.
+import { DEMO } from '../demo';
 import { useEffect, useId, useRef, useState } from 'react';
 import {
   DEFAULT_OVERRIDE_DELAY_SECONDS, evaluate, occurrenceFrom, roundsPlan, validatePlan,
@@ -39,6 +40,7 @@ const ROUNDS = [1, 2, 3, 4, 5, 6];
 /** Whether this surface can restrict apps right now (only a running Windows blocking service can). */
 export function useCanBlock(): boolean {
   const host = useHost();
+  if (layout === 'android') return DEMO?.protect === true; // preview only; the web build never blocks
   return layout === 'desktop' && host?.agent === 'running';
 }
 
@@ -158,6 +160,7 @@ function Setup() {
             </div>
           </div>
 
+          {layout === 'android' && <Protection canBlock={canBlock} extra="protection--content" />}
           {error && <p id={ids.err} className="error" role="alert">{error}</p>}
           <div className="go">
             <div className="go__row">
@@ -187,18 +190,30 @@ function Setup() {
 }
 
 /** One honest line about blocking, with a way to set it up when it isn't available. */
-function Protection({ canBlock, during = false }: { canBlock: boolean; during?: boolean }) {
-  if (canBlock) {
+function Protection({ canBlock, during = false, restricting = true, extra = '' }: { canBlock: boolean; during?: boolean; restricting?: boolean; extra?: string }) {
+  if (canBlock && during && !restricting) {
+    // Breaks and unlocked rounds: blocking exists but isn't applied right now.
     return (
-      <p className="protection protection--on">
-        <span className="dot dot--ok" aria-hidden="true" />
-        <span>{during ? 'Apps outside your profile are restricted.' : 'Apps outside your profile are restricted during focus.'}</span>
+      <p className={`protection ${extra}`}>
+        <span className="dot" aria-hidden="true" />
+        <span>Apps are available until focus resumes.</span>
+        {DEMO?.protect && <span className="demo-tag">Demo</span>}
       </p>
     );
   }
-  const where = layout === 'web' ? 'Browsers can’t restrict apps, so apps and websites stay available.' : 'Apps and websites stay available on this PC.';
+  if (canBlock) {
+    return (
+      <p className={`protection protection--on ${extra}`}>
+        <span className="dot dot--ok" aria-hidden="true" />
+        <span>{during ? 'Apps outside your profile are restricted.' : 'Apps outside your profile are restricted during focus.'}</span>
+        {DEMO?.protect && <span className="demo-tag">Demo</span>}
+      </p>
+    );
+  }
+  const where = layout === 'web' ? 'Browsers can’t restrict apps, so apps and websites stay available.'
+    : layout === 'android' ? 'Apps stay available on this phone.' : 'Apps and websites stay available on this PC.';
   return (
-    <p className="protection">
+    <p className={`protection ${extra}`}>
       <span className="dot" aria-hidden="true" />
       <span>Timer only. {where} <a href="#/devices">Set up blocking</a></span>
     </p>
@@ -269,7 +284,7 @@ function SessionView({ session }: { session: ActiveSession }) {
               {facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
             </dl>
             {note && <p className="nudge" aria-live="polite">{note}</p>}
-            <Protection canBlock={canBlock} during />
+            <Protection canBlock={canBlock} during restricting={snap.restricting} />
           </div>
           <OverridePanel session={session} snap={snap} now={now} />
         </div>

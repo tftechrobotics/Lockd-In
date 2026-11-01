@@ -11,7 +11,9 @@
     "e2e": "playwright test",
     "assets": "node scripts/build-wordmark.mjs",
     "tokens": "node scripts/gen-tokens.mjs",
-    "preview-page": "node scripts/build-preview.mjs"
+    "preview-page": "node scripts/build-preview.mjs",
+    "build:preview": "tsc --noEmit -p . && vite build --mode preview",
+    "preview:dev": "vite --mode preview"
   },
   "dependencies": {
     "@fontsource-variable/figtree": "5.3.0",

@@ -63,6 +63,31 @@ export function App() {
   }, [session]);
   const Page = ROUTES[route].page;
 
+  if (layout === 'android') {
+    // Design preview only: the Compose app's chrome (top bar, bottom navigation) around the shared pages.
+    const tabs: [Route, string, 'focus' | 'calendar' | 'book'][] = [['focus', 'Focus', 'focus'], ['schedule', 'Schedule', 'calendar'], ['profiles', 'Profiles', 'book']];
+    return (
+      <div className="droid">
+        <a className="skip" href="#main">Skip to content</a>
+        <header className="droid__bar">
+          <a className="droid__mark" href="#/focus" aria-label="Lockd In, Focus" dangerouslySetInnerHTML={{ __html: wordmark }} />
+          <a className="droid__icon" href="#/settings" aria-label="Settings"><Icon name="gear" size={22} /></a>
+        </header>
+        <main id="main" tabIndex={-1} className="droid__main">
+          <Page />
+        </main>
+        <nav className="droid__nav" aria-label="Main">
+          {tabs.map(([r, label, icon]) => (
+            <a key={r} href={`#/${r}`} aria-current={route === r ? 'page' : undefined} className="droid__tab">
+              <span className="droid__pill"><Icon name={icon} size={22} /></span>
+              <span>{label}</span>
+            </a>
+          ))}
+        </nav>
+      </div>
+    );
+  }
+
   if (layout === 'desktop') {
     return (
       <>

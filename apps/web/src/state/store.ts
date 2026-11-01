@@ -60,7 +60,9 @@ export interface State {
   recentIntentions: Intention[];
 }
 
-const KEY = 'lockdin.v1';
+// The design preview runs several frames on one origin; each keeps its own sample state.
+const KEY = 'lockdin.v1' + (import.meta.env.MODE === 'preview' && typeof location !== 'undefined'
+  ? '.preview.' + (new URLSearchParams(location.search).get('frame') ?? 'main') : '');
 
 export const BUILT_IN_PROFILES: Profile[] = [
   { id: 'study', name: 'Study', description: 'Course apps, notes, PDFs and a calculator', builtIn: true },
