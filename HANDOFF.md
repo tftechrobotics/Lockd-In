@@ -17,7 +17,9 @@
   mute ledger + guardian, plan/status files in `%LOCALAPPDATA%\LockdIn\agent`. Shell writes the plan from the UI's
   `ui.restriction` message, starts the agent, relays `host.agent_status`; Profiles page has a PC app picker
   (`host.apps`). Runner E2E: `apps/windows/scripts/agent-e2e.ps1`. **Not yet observed working on any Windows machine.**
-- **Known gaps:** Android Compose screens still use the pre-R36 numerals timer (port the circular lock); emulator
+- **Phone UI:** approved R36 views are native now (`ui/ClockLock.kt`; Focus tab = idle lock → setup with Back →
+  minimal running/recap with 'Details/Summary and options').
+- **Known gaps:** emulator
   detection p95 3.6 s (measure on phones); scheduled starts (alarms) not implemented; Windows launch at sign-in to
   resume after reboot not implemented (agent resumes when the app is opened); no website rules yet.
 - **Test APK (R39):** every push to apps/android builds `lockd-in-test.apk` on branch `test-apk`
