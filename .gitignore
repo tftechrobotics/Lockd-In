@@ -9,6 +9,8 @@ build/
 local.properties
 *.jks
 *.keystore
+# Exception: the PUBLIC test key for sideloaded debug builds (password "android"). Never a Play key.
+!apps/android/app/debug.keystore
 .env
 *.p12
 *.pfx
