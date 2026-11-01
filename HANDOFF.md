@@ -14,7 +14,15 @@
   exact alarm and blocks, the 'starts now' notice is posted for non-automatic plans, and nothing starts without the
   person. Code: `engine/Planner.kt` (pure, `PlannerTest`), `sched/` (Scheduler, PlanReceiver, PlanActions, Notifier).
   Not yet checked on the phone: reminders before a session, the missed follow-up, quiet hours, a reboot before a plan.
-- **Sculpted dial + start sequence (R42, commit e72eb6d):** `ui/ClockLock.kt` (`StartIntro` one-shot, `animationsOff`),
+- **Sculpted dial + start sequence (R42; latest app build 2927c56, all emulator checks passed in run for ae6a998):**
+  clock hands on the turning dial (hour hand counter-clockwise) fade into the digits. Review video is rendered
+  frame by frame by `AppTest.recordStartSequenceFrames` (`ci-screenshots/android/seq`); the emulator's realtime
+  recorder drops frames. Accessibility site check now searches all of a browser's windows
+  (`flagRetrieveInteractiveWindows`) and rechecks the front app 300/900 ms after an early window event.
+  Known: emulator Chrome sometimes shows its own full-screen screen with no address bar late in the long run,
+  so `a11y-site-block` can fail there (diagnostics: `ONLY=site`, screen texts on failure).
+  Phone check pending for: start sequence feel/haptics, Chrome blocking, Wallet + home screen.
+- **Sculpted dial + start sequence (R42, first commit e72eb6d):** `ui/ClockLock.kt` (`StartIntro` one-shot, `animationsOff`),
   settings `startHaptics`/`startSound`. Emulator E2E `intro_phase` records `ci-screenshots/start-sequence/*.mp4`.
 - **Profiles pass (R41, commit 26e40d3):** allow-only websites (`AppRules.siteMode`, `BlockPolicy.isSiteRestricted`;
   unsupported browsers blocked whole in allow-only), wallets/clock/camera/contacts never blocked, covers
