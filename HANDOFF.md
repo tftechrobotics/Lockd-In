@@ -14,6 +14,8 @@
   exact alarm and blocks, the 'starts now' notice is posted for non-automatic plans, and nothing starts without the
   person. Code: `engine/Planner.kt` (pure, `PlannerTest`), `sched/` (Scheduler, PlanReceiver, PlanActions, Notifier).
   Not yet checked on the phone: reminders before a session, the missed follow-up, quiet hours, a reboot before a plan.
+- **Sculpted dial + start sequence (R42, commit e72eb6d):** `ui/ClockLock.kt` (`StartIntro` one-shot, `animationsOff`),
+  settings `startHaptics`/`startSound`. Emulator E2E `intro_phase` records `ci-screenshots/start-sequence/*.mp4`.
 - **Profiles pass (R41, commit 26e40d3):** allow-only websites (`AppRules.siteMode`, `BlockPolicy.isSiteRestricted`;
   unsupported browsers blocked whole in allow-only), wallets/clock/camera/contacts never blocked, covers
   only for the app owning the active window (Wallet panel bug), app icons in the editor (`InstalledApps.icon`),
