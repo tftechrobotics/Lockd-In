@@ -23,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
@@ -93,6 +94,8 @@ class AppTest {
         val store = launch()
         rule.onNodeWithText("Start timer").assertExists()
         rule.onNodeWithContentDescription("What are you working on?").performTextInput("TAM 212 · Practice problems")
+        // Done on the keyboard closes it, as a person would before reviewing the plan.
+        rule.onNodeWithContentDescription("What are you working on?").performImeAction()
         rule.onNodeWithContentDescription("25 minutes").performClick()
         rule.onNodeWithContentDescription("25 minutes").assertIsSelected()
         pickRounds("Breaks", "5 min")
