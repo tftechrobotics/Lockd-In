@@ -153,6 +153,7 @@ class FocusService : Service() {
                 // A focus period just began: look back so an app already open is covered too.
                 lastQueryMs = now - LOOKBACK_MS
                 currentTop = null
+                currentTopAt = 0L
             }
             if (interactive) {
                 pollForeground(now)
@@ -177,12 +178,19 @@ class FocusService : Service() {
 
     private fun pollForeground(now: Long) {
         val usm = getSystemService(UsageStatsManager::class.java)
-        val events = runCatching { usm.queryEvents(lastQueryMs, now) }.getOrNull() ?: return
+        // Events are stamped when they happen but can appear in queries a little later. Re-read
+        // an overlapping window each time and keep the newest by timestamp, so a late event is
+        // never skipped (skipping one left a blocked app uncovered until the next app switch).
+        val from = minOf(lastQueryMs, now - OVERLAP_MS)
+        val events = runCatching { usm.queryEvents(from, now) }.getOrNull() ?: return
         lastQueryMs = now
         val e = UsageEvents.Event()
         while (events.hasNextEvent()) {
             events.getNextEvent(e)
-            if (e.eventType == UsageEvents.Event.ACTIVITY_RESUMED) { currentTop = e.packageName; currentTopAt = e.timeStamp }
+            if (e.eventType == UsageEvents.Event.ACTIVITY_RESUMED && e.timeStamp >= currentTopAt) {
+                currentTop = e.packageName
+                currentTopAt = e.timeStamp
+            }
         }
     }
 
@@ -271,6 +279,7 @@ class FocusService : Service() {
         private const val IDLE_MS = 2_000L
         private const val COVER_DEBOUNCE_MS = 1_500L
         private const val LOOKBACK_MS = 30 * 60_000L
+        private const val OVERLAP_MS = 10_000L
         const val ACTION_TICK = "app.lockdin.TICK"
 
         /** This process's service instance exists. Process death resets it. */
