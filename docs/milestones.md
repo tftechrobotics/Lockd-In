@@ -59,6 +59,7 @@ with a signed build; **E-vm** = disposable Windows VM.
 | M1.8 process kill, reboot | Back 12 s after `kill -9` (sticky restart); back 119 s after `adb reboot`, including boot | E-emu | Emulator **pass**; swipe-away and screen-off not yet scripted |
 | M1.9 permission loss | "Blocking paused" notification 2–5 s after usage access was revoked; blocking back about 2–4 s after re-grant | E-emu (3 runs) | Emulator **pass** |
 | M1.10 never closes apps | Target alive after 20 covers; no kill APIs in the app | E-emu | Emulator **pass** |
+| R38 Accessibility mode | With only Accessibility on, 10/10 trials were covered. Window change → block requested: p50 0.31 s, max 1.3 s (n=10). example.com was covered in Chrome, and an unblocked site stayed open. Turning Accessibility off was reported in 4 s, after which usage access took over. Emergency recovery released at once | E-emu (run 41322385333) | Emulator **pass**; phone **not tested** |
 | M1.11–M1.13 Windows agent | Separate agent process with no app window. It minimized an already-open blocked window in 88 ms and re-minimized 10/10 restores (p50 25 ms). It reported "protecting", never closed the target, released and exited at the end, and the window could be restored afterwards. The app launch test with the agent bundled passes. Audio mute is not exercised (the target ran silent). No elevated app was tested | E-win-ci (`agent-e2e.ps1`, run 41276045247) | Runner **pass**; PC **not tested** (signing) |
 
 **M1 closes when** M1.1–M1.16 have evidence, with M1.5–M1.9 on E-phone and M1.11–M1.13 on E-pc.
