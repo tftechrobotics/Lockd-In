@@ -310,8 +310,8 @@ fun ClockLock(
                         cap = StrokeCap.Round,
                     )
                 }
-                // Hands painted on the turning dial (start sequence only): minute hand at 12,
-                // hour hand at 10, so it reads as a clock face clicking round.
+                // Clock hands (start sequence only): the minute hand turns with the dial from 12;
+                // the hour hand starts at 10 and turns the opposite way (owner request).
                 if (hands.value > 0f) {
                     val ink = c.ink.copy(alpha = 0.88f * hands.value)
                     fun hand(deg: Float, len: Float, w: Float) {
@@ -319,7 +319,8 @@ fun ClockLock(
                         drawLine(ink, Offset(center.x - sin(a) * 9f * s, center.y + cos(a) * 9f * s),
                             Offset(center.x + sin(a) * len * s, center.y - cos(a) * len * s), w * s, StrokeCap.Round)
                     }
-                    hand(300f, 40f, 6.5f)
+                    // The hour hand turns the other way (this layer already turns +dial).
+                    hand(300f - 2 * dial.value, 40f, 6.5f)
                     hand(0f, 62f, 4.5f)
                     drawCircle(ink, 6f * s, center)
                     drawCircle(bodyColor.copy(alpha = hands.value), 2.2f * s, center)
