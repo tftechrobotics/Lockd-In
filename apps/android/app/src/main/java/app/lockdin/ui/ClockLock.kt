@@ -153,6 +153,7 @@ fun ClockLock(
     introFor: String? = null,
     haptics: Boolean = false,
     sound: Boolean = false,
+    reducedMotion: Boolean? = null, // null = follow the phone's Remove animations setting
 ) {
     val c = LocalColors.current
     val dark = c == DarkColors
@@ -170,7 +171,7 @@ fun ClockLock(
     var turning by remember { mutableStateOf(introFor != null) }
     var introClosed by remember { mutableStateOf(false) }
     val startedAt = remember { android.os.SystemClock.uptimeMillis() }
-    val reduced = remember { animationsOff(ctx) }
+    val reduced = remember { reducedMotion ?: animationsOff(ctx) }
 
     fun click() {
         if (haptics) view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)

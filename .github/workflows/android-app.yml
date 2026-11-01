@@ -114,7 +114,7 @@ jobs:
           PY
           if [ -f ui-tests-failed ]; then exit 1; fi
       - name: Publish screenshots to the ci-screenshots branch
-        if: always() && github.event_name == 'push'
+        if: always()
         run: |
           set -e
           [ -s out/screens.tar ] || { echo "::warning::No screenshots captured"; exit 0; }
@@ -130,6 +130,7 @@ jobs:
           fi
           rm -rf ../shots-branch/android && mkdir -p ../shots-branch/android
           cp shots/screens/*.png ../shots-branch/android/
+          [ -d shots/screens/seq ] && cp -r shots/screens/seq ../shots-branch/android/seq
           echo "Screenshots from commit $sha (emulator, API 35, Pixel 6 profile)." > ../shots-branch/android/README.txt
           cd ../shots-branch && git add -A && git commit -qm "Android screenshots for $sha" && git push -q origin ci-screenshots
           echo "::notice title=Screenshots::$(ls android | tr '\n' ' ')"

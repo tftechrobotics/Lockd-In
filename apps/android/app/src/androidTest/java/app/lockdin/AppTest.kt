@@ -38,6 +38,12 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
@@ -447,6 +453,47 @@ class AppTest {
         rule.onNodeWithText("Back").performClick()
         rule.onNodeWithContentDescription("Dismiss last session").performClick()
         rule.onAllNodesWithText("Last session", substring = true).assertCountEquals(0)
+    }
+
+    /**
+     * Frame-by-frame capture of the real ClockLock start sequence (30 fps, test clock), for the
+     * design review video. Blocking confirmation is simulated at 250 ms; in the app it is the
+     * service's PROTECTING report. Frames: files/screens/seq/<theme>_NNN.png.
+     */
+    @Test fun recordStartSequenceFrames() {
+        val dark = mutableStateOf(false)
+        val locked = mutableStateOf(false)
+        val key = mutableStateOf<String?>(null)
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            app.lockdin.ui.LockdInTheme(dark.value) {
+                val c = app.lockdin.ui.LocalColors.current
+                androidx.compose.foundation.layout.Box(
+                    Modifier.background(c.ground).padding(24.dp).testTag("seq"),
+                    contentAlignment = androidx.compose.ui.Alignment.Center,
+                ) {
+                    androidx.compose.runtime.key(key.value) {
+                        app.lockdin.ui.ClockLock(
+                            app.lockdin.ui.TimerState.FOCUS, 40 * 60_000L, 40 * 60_000L, locked.value,
+                            "Focus: 40 minutes left", "left this round", width = 260.dp,
+                            introFor = key.value, reducedMotion = false,
+                        )
+                    }
+                }
+            }
+        }
+        val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir, "screens/seq").apply { mkdirs() }
+        for (theme in listOf("light", "dark")) {
+            dark.value = theme == "dark"; locked.value = false; key.value = null
+            rule.mainClock.advanceTimeBy(500)
+            key.value = "demo-$theme"
+            for (i in 0 until 60) {
+                if (i * 33 >= 250) locked.value = true
+                rule.mainClock.advanceTimeBy(33)
+                val bmp = rule.onNodeWithTag("seq").captureToImage().asAndroidBitmap()
+                File(dir, "${theme}_%03d.png".format(i)).outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            }
+        }
     }
 
     @Test fun screenshotHome() { launch(home = true); shot("00-home-light") }
