@@ -47,10 +47,11 @@ object Scheduler {
         val events = Planner.events(st.schedule, now, zone, st.reminders)
         val handled = st.planLog.toSet()
         val due = Planner.due(events, now, handled)
+        Log.i(TAG, "run: ${st.schedule.size} planned, ${events.size} events, due=${due.map { it.kind.name + "@" + (it.at - now) }}")
         if (due.isNotEmpty()) {
             // Mark first, so a crash mid-way never repeats a start or a notification.
             store.logPlan(due.map { it.id })
-            for (e in due) runCatching { handle(ctx, e, now, zone) }.onFailure { Log.w(TAG, "handle ${e.kind}: ${it.javaClass.simpleName}") }
+            for (e in due) runCatching { handle(ctx, e, now, zone) }.onFailure { Log.w(TAG, "handle ${e.kind} failed", it) }
         }
         // Stale ones (phone off for many hours) are marked so they never fire later.
         val stale = events.filter { it.at <= now && it.id !in handled && it !in due }.map { it.id }
@@ -75,6 +76,7 @@ object Scheduler {
         val store = Store.get(ctx)
         val o = e.occ
         val running = store.state.active?.let { FocusService.shouldRun(store.state, now) } == true
+        Log.i(TAG, "handle ${e.kind} auto=${o.session.autoStart} running=$running")
         when (e.kind) {
             EventKind.REMIND -> if (!running) remind(ctx, o, now, zone, starting = false)
             EventKind.START -> if (o.session.autoStart) autoStart(ctx, o, now, zone) else if (!running) remind(ctx, o, now, zone, starting = true)
@@ -86,7 +88,9 @@ object Scheduler {
     fun startOccurrence(ctx: Context, o: Upcoming, now: Long, zone: ZoneId, auto: Boolean) {
         val store = Store.get(ctx)
         val running = store.state.active != null && FocusService.shouldRun(store.state, now)
-        when (val d = Planner.decideStart(o, now, running)) {
+        val decision = Planner.decideStart(o, now, running)
+        Log.i(TAG, "start decision: $decision")
+        when (val d = decision) {
             is StartDecision.Start -> {
                 val s = o.session
                 // A late automatic start joins the occurrence in progress; a manual "Start now"
@@ -116,6 +120,7 @@ object Scheduler {
 
     private fun remind(ctx: Context, o: Upcoming, now: Long, zone: ZoneId, starting: Boolean) {
         val st = Store.get(ctx).state
+        Log.i(TAG, "remind starting=$starting on=${st.reminders.remindersOn} notifications=${Notifier.allowed(ctx)}")
         if (!st.reminders.remindersOn) return
         val key = Planner.key(o)
         if (Planner.inQuietHours(now, zone, st.reminders) || !Planner.underRateLimit(st.notifyLog, now, st.reminders)) {

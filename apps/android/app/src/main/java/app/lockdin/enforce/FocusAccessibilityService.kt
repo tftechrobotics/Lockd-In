@@ -56,6 +56,8 @@ class FocusAccessibilityService : AccessibilityService() {
         }
     }
 
+    private val recheck = Runnable { check.run().also { handler.removeCallbacks(check); handler.postDelayed(check, CHECK_MS) } }
+
     override fun onServiceConnected() {
         handler.removeCallbacks(check)
         handler.postDelayed(check, CHECK_MS)
@@ -126,7 +128,13 @@ class FocusAccessibilityService : AccessibilityService() {
         val t = SystemClock.elapsedRealtime()
         // Only skip duplicate events for the same opening: the block screen is already up, or
         // was asked for a moment ago. Opening the app again later is always covered again.
-        if (BlockActivity.showing) return
+        if (BlockActivity.showing) {
+            // The block screen may be on its way out (Home was pressed and the app reopened
+            // straight away). Look again once it has gone.
+            handler.removeCallbacks(recheck)
+            handler.postDelayed(recheck, 350)
+            return
+        }
         lastCover?.let { (k, at) -> if (k == key && t - at < DEBOUNCE_MS) return }
         lastCover = key to t
         try {
