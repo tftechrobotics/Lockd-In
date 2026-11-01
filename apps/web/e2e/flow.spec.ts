@@ -32,7 +32,12 @@ test('configure → start → focus → break → resume → finish', async ({ p
   await expect(lock(page)).not.toHaveClass(/is-locked/);
   await expect(numerals(page)).toHaveText('25:00');
   await expect(lock(page)).toHaveAttribute('role', 'timer');
-  await expect(lock(page)).toHaveAttribute('aria-label', 'Focus: 25 minutes left');
+  await expect(lock(page)).toHaveAttribute('aria-label', 'This round: 25 minutes left');
+  // The circle is this round; the timeline is the whole session, with labelled segments.
+  await expect(page.locator('.rail__title')).toHaveText('Whole session');
+  await expect(page.locator('.rail__name')).toHaveText(['Focus · 25 min', 'Break', 'Focus · 25 min']);
+  // No blocking badge unless blocking is verified.
+  await expect(page.locator('.guard')).toHaveCount(0);
   // The ring starts full and follows the countdown.
   await expect(lock(page).locator('.clock-lock__arc')).toHaveAttribute('stroke-dasharray', '1000.0 1000');
   await expect(page.locator('.facts')).toContainText('Next break');
@@ -92,7 +97,7 @@ test('unlock for this round waits, can be cancelled, then later rounds start as 
   await page.getByLabel('Breaks').selectOption('5');
   await page.getByRole('button', { name: 'Start timer' }).click();
 
-  await page.getByRole('button', { name: 'Need out?' }).click();
+  await page.getByRole('button', { name: 'Session options' }).click();
   await page.getByRole('radio', { name: 'This round' }).check();
   await page.getByRole('button', { name: 'Start unlock' }).click();
   await expect(page.getByText(/Unlocking in 01:30/)).toBeVisible();
@@ -100,7 +105,7 @@ test('unlock for this round waits, can be cancelled, then later rounds start as 
   await page.clock.fastForward(2 * MIN);
   await expect(status(page)).toHaveText('Focusing · round 1 of 2');
 
-  await page.getByRole('button', { name: 'Need out?' }).click();
+  await page.getByRole('button', { name: 'Session options' }).click();
   await page.getByRole('button', { name: 'Start unlock' }).click();
   await page.clock.fastForward(91_000);
   await expect(status(page)).toHaveText('Unlocked · round 1 of 2');
@@ -112,9 +117,9 @@ test('unlock for this round waits, can be cancelled, then later rounds start as 
 test('emergency recovery ends immediately and says how it ended', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Start timer' }).click();
-  // End now lives behind "Need out?" so it never competes with the timer.
+  // End now lives behind "Session options" so it never competes with the timer.
   await expect(page.getByRole('button', { name: 'End now' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Need out?' }).click();
+  await page.getByRole('button', { name: 'Session options' }).click();
   await page.getByRole('button', { name: 'End now' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Keep going' }).last()).toBeFocused();
@@ -211,7 +216,7 @@ for (const scheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await page.goto('/');
     await page.getByRole('button', { name: 'Start timer' }).click();
-    await page.getByRole('button', { name: 'Need out?' }).click();
+    await page.getByRole('button', { name: 'Session options' }).click();
     const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
     expect(r.violations.map((v) => v.id)).toEqual([]);
   });

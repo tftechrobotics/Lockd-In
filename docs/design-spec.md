@@ -1,5 +1,13 @@
 # Lockd In design specification — Cream & Ink, pass 4
 
+> **Review 2026-10-31 (late):** the lock is one continuous silhouette (body ∪ shackle, a single
+> even-odd path from `src/ui/lockPath.ts`, small concave fillets where the legs meet the body) for the
+> timer, wordmark "o" and symbol; the timer's face is inset so the taupe rim and shackle read as one
+> piece (no dark outline). Running view: task, status and (only when verified) a "Blocking active ·
+> N devices" badge form one header group close above the lock; the circle is labelled "left this
+> round", the timeline "Whole session" with named segments; "Need out?" became a quiet "Session
+> options" control (not pinned on mobile).
+>
 > **Circular lock (2026-10-31, R36) replaces the pass-4 numerals timer.** Component `CircleLock`
 > (`apps/web/src/ui/Timer.tsx`, styles under "Circular lock timer" in `app.css`): viewBox 240 × 344,
 > body r 108 with a 2.5 espresso edge, progress ring r 87 / 9 wide (track = ink at 9–10%, arc =

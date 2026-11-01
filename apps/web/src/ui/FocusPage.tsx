@@ -12,7 +12,7 @@ import { DeviceStrip } from './DeviceStrip';
 import { clockTime, countdown, dayLabel, durationLabel, spokenRemaining } from './format';
 import { Icon } from './Icon';
 import { message } from './messages';
-import { CircleLock, SessionRail, TimerStatus } from './Timer';
+import { CircleLock, MiniLock, SessionRail, TimerStatus } from './Timer';
 import { layout, useHost } from '../platform';
 
 /** Re-render every second while something is counting; never the source of truth. */
@@ -274,11 +274,14 @@ function SessionView({ session }: { session: ActiveSession }) {
   return (
     <div className={`page focus focus--${layout} focus--running`}>
       <div className="running">
-        <h1 className="running__task">{task ?? (phase.kind === 'break' ? 'Break' : 'Focus session')}</h1>
-        <TimerStatus state={state} closed={protectedNow} text={status} live icon={false} />
+        <header className="running__head">
+          <h1 className="running__task">{task ?? (phase.kind === 'break' ? 'Break' : 'Focus session')}</h1>
+          <TimerStatus state={state} closed={protectedNow} text={status} live icon={false} />
+          {protectedNow && <BlockingBadge />}
+        </header>
         <CircleLock state={state} remainingMs={remaining} totalMs={phase.end - phase.start} locked={protectedNow}
-          label={`${phase.kind === 'break' ? 'Break' : 'Focus'}: ${spokenRemaining(remaining)}`}
-          caption={phase.kind === 'break' ? 'of break left' : 'remaining'} />
+          label={`${phase.kind === 'break' ? 'Break' : 'This round'}: ${spokenRemaining(remaining)}`}
+          caption={phase.kind === 'break' ? 'left in break' : 'left this round'} />
         <SessionRail phases={occ.phases} now={now} />
         <div className="running__foot">
           <div className="running__info">
@@ -286,12 +289,28 @@ function SessionView({ session }: { session: ActiveSession }) {
               {facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
             </dl>
             {note && <p className="nudge" aria-live="polite">{note}</p>}
-            <Protection canBlock={canBlock} during restricting={snap.restricting} />
+            {!protectedNow && <Protection canBlock={canBlock} during restricting={snap.restricting} />}
           </div>
           <OverridePanel session={session} snap={snap} now={now} />
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Compact protection status beside the task, shown only while restriction is verified and
+ * applied. Counts this device plus paired devices (paired devices exist only as demo data
+ * in the design preview).
+ */
+function BlockingBadge() {
+  const devices = 1 + (DEMO?.paired ? 1 : 0);
+  const where = devices > 1 ? `${devices} devices` : layout === 'android' ? 'this phone' : 'this PC';
+  return (
+    <p className="guard" role="status">
+      <MiniLock closed size={14} /><span>Blocking active · {where}</span>
+      {(DEMO?.protect || DEMO?.paired) && <span className="demo-tag">Demo</span>}
+    </p>
   );
 }
 
@@ -329,7 +348,7 @@ function OverridePanel({ session, snap, now }: { session: ActiveSession; snap: S
     dialog.current?.close();
   };
 
-  // "End now" (emergency recovery) lives inside the Need out? panel, one step away, so it
+  // "End now" (emergency recovery) lives inside the Session options panel, one step away, so it
   // never competes with the timer but is always reachable.
   return (
     <div className={`out ${open || pending ? 'out--open' : ''}`}>
@@ -344,7 +363,7 @@ function OverridePanel({ session, snap, now }: { session: ActiveSession; snap: S
         </div>
       ) : open ? (
         <fieldset className="out__choices">
-          <legend>Unlock after a {DEFAULT_OVERRIDE_DELAY_SECONDS}-second wait</legend>
+          <legend><strong>Session options</strong> · stop early after a {DEFAULT_OVERRIDE_DELAY_SECONDS}-second wait</legend>
           {inFocus && (
             <label className="radio">
               <input type="radio" name="scope" checked={scope === 'current_focus_period'} onChange={() => setScope('current_focus_period')} />
@@ -362,7 +381,9 @@ function OverridePanel({ session, snap, now }: { session: ActiveSession; snap: S
           </div>
         </fieldset>
       ) : (
-        <button type="button" className="button" onClick={() => setOpen(true)}>Need out?</button>
+        <button type="button" className="button button--quiet out__toggle" onClick={() => setOpen(true)}>
+          Session options<Icon name="chevronDown" size={16} />
+        </button>
       )}
       <dialog ref={dialog} className="dialog" aria-labelledby="emg-title">
         <h2 id="emg-title">End the session now?</h2>
@@ -407,8 +428,10 @@ function Recap({ session, snap }: { session: ActiveSession; snap: Snapshot }) {
   return (
     <div className={`page focus focus--${layout} focus--running`}>
       <div className="running">
-        <h1 className="running__task">{session.intention?.text ?? 'Focus session'}</h1>
-        <TimerStatus state="done" closed={false} text="Session complete" icon={false} />
+        <header className="running__head">
+          <h1 className="running__task">{session.intention?.text ?? 'Focus session'}</h1>
+          <TimerStatus state="done" closed={false} text="Session complete" icon={false} />
+        </header>
         <CircleLock state="done" remainingMs={0} totalMs={1} locked={false} label="Session complete" caption="complete" />
         <SessionRail phases={occ.phases} now={endedAt} />
         <div className="running__foot">
