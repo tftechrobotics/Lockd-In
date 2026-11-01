@@ -365,6 +365,9 @@ if adb shell pm path com.android.chrome >/dev/null 2>&1; then
   adb shell am start -a android.intent.action.VIEW -d "https://www.example.com/" com.android.chrome >/dev/null 2>&1
   r=$(wait_top "${BLOCK//./\\.}" 15000) && record a11y-site-block pass "example.com covered in Chrome (${r} ms after opening)" \
     || { record a11y-site-block FAIL "example.com not covered in Chrome: $r"
+         adb shell screencap -p /sdcard/c.png; adb pull /sdcard/c.png "$OUT/chrome-fail.png" >/dev/null 2>&1
+         adb exec-out uiautomator dump /dev/tty 2>/dev/null | grep -oE 'text="[^"]+"' | head -20 | tr '\n' ' ' > "$OUT/chrome-texts.txt"
+         echo "::notice title=Chrome screen texts (EMULATOR)::$(cat "$OUT/chrome-texts.txt" | sed 's/%/%25/g' | cut -c1-3000)"
          echo "::notice title=Site-block diagnostics (EMULATOR)::$( (adb shell dumpsys activity activities | grep -E 'topResumed|ResumedActivity|BlockActivity' | head -8; adb logcat -d -s LockdInFocus | tail -40) | sed 's/%/%25/g' | tr '\n' '\r' | sed 's/\r/%0A/g' | cut -c1-6000)"; }
   home
   adb shell am start -a android.intent.action.VIEW -d "https://www.iana.org/" com.android.chrome >/dev/null 2>&1; sleep 6

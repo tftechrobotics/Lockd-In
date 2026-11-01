@@ -189,7 +189,7 @@ jobs:
             rm -rf ../rec-branch; git worktree prune
             git fetch -q origin ci-screenshots && git worktree add -q ../rec-branch origin/ci-screenshots -B ci-screenshots-rec || exit 0
             mkdir -p ../rec-branch/start-sequence && rm -f ../rec-branch/start-sequence/*
-            cp out/enforcement/start-sequence*.mp4 out/enforcement/lock-*.png ../rec-branch/start-sequence/ 2>/dev/null || true
+            cp out/enforcement/start-sequence*.mp4 out/enforcement/lock-*.png out/enforcement/chrome-fail.png ../rec-branch/start-sequence/ 2>/dev/null || true
             echo "Manual-start sequence recorded on the CI emulator (API 35) from commit $sha. EMULATOR ONLY." > ../rec-branch/start-sequence/README.txt
             (cd ../rec-branch && git add -A && git commit -qm "Start-sequence recording for $sha" && git push -q origin HEAD:ci-screenshots) && break
             sleep 5
