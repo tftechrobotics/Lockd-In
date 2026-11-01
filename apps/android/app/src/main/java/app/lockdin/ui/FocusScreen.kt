@@ -1,5 +1,8 @@
 package app.lockdin.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -102,7 +105,55 @@ fun rememberNow(clock: AppClock, ticking: Boolean): Long {
 @Composable
 fun FocusScreen(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -> Unit, openSchedule: () -> Unit) {
     val active = store.state.active
-    if (active == null) Setup(store, clock, zone, openDevices, openSchedule) else SessionView(store, active, clock, zone, openDevices)
+    // Approved idle view (R36): the lock shows the time and the next session; setup opens on demand.
+    var composing by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(active?.id) { if (active != null) composing = false }
+    BackHandler(enabled = active == null && composing) { composing = false }
+    when {
+        active != null -> SessionView(store, active, clock, zone, openDevices)
+        composing -> Setup(store, clock, zone, openDevices, openSchedule, onBack = { composing = false })
+        else -> Home(store, clock, zone, onNew = { composing = true }, openSchedule = openSchedule)
+    }
+}
+
+/** The idle lock: the time of day on its face, the next planned session below, one way to begin. */
+@Composable
+private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit, openSchedule: () -> Unit) {
+    val c = LocalColors.current
+    val now = rememberNow(clock, true)
+    val upcoming = Schedule.nextUp(store.state.schedule, now, zone)
+    val at = java.time.Instant.ofEpochMilli(now).atZone(zone)
+    val hm = at.format(java.time.format.DateTimeFormatter.ofPattern("h:mm"))
+    val period = at.format(java.time.format.DateTimeFormatter.ofPattern("a", java.util.Locale.getDefault()))
+    val weekday = at.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault())
+    val inProgress = upcoming != null && upcoming.start <= now
+    WithActionBar(
+        content = {
+            Column(Modifier.fillMaxWidth().padding(top = Dim.s5), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Dim.s5)) {
+                ClockLock(
+                    TimerState.READY, 0, 1, locked = false, label = "It's ${Fmt.clock(now, zone)}, $weekday",
+                    caption = "$period · $weekday", text = hm, width = 230.dp,
+                )
+                androidx.compose.material3.Surface(
+                    shape = RoundedCornerShape(Dim.radius), color = c.surface, border = BorderStroke(1.dp, c.line),
+                    modifier = Modifier.fillMaxWidth().clickable(role = Role.Button, onClickLabel = "Open schedule", onClick = openSchedule),
+                ) {
+                    Column(Modifier.padding(horizontal = Dim.s4, vertical = Dim.s3)) {
+                        Text(if (inProgress) "Scheduled now" else "Next session", style = UiType.caption, color = c.inkMuted)
+                        Text(upcoming?.session?.title ?: "Nothing planned", style = TimerType.task, color = c.ink)
+                        Text(
+                            if (upcoming == null) "Plan one on Schedule" else buildString {
+                                append("${Fmt.dayLabel(upcoming.start, now, zone)} · ${Fmt.clock(upcoming.start, zone)}–${Fmt.clock(upcoming.end, zone)}")
+                                if (!inProgress) append(" · in ${durationLabel(maxOf(1, ((upcoming.start - now) / 60_000).toInt()))}")
+                            },
+                            style = UiType.caption, color = c.inkMuted,
+                        )
+                    }
+                }
+            }
+        },
+        actions = { MainButton("New session", onNew) },
+    )
 }
 
 /** Scrolling content with the action area pinned below it (above the bottom navigation). */
@@ -127,7 +178,7 @@ private fun Question(text: String) =
     Text(text, style = TimerType.question, color = LocalColors.current.ink, modifier = Modifier.semantics { heading() })
 
 @Composable
-private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -> Unit, openSchedule: () -> Unit) {
+private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -> Unit, openSchedule: () -> Unit, onBack: (() -> Unit)? = null) {
     val c = LocalColors.current
     val s = store.state
     var intention by rememberSaveable { mutableStateOf("") }
@@ -159,6 +210,15 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
 
     WithActionBar(
         content = {
+            onBack?.let { back ->
+                Row(Modifier.fillMaxWidth().padding(top = Dim.s1), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = back, modifier = Modifier.heightIn(min = Dim.control)) {
+                        LockdIcon(LIcon.Back, size = 18.dp, tint = c.ink)
+                        Spacer(Modifier.width(Dim.s1))
+                        Text("Back", style = UiType.label, color = c.ink)
+                    }
+                }
+            }
             Column(verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
                 Question("What are you working on?")
                 TaskField(intention, { intention = it.take(120) }, onDone = { focusManager.clearFocus() })
@@ -410,37 +470,78 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
         else -> "Blocking isn’t running on this phone right now"
     }
 
-    WithActionBar(
-        content = {
-            RunningBody(
-                task = task ?: "Focus session", state = state, closed = protected, status = status,
-                remaining = remaining, label = label, phases = occ.phases, now = now, zone = zone, facts = facts,
-            ) { nudge?.let { Text(it, style = UiType.body, color = c.inkMuted) } }
-        },
-        note = { ProtectionLine(protection, protected, if (protected || (blocks && (isBreak || lifted))) null else "Set up blocking", openDevices) },
-        actions = { OutPanel(store, session, snap, now, clock) },
-    )
+    val note: @Composable () -> Unit = {
+        ProtectionLine(protection, protected, if (protected || (blocks && (isBreak || lifted))) null else "Set up blocking", openDevices)
+    }
+    // Phone (approved R36): the task, the lock and what's next; everything else is one tap away.
+    var more by rememberSaveable { mutableStateOf(false) }
+    val pending = snap.overrideState is OverrideState.Pending
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Dim.gutter).padding(top = Dim.s4, bottom = Dim.s6),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(task ?: if (isBreak) "Break" else "Focus session", style = TimerType.task, color = c.ink, textAlign = TextAlign.Center,
+            modifier = Modifier.semantics { heading() })
+        Spacer(Modifier.height(Dim.s1))
+        Text(status, style = TimerType.status, color = c.inkMuted, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+        if (protected) {
+            Spacer(Modifier.height(Dim.s2))
+            BlockingBadge()
+        }
+        Spacer(Modifier.height(Dim.s4))
+        ClockLock(
+            state, remaining, phase.end - phase.start, locked = protected, label = label,
+            caption = if (isBreak) "left in break" else "left this round", width = 220.dp,
+        )
+        Spacer(Modifier.height(Dim.s4))
+        facts.firstOrNull()?.let { (k, v) ->
+            Text(
+                buildAnnotatedString {
+                    append("$k ")
+                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = c.ink)) { append(v) }
+                },
+                style = UiType.body.copy(fontFeatureSettings = "tnum"), color = c.inkMuted,
+            )
+        }
+        Spacer(Modifier.height(Dim.s3))
+        MoreToggle("Details and options", more || pending) { more = !more }
+        if (more || pending) {
+            Column(Modifier.fillMaxWidth().padding(top = Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s4)) {
+                SessionRail(occ.phases, now, zone)
+                FactList(facts)
+                nudge?.let { Text(it, style = UiType.body, color = c.inkMuted) }
+                note()
+                OutPanel(store, session, snap, now, clock)
+            }
+        }
+    }
 }
 
-/** Task → lock status → numerals → rail → facts: one calm column shared by running and recap. */
+/** "Details and options" / "Summary and options": a quiet disclosure under the lock. */
 @Composable
-private fun RunningBody(
-    task: String, state: TimerState, closed: Boolean, status: String, remaining: Long, label: String,
-    phases: List<app.lockdin.engine.Phase>, now: Long, zone: ZoneId, facts: List<Pair<String, String>>,
-    extra: @Composable () -> Unit,
-) {
+private fun MoreToggle(text: String, open: Boolean, onToggle: () -> Unit) {
     val c = LocalColors.current
-    Column(Modifier.fillMaxWidth().padding(top = Dim.s4)) {
-        Text(task, style = TimerType.task, color = c.ink, modifier = Modifier.semantics { heading() })
-        Spacer(Modifier.height(Dim.s4))
-        TimerStatus(state, closed, status)
-        Numerals(state, remaining, label)
-        Spacer(Modifier.height(Dim.s3))
-        SessionRail(phases, now, zone)
-        Spacer(Modifier.height(Dim.s5))
-        FactList(facts)
-        Spacer(Modifier.height(Dim.s4))
-        extra()
+    Row(
+        Modifier.heightIn(min = Dim.control).clickable(role = Role.Button, onClick = onToggle)
+            .semantics { stateDescription = if (open) "Expanded" else "Collapsed" }.padding(horizontal = Dim.s3),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
+        Spacer(Modifier.width(Dim.s1))
+        LockdIcon(LIcon.ChevronDown, size = 16.dp, tint = c.inkMuted, modifier = Modifier.graphicsLayer { rotationZ = if (open) 180f else 0f })
+    }
+}
+
+/** Shown only while restriction is verified and applied on this phone. */
+@Composable
+private fun BlockingBadge() {
+    val c = LocalColors.current
+    androidx.compose.material3.Surface(shape = RoundedCornerShape(50), color = c.taupeSoft, border = BorderStroke(1.dp, c.line)) {
+        Row(Modifier.padding(horizontal = Dim.s3, vertical = 6.dp).semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically) {
+            MiniLock(closed = true, tint = c.ink, size = 14.dp)
+            Spacer(Modifier.width(6.dp))
+            Text("Blocking active · this phone", style = UiType.caption.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
+        }
     }
 }
 
@@ -556,23 +657,40 @@ private fun Recap(store: Store, session: ActiveSession, snap: Snapshot, clock: A
         add("Time" to "${Fmt.clock(session.start, zone)}–${Fmt.clock(endedAt, zone)}")
         store.state.profiles.firstOrNull { it.id == session.profileId }?.let { add("Profile" to it.name) }
     }
-    WithActionBar(
-        content = {
-            RunningBody(
-                task = session.intention ?: "Focus session", state = TimerState.DONE, closed = false, status = "Session complete",
-                remaining = 0, label = "Session complete", phases = occ.phases, now = endedAt, zone = zone, facts = facts,
-            ) {
+    var more by rememberSaveable { mutableStateOf(false) }
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Dim.gutter).padding(top = Dim.s4, bottom = Dim.s6),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(session.intention ?: "Focus session", style = TimerType.task, color = c.ink, textAlign = TextAlign.Center,
+            modifier = Modifier.semantics { heading() })
+        Spacer(Modifier.height(Dim.s1))
+        Text("Session complete", style = TimerType.status, color = c.inkMuted)
+        Spacer(Modifier.height(Dim.s4))
+        ClockLock(TimerState.DONE, 0, 1, locked = false, label = "Session complete", caption = "complete", width = 220.dp)
+        Spacer(Modifier.height(Dim.s4))
+        Text(
+            buildAnnotatedString {
+                append("Focused ")
+                withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = c.ink)) { append("$focusedMin min") }
+            },
+            style = UiType.body, color = c.inkMuted,
+        )
+        Spacer(Modifier.height(Dim.s3))
+        MoreToggle("Summary and options", more) { more = !more }
+        if (more) {
+            Column(Modifier.fillMaxWidth().padding(top = Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s4)) {
+                SessionRail(occ.phases, endedAt, zone)
+                FactList(facts)
                 Column(verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
                     Text(how, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
                     if (snap.status == SessionStatus.COMPLETED) message(store.state.tone, Moment.DONE)?.let { Text(it, style = UiType.body, color = c.inkMuted) }
                 }
+                MainButton("Same again", onClick = {
+                    store.startSession(clock.now(), session.segments, session.intention, session.profileId, store.state.last)
+                })
+                SecondaryButton("Done", { store.finish() }, modifier = Modifier.fillMaxWidth())
             }
-        },
-        actions = {
-            MainButton("Same again", onClick = {
-                store.startSession(clock.now(), session.segments, session.intention, session.profileId, store.state.last)
-            })
-            SecondaryButton("Done", { store.finish() }, modifier = Modifier.fillMaxWidth())
-        },
-    )
+        }
+    }
 }

@@ -56,7 +56,8 @@ class AppTest {
     private val zone = ZoneId.of("America/Chicago")
     private val clock = FakeClock(ZonedDateTime.of(2026, 11, 3, 18, 0, 0, 0, zone).toInstant().toEpochMilli())
 
-    private fun launch(state: AppState = AppState(), dark: Boolean = false, fontScale: Float = 1f): Store {
+    /** Launches the app. Unless `home`, goes from the idle lock to the session setup, as most tests start there. */
+    private fun launch(state: AppState = AppState(), dark: Boolean = false, fontScale: Float = 1f, home: Boolean = false): Store {
         val store = Store(state) {}
         rule.setContent {
             val d = LocalDensity.current
@@ -64,8 +65,12 @@ class AppTest {
                 LockdInApp(store, clock, zone, dark)
             }
         }
+        if (!home && state.active == null) rule.onNodeWithText("New session").performClick()
         return store
     }
+
+    private fun openDetails() = rule.onNodeWithText("Details and options").performScrollTo().performClick()
+    private fun openSummary() = rule.onNodeWithText("Summary and options").performScrollTo().performClick()
 
     /** Menus open in a popup; wait until the item exists before tapping it. */
     private fun pickMenuItem(text: String) {
@@ -105,21 +110,26 @@ class AppTest {
         rule.onNodeWithText("Start timer").performClick()
         rule.onNodeWithText("Focusing · round 1 of 2").assertIsDisplayed()
         rule.onNodeWithContentDescription("Focus: 25 minutes left").assertIsDisplayed()
-        rule.onNodeWithText("Timer only. Apps stay available on this phone.").assertIsDisplayed()
-        // End now is not on screen until the person asks for a way out.
+        rule.onNodeWithText("Next break", substring = true).assertIsDisplayed()
+        // The phone view is just the lock and what's next; details and End now are one tap away.
         rule.onAllNodesWithText("End now").assertCountEquals(0)
+        rule.onAllNodesWithText("Timer only. Apps stay available on this phone.").assertCountEquals(0)
+        openDetails()
+        rule.onNodeWithText("Timer only. Apps stay available on this phone.").performScrollTo().assertIsDisplayed()
 
         clock.advanceMinutes(25); tick(store)
         rule.onNodeWithText("On a break · round 1 of 2").assertIsDisplayed()
-        rule.onNodeWithText("Focus resumes").assertIsDisplayed()
+        rule.onNodeWithText("Focus resumes", substring = true).assertExists()
         clock.advanceMinutes(5); tick(store)
         rule.onNodeWithText("Focusing · round 2 of 2").assertIsDisplayed()
         clock.advanceMinutes(25); tick(store)
         rule.onNodeWithText("Session complete").assertIsDisplayed()
-        rule.onNodeWithText("50 min").assertIsDisplayed()
+        rule.onNodeWithText("Focused 50 min").assertIsDisplayed()
+        openSummary()
         rule.onNodeWithText("Finished as planned.").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("Done").performClick()
-        rule.onNodeWithText("Start timer").assertExists()
+        rule.onNodeWithText("Done").performScrollTo().performClick()
+        // Back to the idle lock.
+        rule.onNodeWithText("New session").assertExists()
     }
 
     @Test fun customLengthMatchingAPresetSelectsIt() {
@@ -133,16 +143,18 @@ class AppTest {
     @Test fun unlockWaitsAndCanBeCancelled_emergencyIsImmediate() {
         val store = launch()
         rule.onNodeWithText("Start timer").performClick()
-        rule.onNodeWithText("Need out?").performClick()
-        rule.onNodeWithText("Start unlock").performClick()
-        rule.onNodeWithText("Unlocking in 01:30", substring = true).assertIsDisplayed()
-        rule.onNodeWithText("Cancel unlock").performClick()
+        openDetails()
+        rule.onNodeWithText("Need out?").performScrollTo().performClick()
+        rule.onNodeWithText("Start unlock").performScrollTo().performClick()
+        rule.onNodeWithText("Unlocking in 01:30", substring = true).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Cancel unlock").performScrollTo().performClick()
         clock.advanceMinutes(2); tick(store)
-        rule.onNodeWithContentDescription("Focus:", substring = true).assertIsDisplayed()
-        rule.onNodeWithText("Need out?").performClick()
-        rule.onNodeWithText("End now").performClick()
+        rule.onNodeWithContentDescription("Focus:", substring = true).assertExists()
+        rule.onNodeWithText("Need out?").performScrollTo().performClick()
+        rule.onNodeWithText("End now").performScrollTo().performClick()
         rule.onNodeWithText("End session now").performClick()
-        rule.onNodeWithText("Ended with emergency recovery.").assertIsDisplayed()
+        openSummary()
+        rule.onNodeWithText("Ended with emergency recovery.").performScrollTo().assertIsDisplayed()
     }
 
     @Test fun navigationAndHonestStatus() {
@@ -165,10 +177,12 @@ class AppTest {
     @Test fun lockedCommitmentOffersOnlyEmergencyRecovery() {
         launch(AppState(commitment = app.lockdin.enforce.Commitment.LOCKED))
         rule.onNodeWithText("Start timer").performClick()
+        openDetails()
         rule.onNodeWithText("Need out?").assertDoesNotExist()
-        rule.onNodeWithText("Emergency recovery").performClick()
+        rule.onNodeWithText("Emergency recovery").performScrollTo().performClick()
         rule.onNodeWithText("End session now").performClick()
-        rule.onNodeWithText("Ended with emergency recovery.").assertIsDisplayed()
+        openSummary()
+        rule.onNodeWithText("Ended with emergency recovery.").performScrollTo().assertIsDisplayed()
     }
 
     @Test fun profileAppsEditorOpensAndSavesMode() {
@@ -262,8 +276,9 @@ class AppTest {
         rule.onNodeWithText("Start timer").performClick()
         clock.advanceMinutes(16); tick(store)
         shot("04-focus-light")
-        rule.onNodeWithText("Need out?").performClick()
-        rule.onNodeWithText("Start unlock").performClick()
+        openDetails()
+        rule.onNodeWithText("Need out?").performScrollTo().performClick()
+        rule.onNodeWithText("Start unlock").performScrollTo().performClick()
         shot("05-unlock-pending")
     }
     @Test fun screenshotFocusDark() {
@@ -291,6 +306,8 @@ class AppTest {
         rule.onNodeWithText("Start timer").performClick()
         clock.advanceMinutes(120); tick(store)
         shot("13-recap")
+        openSummary()
+        shot("14-recap-summary")
     }
     @Test fun screenshotSchedule() {
         launch()
@@ -302,5 +319,18 @@ class AppTest {
         rule.onNodeWithText("Save session").performClick()
         shot("09-schedule-list")
     }
+    @Test fun idleHomeShowsTimeAndNextSession() {
+        val start = java.time.LocalTime.of(19, 0)
+        launch(AppState(schedule = listOf(app.lockdin.engine.ScheduledSession("p", "Physics review", java.time.DayOfWeek.entries.toSet(), start, 40, 10, 2, "study"))), home = true)
+        rule.onNodeWithContentDescription("It's 6:00", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Physics review").assertIsDisplayed()
+        rule.onNodeWithText("in 1 h", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("New session").performClick()
+        rule.onNodeWithText("Start timer").assertExists()
+        rule.onNodeWithText("Back").performClick()
+        rule.onNodeWithText("New session").assertExists()
+    }
+    @Test fun screenshotHome() { launch(home = true); shot("00-home-light") }
+    @Test fun screenshotHomeDark() { launch(AppState(theme = ThemeChoice.DARK), dark = true, home = true); shot("00-home-dark") }
     @Test fun screenshotDevices() { launch(); rule.onNodeWithText("Set up blocking").performClick(); shot("10-devices") }
 }
