@@ -144,6 +144,7 @@ fun ClockLock(
             }
         }
         val px = maxWidth / W // dp per unit
+        val showCaption = maxWidth >= 130.dp
         val digits = with(LocalDensity.current) { (52f * px.value).dp.toSp() }
         val small = with(LocalDensity.current) { (14f * px.value).dp.toSp() }
         Column(
@@ -156,7 +157,7 @@ fun ClockLock(
                 color = if (state == TimerState.DONE || (state == TimerState.READY && text == null)) c.inkMuted else c.ink,
                 textAlign = TextAlign.Center, maxLines = 1,
             )
-            if (maxWidth >= 130.dp) Text(
+            if (showCaption) Text(
                 caption, style = UiType.caption.copy(fontSize = small, lineHeight = small, fontWeight = FontWeight.Medium, letterSpacing = with(LocalDensity.current) { (0.56f * px.value).dp.toSp() }),
                 color = c.inkMuted, maxLines = 1,
             )
