@@ -20,6 +20,8 @@
 - **Known gaps:** Android Compose screens still use the pre-R36 numerals timer (port the circular lock); emulator
   detection p95 3.6 s (measure on phones); scheduled starts (alarms) not implemented; Windows launch at sign-in to
   resume after reboot not implemented (agent resumes when the app is opened); no website rules yet.
+- **Test APK (R39):** every push to apps/android builds `lockd-in-test.apk` on branch `test-apk`
+  (`git show origin/test-apk:lockd-in-test.apk > x.apk`). Debug build, public test key.
 - **Owner setup needed for real-device evidence:** Google Play developer account (internal testing) and Azure
   Artifact Signing. Relay hosting only for M2. None started.
 
