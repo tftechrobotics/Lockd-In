@@ -153,29 +153,42 @@ class FocusAccessibilityService : AccessibilityService() {
     private var browsers: Set<String> = emptySet()
     private var browsersAt = 0L
 
-    /** Reads the address bar of a supported browser and covers it if the site is restricted. */
+    /**
+     * Reads the address bar of a supported browser and covers it if the site is restricted. The
+     * bar is looked for in every on-screen window of that browser, not only the focused one: a
+     * browser prompt or menu in front (sign-in, notifications) would otherwise hide the page.
+     */
     private fun checkAddress(pkg: String, rules: AppRules, force: Boolean) {
         if (!rules.restrictsSites) return
         val id = BROWSER_URL_BARS[pkg] ?: return
         val t = SystemClock.elapsedRealtime()
         if (!force && t - lastUrlCheck < URL_CHECK_MS) return
         lastUrlCheck = t
-        val root = rootInActiveWindow ?: return
-        try {
-            val nodes = root.findAccessibilityNodeInfosByViewId(id)
-            val bar = nodes.firstOrNull()
-            val text = bar?.text?.toString()
-            // Don't act while the address bar is being edited: that text is what the user is typing.
-            val editing = bar?.isFocused == true
-            nodes.forEach { it.recycleCompat() }
-            val host = BlockPolicy.domainOf(text)
-            // Debug builds only: what the address check saw (domain only). Release builds log nothing here.
-            if (debuggable) Log.d(TAG, "url_check pkg=$pkg bar=${bar != null} editing=$editing host=$host")
-            if (editing || host == null) return
-            if (BlockPolicy.isSiteRestricted(host, rules)) cover(pkg, host, null)
-        } finally {
-            root.recycleCompat()
+        val roots = buildList {
+            rootInActiveWindow?.let(::add)
+            runCatching { windows }.getOrNull()?.forEach { w ->
+                if (w.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION) w.root?.let(::add)
+            }
         }
+        var text: String? = null
+        var editing = false
+        var found = false
+        try {
+            for (root in roots) {
+                if (found || root.packageName?.toString() != pkg) continue
+                val nodes = root.findAccessibilityNodeInfosByViewId(id)
+                nodes.firstOrNull()?.let { bar -> found = true; text = bar.text?.toString(); editing = bar.isFocused }
+                nodes.forEach { it.recycleCompat() }
+            }
+        } finally {
+            roots.forEach { it.recycleCompat() }
+        }
+        val host = BlockPolicy.domainOf(text)
+        // Debug builds only: what the address check saw (domain only). Release builds log nothing here.
+        if (debuggable) Log.d(TAG, "url_check pkg=$pkg bar=$found editing=$editing host=$host windows=${roots.size}")
+        // Don't act while the address bar is being edited: that text is what the user is typing.
+        if (editing || host == null) return
+        if (BlockPolicy.isSiteRestricted(host, rules)) cover(pkg, host, null)
     }
 
     private fun cover(pkg: String, site: String?, latencyMs: Long?) {
