@@ -121,7 +121,7 @@ class AppTest {
         clock.advanceMinutes(25); tick(store)
         // Details are open and scrolled; the status line is above them.
         rule.onNodeWithText("On a break · round 1 of 2").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("Focus resumes", substring = true).assertExists()
+        rule.onAllNodesWithText("Focus resumes", substring = true).onFirst().assertExists()
         clock.advanceMinutes(5); tick(store)
         rule.onNodeWithText("Focusing · round 2 of 2").performScrollTo().assertIsDisplayed()
         clock.advanceMinutes(25); tick(store)
