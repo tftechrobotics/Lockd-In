@@ -113,7 +113,7 @@ export function App() {
                   <a href={`#/${r}`} aria-current={route === r ? 'page' : undefined} className={r === 'settings' ? 'nav__icon' : undefined}
                     aria-label={r === 'settings' ? 'Settings' : undefined}>
                     {r === 'settings' ? <Icon name="gear" size={22} /> : ROUTES[r].label}
-                    {r === 'focus' && active && <span className="nav__live" aria-label="session running" />}
+                    {r === 'focus' && active && route !== 'focus' && <span className="nav__live" role="img" aria-label="session running" title="Session running" />}
                   </a>
                 </li>
               ))}

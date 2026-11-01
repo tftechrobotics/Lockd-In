@@ -40,7 +40,8 @@ export function DesktopBar({ route, sessionRunning }: { route: Route; sessionRun
         {(['focus', 'schedule'] as const).map((r) => (
           <a key={r} href={`#/${r}`} className="switch__item" aria-current={route === r ? 'page' : undefined}>
             {r === 'focus' ? 'Focus' : 'Schedule'}
-            {r === 'focus' && sessionRunning && <span className="nav__live" aria-label="session running" />}
+            {/* Marks a running session while you're elsewhere; on Focus itself the session is already on screen. */}
+            {r === 'focus' && sessionRunning && route !== 'focus' && <span className="nav__live" role="img" aria-label="session running" title="Session running" />}
           </a>
         ))}
       </nav>
