@@ -2,6 +2,7 @@
 // WebView2 and announces itself over the bridge; `?shell=desktop` forces the
 // desktop layout for development and tests in an ordinary browser.
 import { useSyncExternalStore } from 'react';
+import { previewParams } from './previewParams';
 
 /** 'android' exists only in the design preview: a browser approximation of the Compose screens. */
 export type Layout = 'web' | 'desktop' | 'android';
@@ -18,7 +19,7 @@ interface WebView { postMessage(m: unknown): void; addEventListener(t: 'message'
 const webview = (): WebView | undefined =>
   typeof window === 'undefined' ? undefined : (window as unknown as { chrome?: { webview?: WebView } }).chrome?.webview;
 
-const shellParam = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('shell') : null;
+const shellParam = previewParams().get('shell');
 export const layout: Layout =
   webview() || shellParam === 'desktop' ? 'desktop'
     : shellParam === 'android' && import.meta.env.MODE === 'preview' ? 'android'
@@ -56,7 +57,7 @@ export function initBridge(): void {
   const wv = webview();
   if (!wv && import.meta.env.MODE === 'preview' && layout === 'desktop') {
     // Design preview: stand in for the Windows shell. "running" only with the demo toggle.
-    const protect = new URLSearchParams(location.search).get('protect') === '1';
+    const protect = previewParams().get('protect') === '1';
     host = { platform: 'windows', appVersion: 'preview', agent: protect ? 'running' : 'not_installed' };
     listeners.forEach((l) => l());
     return;

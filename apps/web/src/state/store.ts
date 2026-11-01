@@ -4,6 +4,7 @@
 // the app still works for the current tab and says so in Settings.
 import { useSyncExternalStore } from 'react';
 import type { Segment, SessionControls } from '../engine/session';
+import { previewParams } from '../previewParams';
 
 export const SCHEMA_VERSION = 1;
 
@@ -62,7 +63,7 @@ export interface State {
 
 // The design preview runs several frames on one origin; each keeps its own sample state.
 const KEY = 'lockdin.v1' + (import.meta.env.MODE === 'preview' && typeof location !== 'undefined'
-  ? '.preview.' + (new URLSearchParams(location.search).get('frame') ?? 'main') : '');
+  ? '.preview.' + (previewParams().get('frame') ?? 'main') : '');
 
 export const BUILT_IN_PROFILES: Profile[] = [
   { id: 'study', name: 'Study', description: 'Course apps, notes, PDFs and a calculator', builtIn: true },

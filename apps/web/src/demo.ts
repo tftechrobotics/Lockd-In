@@ -3,11 +3,11 @@
 // build `PREVIEW` is false at compile time, so none of this can make the real app claim blocking
 // or pairing.
 import { getState, newId, update } from './state/store';
+import { previewParams } from './previewParams';
 
 export const PREVIEW = import.meta.env.MODE === 'preview';
 
-const params = (): URLSearchParams =>
-  new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
+const params = previewParams;
 
 export interface Demo {
   /** Demo: restriction is "verified" on this device (Windows agent running / Android blocking). */

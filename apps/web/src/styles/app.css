@@ -540,3 +540,5 @@ select.input { appearance: none; padding-right: 36px; cursor: pointer;
 .focus--web .home .clock-lock { width: clamp(220px, 24vw, 280px); }
 .home__foot { width: 100%; max-width: 640px; align-items: center; }
 .home__foot .devices { justify-content: center; }
+/* A packaged phone demo opened in a wide window stays phone-sized. */
+@media (min-width: 600px) { :root[data-layout="android"] body { max-width: 430px; margin: 0 auto; box-shadow: 0 0 0 1px var(--line); } }

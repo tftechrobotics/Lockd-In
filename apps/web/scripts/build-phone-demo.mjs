@@ -10,8 +10,9 @@ const assets = readdirSync(join(dist, 'assets'));
 const css = assets.filter((f) => f.endsWith('.css')).map((f) => readFileSync(join(dist, 'assets', f), 'utf8')).join('\n');
 const js = assets.filter((f) => f.endsWith('.js')).map((f) => readFileSync(join(dist, 'assets', f), 'utf8')).join('\n');
 html = html.replace(/<script type="module"[^>]*><\/script>/, '').replace(/<link rel="stylesheet"[^>]*>/g, '').replace(/<link rel="modulepreload"[^>]*>/g, '');
-// Default to the phone layout and the idle sample unless the address already says otherwise.
-const boot = `<script>(function(){var q=new URLSearchParams(location.search);if(!q.has('shell')){q.set('shell','android');}var seen=false;try{seen=!!localStorage.getItem('lockdin.v1.preview.phone');}catch(e){}if(!q.has('scene')&&!seen){q.set('scene','setup');}if(seen){q.delete('scene');}q.set('frame','phone');try{history.replaceState(null,'',location.pathname+'?'+q.toString()+(location.hash||'#/focus'));}catch(e){}})();</script>`;
+// Phone layout and the idle sample by default, set before the app loads (works even where the
+// address can't be read or changed, such as a file viewer).
+const boot = `<script>(function(){var seen=false;try{seen=!!localStorage.getItem('lockdin.v1.preview.phone');}catch(e){}window.__LOCKDIN_DEFAULTS='shell=android&frame=phone'+(seen?'':'&scene=setup');})();</script>`;
 // Function replacers: the bundles contain `$` sequences that string replacement would expand.
 html = html.replace('<head>', () => `<head>${boot}`).replace('</head>', () => `<style>${css}</style></head>`).replace('</body>', () => `<script type="module">${js}</script></body>`);
 html = html.replace(/<link rel="icon"[^>]*>/, '');
