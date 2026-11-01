@@ -9,4 +9,10 @@ import { applyPreviewScene, PREVIEW } from './demo';
 
 if (PREVIEW) applyPreviewScene();
 
-createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>);
+const root = createRoot(document.getElementById('root')!);
+if (PREVIEW && new URLSearchParams(location.search).get('sheet') === '1') {
+  // Design preview only: the component sheet (compiled out of the production build).
+  void import('./preview/Sheet').then(({ Sheet }) => root.render(<StrictMode><Sheet /></StrictMode>));
+} else {
+  root.render(<StrictMode><App /></StrictMode>);
+}

@@ -42,38 +42,44 @@ const glyphRun = (text) => {
   }
 };
 
-// The lock replaces "o": same advance as "o"; body = x-height; shackle to cap height.
+// The lock replaces "o" (pass 4, circular lock): a round body sized like the "o" (x-height plus
+// overshoot) sitting on the baseline, and a substantial shackle rising to the ascender. Optical
+// variant of the timer component: no countdown, no label; a thin knocked-out ring echoes the
+// progress track so the body still reads as the clock face.
+const VARIANT = process.env.WM_VARIANT ?? 'ring';
 const lockGlyph = (ox) => {
   const o = font.charToGlyph('o');
-  const adv = o.advanceWidth * scale;
-  const lsb = 3, w = adv - 2 * lsb;            // body width
-  const bodyTop = baseline - xHeight * 0.92;
-  const bodyH = baseline - bodyTop;
-  const r = w * 0.22;                           // body corner radius
-  const stroke = w * 0.17;                      // shackle weight, close to Outfit's stem
-  const sx1 = ox + lsb + w * 0.24, sx2 = ox + lsb + w * 0.76;
-  const sTop = baseline - capHeight * 1.0;
-  const sr = (sx2 - sx1) / 2;
-  // Shackle: an open U drawn as a stroked arc, converted to an outline path.
-  const ri = sr - stroke / 2, ro = sr + stroke / 2, cx = (sx1 + sx2) / 2, cy = sTop + ro;
+  const ob = o.getBoundingBox();
+  const over = (-ob.y1 * scale);                // the "o" overshoot below the baseline
+  const D = xHeight + 2 * over;                 // body diameter, like the "o"
+  const lsb = 2.5;
+  const adv = D + 2 * lsb;
+  const cx = ox + adv / 2, cy = baseline + over - D / 2, R = D / 2;
+  const stroke = D * 0.2;                       // shackle weight: near Outfit Bold's stem
+  const outerW = D * 0.7;                       // reference: shackle is ~0.69 of the body width
+  const ro = outerW / 2, ri = ro - stroke;
+  const sTop = baseline - capHeight * 1.04;     // up to the ascender of "l"/"k"
+  const scy = sTop + ro;                        // shackle arc centre
+  // Legs stop just inside the body's edge, so nothing shows through the knocked-out ring.
+  const legEnd = cy - Math.sqrt(R * R - ro * ro) + D * 0.06;
   const shackle = [
-    `M${(cx - ro).toFixed(2)},${(bodyTop + 1).toFixed(2)}`,
-    `V${cy.toFixed(2)}`,
-    `A${ro.toFixed(2)},${ro.toFixed(2)} 0 0 1 ${(cx + ro).toFixed(2)},${cy.toFixed(2)}`,
-    `V${(bodyTop + 1).toFixed(2)}`,
+    `M${(cx - ro).toFixed(2)},${legEnd.toFixed(2)}`,
+    `V${scy.toFixed(2)}`,
+    `A${ro.toFixed(2)},${ro.toFixed(2)} 0 0 1 ${(cx + ro).toFixed(2)},${scy.toFixed(2)}`,
+    `V${legEnd.toFixed(2)}`,
     `H${(cx + ri).toFixed(2)}`,
-    `V${cy.toFixed(2)}`,
-    `A${ri.toFixed(2)},${ri.toFixed(2)} 0 0 0 ${(cx - ri).toFixed(2)},${cy.toFixed(2)}`,
-    `V${(bodyTop + 1).toFixed(2)}Z`,
+    `V${scy.toFixed(2)}`,
+    `A${ri.toFixed(2)},${ri.toFixed(2)} 0 0 0 ${(cx - ri).toFixed(2)},${scy.toFixed(2)}`,
+    `V${legEnd.toFixed(2)}Z`,
   ].join('');
-  const bx = ox + lsb, by = bodyTop;
-  const body = `M${(bx + r).toFixed(2)},${by.toFixed(2)}H${(bx + w - r).toFixed(2)}A${r},${r} 0 0 1 ${(bx + w).toFixed(2)},${(by + r).toFixed(2)}V${(by + bodyH - r).toFixed(2)}A${r},${r} 0 0 1 ${(bx + w - r).toFixed(2)},${(by + bodyH).toFixed(2)}H${(bx + r).toFixed(2)}A${r},${r} 0 0 1 ${bx.toFixed(2)},${(by + bodyH - r).toFixed(2)}V${(by + r).toFixed(2)}A${r},${r} 0 0 1 ${(bx + r).toFixed(2)},${by.toFixed(2)}Z`;
-  // Clock face knocked out of the body (evenodd), with hands left solid.
-  const ccx = bx + w / 2, ccy = by + bodyH * 0.55, cr = Math.min(w, bodyH) * 0.29;
-  const face = `M${(ccx + cr).toFixed(2)},${ccy.toFixed(2)}A${cr},${cr} 0 1 0 ${(ccx - cr).toFixed(2)},${ccy.toFixed(2)}A${cr},${cr} 0 1 0 ${(ccx + cr).toFixed(2)},${ccy.toFixed(2)}Z`;
-  const hw = stroke * 0.42;
-  const hands = `M${(ccx - hw / 2).toFixed(2)},${(ccy - cr * 0.62).toFixed(2)}H${(ccx + hw / 2).toFixed(2)}V${(ccy - hw / 2).toFixed(2)}H${(ccx + cr * 0.5).toFixed(2)}V${(ccy + hw / 2).toFixed(2)}H${(ccx - hw / 2).toFixed(2)}Z`;
-  return { d: `${shackle}${body}${face}`, hands, adv };
+  const circle = (r) => `M${(cx + r).toFixed(2)},${cy.toFixed(2)}A${r.toFixed(2)},${r.toFixed(2)} 0 1 0 ${(cx - r).toFixed(2)},${cy.toFixed(2)}A${r.toFixed(2)},${r.toFixed(2)} 0 1 0 ${(cx + r).toFixed(2)},${cy.toFixed(2)}Z`;
+  // Body: solid disc; "ring" knocks out a thin track inside it (even-odd: disc, outer, inner).
+  const ringW = D * 0.1, ringR = R * 0.72;
+  const body = VARIANT === 'ring'
+    ? circle(R) + circle(ringR + ringW / 2) + circle(ringR - ringW / 2)
+    : circle(R);
+  // The shackle is a separate path so its legs never cut into the body.
+  return { shackle, body, adv };
 };
 
 glyphRun('l');
@@ -86,14 +92,14 @@ glyphRun('in');
 const width = Math.ceil(x - tracking) + 2;
 const height = Math.ceil(baseline + (-font.descender * scale) * 0.35);
 const svg = (title, body, w, h) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="${title}"><title>${title}</title>${body}</svg>\n`;
-const wordBody = `<g fill="currentColor">${parts.map((d) => `<path d="${d}"/>`).join('')}<path fill-rule="evenodd" d="${lock.d}"/><path d="${lock.hands}"/></g>`;
+const wordBody = `<g fill="currentColor">${parts.map((d) => `<path d="${d}"/>`).join('')}<path d="${lock.shackle}"/><path fill-rule="evenodd" d="${lock.body}"/></g>`;
 writeFileSync(join(out, 'wordmark.svg'), svg('lockd in', wordBody, width, height));
 
 // Standalone lock mark (app icon source), re-drawn at the origin.
 x = 0;
 const mark = lockGlyph(0);
-const top = Math.floor(baseline - capHeight) - 2;
-const mh = Math.ceil(baseline - top) + 2;
-const markBody = `<g fill="currentColor" transform="translate(0 ${-top})"><path fill-rule="evenodd" d="${mark.d}"/><path d="${mark.hands}"/></g>`;
+const top = Math.floor(baseline - capHeight * 1.04) - 2;
+const mh = Math.ceil(baseline + 2 - top) + 2;
+const markBody = `<g fill="currentColor" transform="translate(0 ${-top})"><path d="${mark.shackle}"/><path fill-rule="evenodd" d="${mark.body}"/></g>`;
 writeFileSync(join(out, 'lock-mark.svg'), svg('Lockd In', markBody, Math.ceil(mark.adv), mh));
 console.log(`wordmark ${width}x${height}, mark ${Math.ceil(mark.adv)}x${mh}`);

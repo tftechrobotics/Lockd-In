@@ -1,0 +1,14 @@
+.pv-sheetpage { max-width: 1160px; margin: 0 auto; padding: 24px 24px 48px; color: var(--ink); }
+.pv-sheetpage section { padding: 8px 0 28px; border-bottom: 1px solid var(--line); }
+.pv-sheetpage h2 { margin: 16px 0 16px; font: 600 1.125rem/1.3 'Outfit Variable', sans-serif; }
+.pv-sheetpage h3 { margin: 20px 0 12px; font: 600 0.9375rem/1.3 'Figtree Variable', sans-serif; color: var(--ink-muted); }
+.sheet-row { display: flex; flex-wrap: wrap; gap: 28px 36px; align-items: flex-end; }
+.sheet-cell { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.sheet-cell__art { display: flex; align-items: flex-end; min-height: 40px; }
+.sheet-cell figcaption { display: flex; flex-direction: column; font-size: 0.8125rem; color: var(--ink-muted); }
+.sheet-cell figcaption strong { color: var(--ink); font-weight: 600; }
+.sheet-wm, .sheet-mark { display: block; color: var(--ink); }
+.sheet-wm svg { display: block; width: 100%; height: auto; }
+.sheet-mark svg { display: block; height: 100%; width: auto; }
+.pv-sheetpage .clock-lock { margin: 0; }
+.sheet-note { margin: 16px 0 0; max-width: 70ch; font-size: 0.875rem; color: var(--ink-muted); }

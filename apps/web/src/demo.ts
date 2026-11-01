@@ -28,7 +28,7 @@ export function applyPreviewScene(): void {
   if (!PREVIEW) return;
   const p = params();
   const theme = p.get('theme');
-  if (theme === 'light' || theme === 'dark') update((s) => ({ ...s, theme }));
+  if (theme === 'light' || theme === 'dark') { update((s) => ({ ...s, theme })); document.documentElement.dataset.theme = theme; }
   if (p.get('text') === '200') {
     document.documentElement.dataset.text = '200';
     const st = document.createElement('style');

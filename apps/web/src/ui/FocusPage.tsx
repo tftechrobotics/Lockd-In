@@ -12,7 +12,7 @@ import { DeviceStrip } from './DeviceStrip';
 import { clockTime, countdown, dayLabel, durationLabel, spokenRemaining } from './format';
 import { Icon } from './Icon';
 import { message } from './messages';
-import { Numerals, SessionRail, TimerStatus } from './Timer';
+import { CircleLock, SessionRail, TimerStatus } from './Timer';
 import { layout, useHost } from '../platform';
 
 /** Re-render every second while something is counting; never the source of truth. */
@@ -173,8 +173,8 @@ function Setup() {
 
         {layout === 'web' && valid && (
           <aside className="preview" aria-label="Session preview">
-            <TimerStatus state="ready" closed={false} text="Ready" />
-            <Numerals state="ready" ms={focus * 60_000} label={`${focus} minutes per round`} size="medium" />
+            <CircleLock state="ready" remainingMs={focus * 60_000} totalMs={focus * 60_000} locked={false}
+              label={`Ready: ${focus} minutes per round`} caption={effRounds > 1 ? 'per round' : 'ready'} size="200px" />
             <SessionRail phases={occurrenceFrom(now, segments).phases} now={now} />
             <p className="preview__ends">If you start now, you’re done at <strong>{clockTime(now + total * 60_000)}</strong>.</p>
           </aside>
@@ -275,8 +275,10 @@ function SessionView({ session }: { session: ActiveSession }) {
     <div className={`page focus focus--${layout} focus--running`}>
       <div className="running">
         <h1 className="running__task">{task ?? (phase.kind === 'break' ? 'Break' : 'Focus session')}</h1>
-        <TimerStatus state={state} closed={protectedNow} text={status} live />
-        <Numerals state={state} ms={remaining} label={`${phase.kind === 'break' ? 'Break' : 'Focus'}: ${spokenRemaining(remaining)}`} />
+        <TimerStatus state={state} closed={protectedNow} text={status} live icon={false} />
+        <CircleLock state={state} remainingMs={remaining} totalMs={phase.end - phase.start} locked={protectedNow}
+          label={`${phase.kind === 'break' ? 'Break' : 'Focus'}: ${spokenRemaining(remaining)}`}
+          caption={phase.kind === 'break' ? 'of break left' : 'remaining'} />
         <SessionRail phases={occ.phases} now={now} />
         <div className="running__foot">
           <div className="running__info">
@@ -406,8 +408,8 @@ function Recap({ session, snap }: { session: ActiveSession; snap: Snapshot }) {
     <div className={`page focus focus--${layout} focus--running`}>
       <div className="running">
         <h1 className="running__task">{session.intention?.text ?? 'Focus session'}</h1>
-        <TimerStatus state="done" closed={false} text="Session complete" />
-        <Numerals state="done" ms={0} label="Session complete" />
+        <TimerStatus state="done" closed={false} text="Session complete" icon={false} />
+        <CircleLock state="done" remainingMs={0} totalMs={1} locked={false} label="Session complete" caption="complete" />
         <SessionRail phases={occ.phases} now={endedAt} />
         <div className="running__foot">
           <div className="running__info">

@@ -3,7 +3,8 @@ import AxeBuilder from '@axe-core/playwright';
 
 const MIN = 60_000;
 const status = (page: import('@playwright/test').Page) => page.locator('.timer-status');
-const numerals = (page: import('@playwright/test').Page) => page.locator('.numerals');
+const numerals = (page: import('@playwright/test').Page) => page.locator('.running .clock-lock__time');
+const lock = (page: import('@playwright/test').Page) => page.locator('.running .clock-lock');
 async function rounds(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: 'Change rounds and breaks' }).click();
 }
@@ -28,17 +29,23 @@ test('configure → start → focus → break → resume → finish', async ({ p
   await expect(status(page)).toHaveText('Focusing · round 1 of 2');
   await expect(page.getByRole('heading', { name: 'TAM 212 · Practice problems' })).toBeVisible();
   // Timer only: the lock never shows as closed when nothing is restricted.
-  await expect(status(page).locator('.minilock path')).toHaveAttribute('d', /V6\.5/);
+  await expect(lock(page)).not.toHaveClass(/is-locked/);
   await expect(numerals(page)).toHaveText('25:00');
-  await expect(numerals(page)).toHaveAttribute('role', 'timer');
+  await expect(lock(page)).toHaveAttribute('role', 'timer');
+  await expect(lock(page)).toHaveAttribute('aria-label', 'Focus: 25 minutes left');
+  // The ring starts full and follows the countdown.
+  await expect(lock(page).locator('.clock-lock__arc')).toHaveAttribute('stroke-dasharray', '1000.0 1000');
   await expect(page.locator('.facts')).toContainText('Next break');
 
   await page.clock.fastForward(25 * MIN + 1000);
   await expect(status(page)).toHaveText('On a break · round 1 of 2');
-  await expect(numerals(page)).toHaveClass(/numerals--break/);
+  await expect(lock(page)).toHaveClass(/clock-lock--break/);
+  await expect(lock(page)).not.toHaveClass(/is-locked/);
   await expect(page.locator('.facts')).toContainText('Focus resumes');
 
-  await page.clock.fastForward(4 * MIN + 10_000); // 50 s left in the break
+  await page.clock.fastForward(2.5 * MIN); // halfway through the 5-minute break
+  await expect(lock(page).locator('.clock-lock__arc')).toHaveAttribute('stroke-dasharray', /^(49\d|50\d)\.\d 1000$/);
+  await page.clock.fastForward(1.5 * MIN + 10_000); // 50 s left in the break
   await expect(page.getByText(/resumes in about a minute/)).toBeVisible();
 
   await page.clock.fastForward(60_000);

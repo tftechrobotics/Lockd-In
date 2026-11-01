@@ -5,9 +5,10 @@ import '@fontsource-variable/outfit/wght.css';
 import '@fontsource-variable/figtree/wght.css';
 import '../styles/tokens.css';
 import './preview.css';
+import mark from '@design/assets/lock-mark.svg?raw';
 
 type Scene = 'setup' | 'focus' | 'break' | 'pending' | 'done';
-type View = 'devices' | 'web';
+type View = 'devices' | 'web' | 'sheet';
 interface Opts { scene: Scene; protect: boolean; paired: boolean; theme: 'light' | 'dark'; text: '100' | '200'; view: View }
 
 const APP = location.pathname.endsWith('preview.html') ? 'index.html' : 'app.html';
@@ -18,7 +19,7 @@ const CHOICES: { key: keyof Opts; label: string; items: [string, string][] }[] =
   { key: 'scene', label: 'Sample', items: [['setup', 'Setup'], ['focus', 'Focusing'], ['break', 'Break'], ['pending', 'Unlock pending'], ['done', 'Done']] },
   { key: 'theme', label: 'Theme', items: [['light', 'Light'], ['dark', 'Dark']] },
   { key: 'text', label: 'Text', items: [['100', '100%'], ['200', '200%']] },
-  { key: 'view', label: 'Show', items: [['devices', 'Windows + Android'], ['web', 'Web']] },
+  { key: 'view', label: 'Show', items: [['devices', 'Windows + Android'], ['web', 'Web'], ['sheet', 'Timer & wordmark']] },
 ];
 
 const root = document.getElementById('preview')!;
@@ -80,6 +81,15 @@ const src = (shell: 'desktop' | 'android' | 'web', frame: string) => {
 const reset = '<button type="button" class="pv-reset" title="Reload this frame with the selected sample">Reset</button>';
 
 function renderStage() {
+  if (opts.view === 'sheet') {
+    const q = new URLSearchParams({ frame: 'sheet', sheet: '1', theme: opts.theme, text: opts.text });
+    stage.innerHTML = `<figure class="pv-frame pv-frame--sheet"><figcaption><strong>Timer and wordmark</strong> · components at real size</figcaption>
+      <iframe class="pv-sheet" title="Timer and wordmark sheet" src="${APP}?${q}"></iframe></figure>`;
+    const f = stage.querySelector<HTMLIFrameElement>('iframe')!;
+    const grow = () => { try { f.style.height = `${f.contentDocument!.documentElement.scrollHeight}px`; } catch { /* same origin only */ } };
+    f.addEventListener('load', () => { grow(); setTimeout(grow, 400); setTimeout(grow, 1200); });
+    return;
+  }
   if (opts.view === 'web') {
     stage.innerHTML = `
       <figure class="pv-frame pv-frame--web">
@@ -93,7 +103,7 @@ function renderStage() {
       <figure class="pv-frame pv-frame--win">
         <figcaption><strong>Windows</strong> · preview of the desktop layout ${reset}</figcaption>
         <div class="pv-window">
-          <div class="pv-window__title"><span class="pv-window__icon"></span>lockd in<span class="pv-window__btns"><i>&#x2013;</i><i>&#x25A1;</i><i>&#x2715;</i></span></div>
+          <div class="pv-window__title"><span class="pv-window__icon">${mark}</span>lockd in<span class="pv-window__btns"><i>&#x2013;</i><i>&#x25A1;</i><i>&#x2715;</i></span></div>
           <div class="pv-scale" data-w="640" data-h="760"><iframe title="Windows layout preview" src="${src('desktop', 'win')}" width="640" height="760"></iframe></div>
         </div>
       </figure>

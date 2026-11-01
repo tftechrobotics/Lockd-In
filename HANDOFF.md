@@ -39,7 +39,11 @@ actionlint).
   (browser approximation: `?shell=android`, preview build only), Web. Sample scenes: setup / focusing / break /
   unlock pending / done; theme; 100/200% text; demo toggles "Blocking verified" and "Devices paired", each
   labeled DEMO in the UI. Demo code is compiled out of the production build (checked: no traces in `dist/`).
-- Status: Focus is awaiting owner approval. Then Schedule → Profiles → Devices → Settings, one at a time.
+- Status: owner approved the circular lock direction (R36); it is in the web/Windows/Android previews with a
+  "Timer & wordmark" sheet. Next: owner sign-off on Focus, then Schedule → Profiles → Devices → Settings.
+- Not yet carried to native (deferred to the native batch): Android `wordmark.xml`/`lock_mark.xml`
+  (`python3 design/export-android.py`), Android Compose timer (`ui/Timer.kt` still numerals), launcher icons,
+  Windows `lock-mark-32.png` title icon and `app-icon` art.
 - **Unresolved native issue (deferred):** Android CI `AppTest.configureStartFocusBreakResumeFinish` fails at
   "Ends at 6:55 PM … is not displayed" (pinned plan line) after choosing 25 min + 5 min breaks; not the keyboard
   (reordering didn't fix it). Other 14 emulator tests pass and screenshots render. Investigate when native

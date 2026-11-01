@@ -16,12 +16,57 @@ export function MiniLock({ closed, size = 18 }: { closed: boolean; size?: number
 }
 
 /** Status line with the lock detail: "Focusing · round 1 of 2". */
-export function TimerStatus({ state, closed, text, live = false }: { state: TimerState; closed: boolean; text: string; live?: boolean }) {
+export function TimerStatus({ state, closed, text, live = false, icon = true }: { state: TimerState; closed: boolean; text: string; live?: boolean; icon?: boolean }) {
   return (
     <p className={`timer-status timer-status--${state}`} aria-live={live ? 'polite' : undefined}>
-      <MiniLock closed={closed} />
+      {icon && <MiniLock closed={closed} />}
       <span>{text}</span>
     </p>
+  );
+}
+
+/*
+ * Circular lock timer (approved 2026-10-31): the round body is the clock face, a substantial
+ * shackle above it, a centred MM:SS countdown and a progress ring that starts full at 12 o'clock
+ * and shrinks with the time left. Geometry follows the owner's reference: shackle ~0.69 of the
+ * body's width, rising ~0.4 of its diameter above it. Flat: no gloss, no hands.
+ *
+ * `locked` closes the shackle. Pass it only when restriction is verified and applied right now;
+ * timer-only focus, breaks and unlocked rounds show it open.
+ */
+const LK = { w: 240, h: 344, cx: 120, cy: 232, r: 108, ring: 87 };
+const SHACKLE = { ro: 74.5, stroke: 21, top: 36, lift: 28 };
+
+export function CircleLock({ state, remainingMs, totalMs, locked, label, caption, size }: {
+  state: TimerState; remainingMs: number; totalMs: number; locked: boolean;
+  /** Spoken summary, minute-level ("Focus: 23 minutes left"). */
+  label: string;
+  /** Small word under the digits: "remaining", "of break", "ready", "complete". */
+  caption: string;
+  /** CSS width; the height follows. */
+  size?: string;
+}) {
+  const f = state === 'done' ? 0 : totalMs > 0 ? Math.max(0, Math.min(1, remainingMs / totalMs)) : 0;
+  const { ro, stroke, top, lift } = SHACKLE;
+  const rc = ro - stroke / 2;                         // centreline radius
+  const y0 = (locked ? top : top - lift) + ro;        // arc centre
+  const legBottom = LK.cy - 40;                       // hidden behind the body
+  // Closed: both legs run into the body. Open: lifted, and the right leg stops short of it.
+  const shackle = `M${LK.cx - rc} ${legBottom}V${y0}A${rc} ${rc} 0 0 1 ${LK.cx + rc} ${y0}V${locked ? legBottom : y0 + 22}`;
+  return (
+    <div className={`clock-lock clock-lock--${state}${locked ? ' is-locked' : ''}`} role="timer" aria-label={label} style={size ? { width: size } : undefined}>
+      <svg viewBox={`0 0 ${LK.w} ${LK.h}`} aria-hidden="true" focusable="false">
+        <path className="clock-lock__shackle" d={shackle} fill="none" strokeWidth={stroke} strokeLinecap="round" />
+        <circle className="clock-lock__body" cx={LK.cx} cy={LK.cy} r={LK.r} />
+        <circle className="clock-lock__track" cx={LK.cx} cy={LK.cy} r={LK.ring} fill="none" />
+        {f > 0.0005 && (
+          <circle className="clock-lock__arc" cx={LK.cx} cy={LK.cy} r={LK.ring} fill="none" pathLength={1000}
+            strokeDasharray={`${(f * 1000).toFixed(1)} 1000`} transform={`rotate(-90 ${LK.cx} ${LK.cy})`} />
+        )}
+        <text className="clock-lock__time" x={LK.cx} y={LK.cy + 14} textAnchor="middle">{state === 'done' ? 'Done' : countdown(remainingMs)}</text>
+        <text className="clock-lock__caption" x={LK.cx} y={LK.cy + 46} textAnchor="middle">{caption}</text>
+      </svg>
+    </div>
   );
 }
 

@@ -88,7 +88,7 @@ test('bridge: reports session state and theme; tray command starts a 10-minute f
   expect((await sent()).map((m) => m.type)).toEqual(expect.arrayContaining(['ui.ready', 'ui.theme', 'ui.session_state']));
   await page.evaluate(() => (window as unknown as { __host: (d: unknown) => void }).__host({ v: 1, type: 'host.command', command: 'start_quick' }));
   await expect(page.locator('.timer-status')).toHaveText('Focusing');
-  await expect(page.locator('.numerals')).toHaveText(/^(10:00|09:5\d)$/);
+  await expect(page.locator('.running .clock-lock__time')).toHaveText(/^(10:00|09:5\d)$/);
   const last = (await sent()).filter((m) => m.type === 'ui.session_state').pop() as { active: boolean; endsAt: number };
   expect(last.active).toBe(true);
   expect(last.endsAt).toBeGreaterThan(Date.now() + 9 * 60_000);

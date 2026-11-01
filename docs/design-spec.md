@@ -1,5 +1,15 @@
 # Lockd In design specification — Cream & Ink, pass 4
 
+> **Circular lock (2026-10-31, R36) replaces the pass-4 numerals timer.** Component `CircleLock`
+> (`apps/web/src/ui/Timer.tsx`, styles under "Circular lock timer" in `app.css`): viewBox 240 × 344,
+> body r 108 with a 2.5 espresso edge, progress ring r 87 / 9 wide (track = ink at 9–10%, arc =
+> taupe #94877B light / #B3A595 dark, break arc lighter), shackle stroke 21 in muted taupe,
+> digits Outfit 500 50u tabular, caption Figtree 500 15u ("remaining", "of break left", "per round",
+> "complete"; hidden below 130 px wide). States: ready (muted digits, open), focus (open unless
+> verified), break (lighter body and arc, open), done ("Done", empty ring, open). Sizes: web
+> 200–300 px, Windows 170–220 px, Android ≤ 210 px. Wordmark/symbol: `scripts/build-wordmark.mjs`
+> (round body = "o" size, knocked-out ring, closed shackle to the ascender) → `design/assets/`.
+
 > **Pass 4 (2026-10-31, R34) supersedes pass 3 for the Focus screen.** Owner picked "A setup, B timer"
 > from two isolated directions (lab: `apps/web/lab.html`, `apps/android/.../androidTest/.../lab/`).
 >
