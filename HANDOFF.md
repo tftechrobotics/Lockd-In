@@ -6,10 +6,14 @@
 
 **Where things stand (2026-11-01, Android-only — R40)**
 - Owner paused Windows and web; the Android backlog map is in `docs/android-backlog.md`.
-- **Milestone A (automatic schedules + reminders) is written, commit bd2cd55, but NOT built.** GitHub Actions stopped
-  starting jobs ("recent account payments have failed or your spending limit needs to be increased"). Local
-  checks only: Kotlin type-check of non-UI code, PlannerTest 10/11 (the codec test needs real org.json, i.e. CI).
-  Compose UI, lint, emulator E2E (planned-session phase added) and the test APK wait on CI billing.
+- **Repository is public since 2026-11-01** (owner), so GitHub-hosted CI is free again. Emulator jobs run only on
+  request: `gh api -X POST repos/tftechrobotics/Lockd-In/actions/workflows/android-app.yml/dispatches -f ref=main
+  -f 'inputs[emulator]=true'` (add `-f 'inputs[only]=plan'` for just the planned-session phase). The `ci` workflow
+  (Windows/web) is manual only.
+- **Milestone A (automatic schedules + reminders): built; emulator checks pass** — auto start fires on time with an
+  exact alarm and blocks, the 'starts now' notice is posted for non-automatic plans, and nothing starts without the
+  person. Code: `engine/Planner.kt` (pure, `PlannerTest`), `sched/` (Scheduler, PlanReceiver, PlanActions, Notifier).
+  Not yet checked on the phone: reminders before a session, the missed follow-up, quiet hours, a reboot before a plan.
 
 - **Android blocking is in the real app** (`apps/android/app/src/main/java/app/lockdin/enforce/`): `FocusService`
   (specialUse FGS, usage events, 500 ms poll), `BlockActivity`, `BlockPolicy` (pure, tested), `Capabilities`,
