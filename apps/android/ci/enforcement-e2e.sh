@@ -364,7 +364,8 @@ if adb shell pm path com.android.chrome >/dev/null 2>&1; then
   adb shell am force-stop com.android.chrome
   adb shell am start -a android.intent.action.VIEW -d "https://www.example.com/" com.android.chrome >/dev/null 2>&1
   r=$(wait_top "${BLOCK//./\\.}" 15000) && record a11y-site-block pass "example.com covered in Chrome (${r} ms after opening)" \
-    || { adb exec-out uiautomator dump /dev/tty > "$OUT/chrome.xml" 2>/dev/null; record a11y-site-block FAIL "example.com not covered in Chrome: $r"; }
+    || { record a11y-site-block FAIL "example.com not covered in Chrome: $r"
+         echo "::notice title=Site-block diagnostics (EMULATOR)::$( (adb shell dumpsys activity activities | grep -E 'topResumed|ResumedActivity|BlockActivity' | head -8; adb logcat -d -s LockdInFocus | tail -40) | sed 's/%/%25/g' | tr '\n' '\r' | sed 's/\r/%0A/g' | cut -c1-6000)"; }
   home
   adb shell am start -a android.intent.action.VIEW -d "https://www.iana.org/" com.android.chrome >/dev/null 2>&1; sleep 6
   t=$(top); home
