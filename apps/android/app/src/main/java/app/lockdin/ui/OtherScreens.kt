@@ -170,6 +170,16 @@ fun SettingsScreen(store: Store) {
         }
         RemindersSettings(store)
         Column {
+            SectionLabel("Starting a session")
+            SettingsGroup {
+                SwitchRow("Haptic clicks", "The dial clicks as it turns when you start focus. Follows your phone’s touch vibration setting.",
+                    store.state.startHaptics) { v -> store.update { it.copy(startHaptics = v) } }
+                GroupDivider()
+                SwitchRow("Click sound", "A quiet mechanical click. Follows your phone’s touch sounds and silent mode.",
+                    store.state.startSound) { v -> store.update { it.copy(startSound = v) } }
+            }
+        }
+        Column {
             SectionLabel("Ending a session early")
             SettingsGroup {
                 Column(Modifier.selectableGroup()) {

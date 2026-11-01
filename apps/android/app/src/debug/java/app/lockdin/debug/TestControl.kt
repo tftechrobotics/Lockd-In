@@ -53,6 +53,16 @@ class TestControl : BroadcastReceiver() {
                 }
                 app.lockdin.sched.Scheduler.run(context)
             }
+            // Sets the Study profile's apps (empty = timer only) and makes it the setup default.
+            "rules" -> {
+                val pkgs = intent.getStringExtra("block")?.split(',')?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+                store.update { s ->
+                    s.copy(
+                        profiles = s.profiles.map { if (it.id == "study") it.copy(rules = AppRules(RuleMode.BLOCK_LIST, pkgs)) else it },
+                        last = s.last.copy(profileId = "study"),
+                    )
+                }
+            }
             "emergency" -> store.state.active?.let { a ->
                 store.setControls(a.id) { it.copy(emergencyRecoveryAt = System.currentTimeMillis()) }
             }

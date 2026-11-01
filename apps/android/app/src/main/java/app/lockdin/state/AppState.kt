@@ -57,6 +57,9 @@ data class AppState(
     val recentIntentions: List<String> = emptyList(),
     /** Default commitment for new sessions. */
     val commitment: Commitment = Commitment.DELAYED,
+    /** Manual-start animation feedback: haptic clicks (on) and a quiet click sound (off). */
+    val startHaptics: Boolean = true,
+    val startSound: Boolean = false,
     val reminders: ReminderSettings = ReminderSettings(),
     /** Planner events already handled ("KIND:<occurrence key>", also session notices); newest last. */
     val planLog: List<String> = emptyList(),
@@ -90,6 +93,8 @@ object StateCodec {
                 .put("rules", rulesJson(it.rules))
         }))
         put("commitment", s.commitment.name)
+        put("startHaptics", s.startHaptics)
+        put("startSound", s.startSound)
         put("schedule", JSONArray(s.schedule.map {
             JSONObject().put("id", it.id).put("title", it.title)
                 .put("days", JSONArray(it.days.map { d -> d.value }.sorted()))
@@ -139,6 +144,8 @@ object StateCodec {
                     (0 until a.length()).mapNotNull { a.optString(it).takeIf { s -> s.isNotBlank() } }
                 }?.take(8) ?: emptyList(),
                 commitment = enumOr(o.optString("commitment"), Commitment.DELAYED),
+                startHaptics = o.optBoolean("startHaptics", true),
+                startSound = o.optBoolean("startSound", false),
                 reminders = o.optJSONObject("reminders")?.let(::remindersOf) ?: ReminderSettings(),
                 planLog = o.optJSONArray("planLog")?.let { a -> (0 until a.length()).mapNotNull { a.optString(it).takeIf { x -> x.isNotBlank() && x.length < 200 } } }?.takeLast(MAX_LOG) ?: emptyList(),
                 recentStarts = longs(o.optJSONArray("recentStarts")).takeLast(MAX_STARTS),

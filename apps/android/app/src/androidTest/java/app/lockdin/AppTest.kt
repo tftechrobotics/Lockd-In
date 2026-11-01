@@ -262,6 +262,42 @@ class AppTest {
         rule.onNodeWithText("Study").assertIsDisplayed()
     }
 
+    @Test fun startSequencePlaysOnceForAManualStartOnly() {
+        val tester = androidx.compose.ui.test.junit4.StateRestorationTester(rule)
+        val store = Store(AppState()) {}
+        tester.setContent { LockdInApp(store, clock, zone, false) }
+        rule.onNodeWithText("New session").performClick()
+        val before = app.lockdin.ui.StartIntro.plays
+        rule.onNodeWithText("Start timer").performClick()
+        rule.waitForIdle()
+        org.junit.Assert.assertEquals("plays once for the manual start", before + 1, app.lockdin.ui.StartIntro.plays)
+        // Rotation / activity re-creation rebuilds the screen: no replay.
+        tester.emulateSavedInstanceStateRestore()
+        rule.waitForIdle()
+        org.junit.Assert.assertEquals("no replay after re-creation", before + 1, app.lockdin.ui.StartIntro.plays)
+        rule.onNodeWithText("Focusing", substring = true).assertExists()
+    }
+
+    @Test fun sessionStartedOutsideTheAppDoesNotPlayTheSequence() {
+        // As after a scheduled start: the session already exists when the app is opened.
+        val store = Store(AppState()) {}
+        store.startSession(clock.now(), app.lockdin.engine.Session.roundsPlan(1, 25, 5), "Planned", "study", store.state.last)
+        val before = app.lockdin.ui.StartIntro.plays
+        launch(store.state)
+        rule.waitForIdle()
+        org.junit.Assert.assertEquals(before, app.lockdin.ui.StartIntro.plays)
+    }
+
+    @Test fun startFeedbackSettingsDefaultHapticsOnSoundOff() {
+        launch(home = true)
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.onNodeWithText("Haptic clicks").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Click sound").performScrollTo().assertIsDisplayed()
+        val s = AppState()
+        org.junit.Assert.assertTrue(s.startHaptics)
+        org.junit.Assert.assertFalse(s.startSound)
+    }
+
     @Test fun invalidCustomLengthExplained() {
         launch()
         rule.onNodeWithContentDescription("Custom minutes").performClick()

@@ -142,6 +142,8 @@ jobs:
     needs: app
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    permissions:
+      contents: write   # push the start-sequence recordings to the ci-screenshots branch
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -175,3 +177,19 @@ jobs:
           name: lockdin-enforcement-EMULATOR-ONLY
           path: out/enforcement
           retention-days: 7
+      - name: Publish start-sequence recordings to the ci-screenshots branch
+        if: always()
+        run: |
+          ls out/enforcement/start-sequence*.mp4 >/dev/null 2>&1 || { echo "::warning::No start-sequence recording"; exit 0; }
+          sha=$(git rev-parse --short HEAD)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            rm -rf ../rec-branch; git worktree prune
+            git fetch -q origin ci-screenshots && git worktree add -q ../rec-branch origin/ci-screenshots -B ci-screenshots-rec || exit 0
+            mkdir -p ../rec-branch/start-sequence && rm -f ../rec-branch/start-sequence/*
+            cp out/enforcement/start-sequence*.mp4 out/enforcement/lock-*.png ../rec-branch/start-sequence/ 2>/dev/null || true
+            echo "Manual-start sequence recorded on the CI emulator (API 35) from commit $sha. EMULATOR ONLY." > ../rec-branch/start-sequence/README.txt
+            (cd ../rec-branch && git add -A && git commit -qm "Start-sequence recording for $sha" && git push -q origin HEAD:ci-screenshots) && break
+            sleep 5
+          done

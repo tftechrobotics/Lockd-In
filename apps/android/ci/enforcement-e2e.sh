@@ -72,6 +72,95 @@ trial_open() {
   [[ "$t" == "$T/"* ]] && { echo "open"; return 0; } || { echo "covered-later($t)"; return 1; }
 }
 
+# find_text <text>: prints the centre of the first on-screen node whose text or description is <text>.
+find_text() {
+  local f=/tmp/ui.xml xy
+  for _ in 1 2 3 4 5 6; do
+    adb exec-out uiautomator dump /dev/tty > "$f" 2>/dev/null
+    xy=$(python3 - "$1" "$f" <<'PY'
+import re, sys
+t, x = sys.argv[1], open(sys.argv[2], errors="ignore").read()
+for n in re.findall(r"<node [^>]*>", x):
+    if f'text="{t}"' in n or f'content-desc="{t}"' in n:
+        a = list(map(int, re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', n).groups()))
+        print((a[0] + a[2]) // 2, (a[1] + a[3]) // 2); break
+PY
+)
+    [ -n "$xy" ] && { echo "$xy"; return 0; }
+    sleep 1
+  done
+  return 1
+}
+tap_text() { local xy; xy=$(find_text "$1") || return 1; adb shell input tap $xy; }
+intro_count() { adb logcat -d -s LockdInIntro:I 2>/dev/null | grep -c "$1"; }
+anim_scale() { for k in window_animation_scale transition_animation_scale animator_duration_scale; do adb shell settings put global $k "$1"; done; }
+
+# Manual start sequence (R42): plays once per start pressed in the app; the shackle shuts only
+# after blocking is confirmed; never replayed by reopening, rotation or a blocked app; a timer-only
+# start keeps the shackle open; Remove animations replaces the turn with a fade.
+manual_start() { # manual_start <button text>
+  adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2
+  tap_text "New session" || return 1
+  sleep 1.5
+  tap_text "$1"
+}
+intro_phase() {
+  ctl --es cmd finish; ctl --es cmd rules --es block "$T"
+  anim_scale 1
+  adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2
+  tap_text "New session" || record intro-ui FAIL "couldn't find New session"
+  sleep 1.5
+  p0=$(intro_count "played session="); c0=$(intro_count "shackle_closed")
+  if xy=$(find_text "Start focus"); then
+    adb shell screenrecord --time-limit 5 --bit-rate 8000000 /sdcard/start-sequence.mp4 & rec=$!
+    sleep 1; adb shell input tap $xy
+    wait $rec; adb pull /sdcard/start-sequence.mp4 "$OUT/start-sequence.mp4" >/dev/null 2>&1
+    adb shell screencap -p /sdcard/s.png; adb pull /sdcard/s.png "$OUT/lock-light.png" >/dev/null 2>&1
+    p1=$(intro_count "played session="); c1=$(intro_count "shackle_closed")
+    closed=$(adb logcat -d -s LockdInIntro:I | grep shackle_closed | tail -1 | grep -oE 'after_ms=[0-9]+' | cut -d= -f2)
+    [ $((p1 - p0)) = 1 ] && grep -q 'reduced=false' <(adb logcat -d -s LockdInIntro:I | grep played | tail -1) \
+      && record intro-manual-plays pass "played once on Start focus" || record intro-manual-plays FAIL "played $((p1 - p0)) times"
+    [ $((c1 - c0)) = 1 ] && record intro-shackle-after-verify pass "shackle shut ${closed} ms after Start (after the turn and the service's PROTECTING report)" \
+      || record intro-shackle-after-verify FAIL "shackle did not shut"
+    service_up && record intro-enforcement pass "blocking service running" || record intro-enforcement FAIL "service not running"
+  else
+    record intro-manual-plays FAIL "couldn't find Start focus"
+  fi
+  # Reopening, rotation and a blocked app must not replay it.
+  home; adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2
+  adb shell settings put system accelerometer_rotation 0
+  adb shell settings put system user_rotation 1; sleep 2; adb shell settings put system user_rotation 0; sleep 2
+  trial_blocked >/dev/null; adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2
+  p2=$(intro_count "played session=")
+  [ "$p2" = "$p1" ] && record intro-no-replay pass "no replay after reopening, rotation and a blocked app" || record intro-no-replay FAIL "replayed $((p2 - p1)) times"
+  # Dark theme recording (same sequence).
+  ctl --es cmd finish; adb shell cmd uimode night yes; sleep 2
+  adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2
+  if tap_text "New session" && sleep 1.5 && xy=$(find_text "Start focus"); then
+    adb shell screenrecord --time-limit 5 --bit-rate 8000000 /sdcard/dark.mp4 & rec=$!
+    sleep 1; adb shell input tap $xy; wait $rec
+    adb pull /sdcard/dark.mp4 "$OUT/start-sequence-dark.mp4" >/dev/null 2>&1
+    adb shell screencap -p /sdcard/s.png; adb pull /sdcard/s.png "$OUT/lock-dark.png" >/dev/null 2>&1
+  fi
+  adb shell cmd uimode night no; p2=$(intro_count "played session=")
+  # Timer only: the turn plays, the shackle stays open.
+  ctl --es cmd finish; ctl --es cmd rules; sleep 1
+  c2=$(intro_count "shackle_closed")
+  if manual_start "Start timer"; then
+    sleep 4
+    [ "$(intro_count "played session=")" = $((p2 + 1)) ] && [ "$(intro_count "shackle_closed")" = "$c2" ] \
+      && record intro-timer-only pass "timer-only start played the turn; shackle stayed open" || record intro-timer-only FAIL "shackle shut or no sequence"
+  else record intro-timer-only FAIL "couldn't start a timer"; fi
+  # Remove animations: no turn, a fade instead.
+  ctl --es cmd finish; ctl --es cmd rules --es block "$T"; anim_scale 0; sleep 1
+  if manual_start "Start focus"; then
+    sleep 3
+    adb logcat -d -s LockdInIntro:I | grep played | tail -1 | grep -q 'reduced=true' \
+      && record intro-reduced-motion pass "Remove animations: fade only" || record intro-reduced-motion FAIL "turn not replaced"
+  else record intro-reduced-motion FAIL "couldn't start"; fi
+  ctl --es cmd finish; home
+}
+
 plan_phase() {
   # ---------------- Milestone A: planned sessions ----------------
   ctl --es cmd finish
@@ -91,6 +180,10 @@ plan_phase() {
   sleep 60
   service_up && record A-auto-start pass "automatic plan started the blocking service at $T2" || record A-auto-start FAIL "service not running after $T2"
   notif_has "AutoPlan started" && record A-auto-notice pass "AutoPlan started notice" || record A-auto-notice FAIL "no start notice"
+  t=$(top); [[ "$t" == "$A/"* ]] && record A-auto-not-onscreen FAIL "app came to the front ($t)" || record A-auto-not-onscreen pass "app stayed in the background ($t)"
+  pa=$(intro_count "played session="); adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 3; home
+  [ "$(intro_count "played session=")" = "$pa" ] && record A-auto-no-sequence pass "opening the app during a scheduled session didn't play the start sequence" \
+    || record A-auto-no-sequence FAIL "start sequence played for a scheduled session"
   r=$(trial_blocked 6000) && record A-auto-blocks pass "target covered during the automatic session (${r} ms)" || record A-auto-blocks FAIL "$r"
   ctl --es cmd emergency; sleep 3
   # Diagnostics for this phase (annotations are the only way to read CI output from here).
@@ -108,6 +201,14 @@ adb shell appops set $A GET_USAGE_STATS allow
 adb shell appops set $A SYSTEM_ALERT_WINDOW allow
 adb shell pm grant $A android.permission.POST_NOTIFICATIONS || true
 adb logcat -c
+if [ "${ONLY:-}" = intro ]; then
+  adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2; home
+  intro_phase
+  plan_phase
+  cat "$RESULTS"; grep -q " FAIL " "$RESULTS" && echo "::error title=Start sequence (EMULATOR)::$(grep ' FAIL ' "$RESULTS" | tr '\n' ' ')"
+  echo "::notice title=Start sequence (EMULATOR)::$(tr '\n' ' ' < "$RESULTS")"
+  exit $FAILED
+fi
 if [ "${ONLY:-}" = plan ]; then
   adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2; home
   plan_phase
@@ -267,6 +368,7 @@ ctl --es cmd emergency; sleep 3
 r=$(trial_open) && record emergency-release pass "target opens right after emergency recovery" || record emergency-release FAIL "$r"
 
 
+intro_phase
 plan_phase
 
 adb logcat -d -s LockdInFocus LockdInTest LockdInPlan ActivityTaskManager:W ActivityManager:W > "$OUT/logcat.txt" 2>/dev/null || true

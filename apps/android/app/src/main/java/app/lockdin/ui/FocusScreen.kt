@@ -322,6 +322,8 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
                         clock.now(), segments, intention, profileId,
                         LastChoice(focus, if (breakMin > 0) breakMin else s.last.breakMinutes, effectiveRounds, profileId),
                     )
+                    // The start sequence plays once, for this manual start only.
+                    store.state.active?.let { StartIntro.request(it.id) }
                 }
             })
         },
@@ -459,6 +461,8 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
     val tone = store.state.tone
     val task = session.intention
     val report by liveReport()
+    // Manual start only; consumed once, so reopening, rotation and scheduled starts never play it.
+    val intro = remember(session.id) { if (StartIntro.consume(session.id)) session.id else null }
     // Closed lock and "blocking" wording only from a fresh, verified report by the service.
     val protected = snap.restricting && EnforcerStatus.protecting(session.id, report)
     val permissionNeeded = report?.sessionId == session.id && report?.protection == Protection.PERMISSION_NEEDED
@@ -520,6 +524,7 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
         ClockLock(
             state, remaining, phase.end - phase.start, locked = protected, label = label,
             caption = if (isBreak) "left in break" else "left this round", width = 220.dp,
+            introFor = intro, haptics = store.state.startHaptics, sound = store.state.startSound,
         )
         Spacer(Modifier.height(Dim.s4))
         facts.firstOrNull()?.let { (k, v) ->
@@ -754,6 +759,7 @@ private fun Recap(
             if (onClose != null) SecondaryButton("Back", onClose, modifier = Modifier.fillMaxWidth())
             else SecondaryButton("Same again", {
                 store.startSession(clock.now(), session.segments, session.intention, session.profileId, store.state.last)
+                store.state.active?.let { StartIntro.request(it.id) }
             }, modifier = Modifier.fillMaxWidth())
         },
     )
