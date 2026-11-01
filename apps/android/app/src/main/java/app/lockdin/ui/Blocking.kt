@@ -46,6 +46,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import app.lockdin.enforce.AppRules
+import app.lockdin.enforce.BlockPolicy
 import app.lockdin.enforce.Capabilities
 import app.lockdin.enforce.Capability
 import app.lockdin.enforce.EnforcerStatus
@@ -83,12 +84,24 @@ fun rememberMissing(): Set<Capability> {
 @Composable
 fun liveReport(): State<EnforcerStatus.Report?> = EnforcerStatus.reports.collectAsState()
 
+private const val MAX_SITES = 300
+
 /** One line describing a profile's rules on this phone. */
-fun rulesSummary(rules: AppRules): String = when {
-    rules.mode == RuleMode.APPROVED_ONLY && rules.packages.isEmpty() -> "Only essential apps (phone, Settings, keyboard) during focus"
-    rules.mode == RuleMode.APPROVED_ONLY -> "Only ${rules.packages.size} approved app${if (rules.packages.size == 1) "" else "s"} plus essentials during focus"
-    rules.packages.isEmpty() -> "No apps chosen on this phone yet"
-    else -> "${rules.packages.size} app${if (rules.packages.size == 1) "" else "s"} blocked during focus"
+fun rulesSummary(rules: AppRules): String {
+    val n = rules.packages.size
+    val apps = "$n app${if (n == 1) "" else "s"}"
+    val appPart = when {
+        rules.mode == RuleMode.APPROVED_ONLY && n == 0 -> "Only essential apps (phone, Settings, keyboard)"
+        rules.mode == RuleMode.APPROVED_ONLY -> "Only $apps plus essentials"
+        n == 0 -> null
+        else -> "$apps blocked"
+    }
+    val m = rules.sites.size
+    val sitePart = if (m == 0) null else "$m website${if (m == 1) "" else "s"} blocked"
+    return when {
+        appPart == null && sitePart == null -> "No apps chosen on this phone yet"
+        else -> listOfNotNull(appPart, sitePart).joinToString(" · ") + " during focus"
+    }
 }
 
 private fun Context.open(cap: Capability) = Capabilities.open(
@@ -96,31 +109,54 @@ private fun Context.open(cap: Capability) = Capabilities.open(
     when (cap) {
         Capability.USAGE_ACCESS -> Capabilities.usageAccessSettings(this)
         Capability.DISPLAY_OVER_APPS -> Capabilities.displayOverAppsSettings(this)
+        Capability.ACCESSIBILITY -> Capabilities.accessibilitySettings()
     },
 )
 
-/** Permission checklist for blocking on this phone. Each row says why it's needed. */
+/**
+ * Permission checklist for blocking on this phone. Accessibility is offered first (instant, and
+ * the only way to block websites); usage access + display over other apps is the alternative.
+ * Accessibility is opened only after a plain-language disclosure of exactly what it reads.
+ */
 @Composable
 fun BlockingSetup() {
     val ctx = LocalContext.current
     val c = LocalColors.current
     val missing = rememberMissing()
     val tick = Resumes.tick
+    val a11y = remember(tick, missing) { Capabilities.accessibility(ctx) }
+    val usage = remember(tick, missing) { Capabilities.usageAccess(ctx) }
+    val overlay = remember(tick, missing) { Capabilities.displayOverApps(ctx) }
     val notifications = remember(tick) { Capabilities.notifications(ctx) }
     val battery = remember(tick) { Capabilities.batteryUnrestricted(ctx) }
     val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { Resumes.bump() }
+    var disclose by remember { mutableStateOf(false) }
 
     SettingsGroup {
         PermissionRow(
-            "Usage access", Capability.USAGE_ACCESS !in missing,
-            "Lets Lockd In see which app is in front, so it can cover blocked apps. App names only; nothing inside apps.",
+            "Accessibility (recommended)", a11y,
+            "Blocks apps the moment they open, and blocks websites in Chrome, Samsung Internet, Edge, Firefox, Brave and Opera.",
+        ) { disclose = true }
+    }
+    if (!a11y) Text(
+        "If Android says this setting is restricted: open Settings › Apps › Lockd In, tap ⋮ › Allow restricted settings, then try again.",
+        style = UiType.caption, color = c.inkMuted,
+    )
+    SectionLabel(if (a11y) "Without Accessibility (not needed now)" else "Or, without Accessibility")
+    SettingsGroup {
+        PermissionRow(
+            "Usage access", usage || a11y,
+            "Lets Lockd In see which app is in front, about twice a second. App names only. Can’t block websites.",
+            value = if (a11y && !usage) "Not needed" else null,
         ) { ctx.open(Capability.USAGE_ACCESS) }
         GroupDivider()
         PermissionRow(
-            "Display over other apps", Capability.DISPLAY_OVER_APPS !in missing,
+            "Display over other apps", overlay || a11y,
             "Lets the block screen come to the front when a blocked app opens.",
+            value = if (a11y && !overlay) "Not needed" else null,
         ) { ctx.open(Capability.DISPLAY_OVER_APPS) }
-        GroupDivider()
+    }
+    SettingsGroup {
         PermissionRow("Notifications", notifications, "Shows that a session is running and warns you if blocking stops.") {
             if (Build.VERSION.SDK_INT >= 33) askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
             else Capabilities.open(ctx, Capabilities.notificationSettings(ctx))
@@ -133,20 +169,45 @@ fun BlockingSetup() {
         ) { Capabilities.open(ctx, Capabilities.batterySettings()) }
     }
     Text(
-        if (missing.isEmpty()) "Ready. During focus, apps you block are covered by a block screen. They aren’t closed, and Settings, calls and your keyboard always work."
-        else "Until both required permissions are on, sessions run as a timer only.",
+        if (missing.isEmpty()) "Ready. During focus, blocked apps and sites are covered by a block screen. Nothing is closed, and Settings, calls and your keyboard always work."
+        else "Until blocking is set up, sessions run as a timer only.",
         style = UiType.caption, color = c.inkMuted,
     )
+
+    if (disclose) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { disclose = false },
+            title = { Text("Use Accessibility for blocking?", style = Type.title) },
+            text = {
+                Text(
+                    "Lockd In uses Android’s Accessibility service only during focus sessions, to:\n\n" +
+                        "• see which app comes to the front, so it can cover apps you chose to block;\n" +
+                        "• read the web address in supported browsers, so it can cover sites you chose to block.\n\n" +
+                        "It doesn’t read what you type, your messages or page content, doesn’t store or send anything, and never taps or acts in other apps. You can turn it off any time in Settings.",
+                    style = UiType.body,
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { disclose = false; ctx.open(Capability.ACCESSIBILITY) }) {
+                    Text("Continue to Settings", style = UiType.label, color = c.ink)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { disclose = false }) { Text("Not now", style = UiType.label, color = c.ink) }
+            },
+            containerColor = c.surface,
+        )
+    }
 }
 
 @Composable
-private fun PermissionRow(label: String, granted: Boolean, why: String, optional: Boolean = false, onGrant: () -> Unit) {
-    val value = when {
+private fun PermissionRow(label: String, granted: Boolean, why: String, optional: Boolean = false, value: String? = null, onGrant: () -> Unit) {
+    val shown = value ?: when {
         granted -> "On"
         optional -> "Recommended"
         else -> "Turn on"
     }
-    SettingRow(label, value, supporting = why, onClick = if (granted) null else onGrant)
+    SettingRow(label, shown, supporting = why, onClick = if (granted) null else onGrant)
 }
 
 /** Live status of this phone for the Devices screen. */
@@ -169,14 +230,19 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
     val c = LocalColors.current
     var mode by remember { mutableStateOf(profile.rules.mode) }
     var chosen by remember { mutableStateOf(profile.rules.packages) }
+    var sites by remember { mutableStateOf(profile.rules.sites) }
+    var tab by remember { mutableStateOf(0) }
+    var siteText by remember { mutableStateOf("") }
+    var siteError by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
+    val a11y = remember(Resumes.tick) { Capabilities.accessibility(ctx) }
     val apps by produceState<List<LaunchableApp>?>(null) {
         value = withContext(Dispatchers.IO) { runCatching { InstalledApps.launchable(ctx) }.getOrDefault(emptyList()) }
     }
     val running = store.state.active?.profileId == profile.id
 
     fun save() {
-        store.update { s -> s.copy(profiles = s.profiles.map { if (it.id == profile.id) it.copy(rules = AppRules(mode, chosen)) else it }) }
+        store.update { s -> s.copy(profiles = s.profiles.map { if (it.id == profile.id) it.copy(rules = AppRules(mode, chosen, sites)) else it }) }
         onClose()
     }
 
@@ -187,6 +253,42 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
             TextAction("Save", ::save)
         }
         Column(Modifier.padding(horizontal = Dim.gutter), verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
+            SegmentedChoice(listOf(0 to "Apps", 1 to "Websites"), tab, { tab = it }, label = "Edit apps or websites")
+        }
+        if (tab == 1) {
+            Column(Modifier.padding(horizontal = Dim.gutter, vertical = Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
+                Text(
+                    "Sites you add are covered during focus in Chrome, Samsung Internet, Edge, Firefox, Brave and Opera, including their subdomains (youtube.com covers m.youtube.com). Other browsers can be blocked as apps.",
+                    style = UiType.caption, color = c.inkMuted,
+                )
+                if (!a11y) Text("Website blocking needs Accessibility. Turn it on in Devices › Set up blocking.", style = UiType.caption, color = c.ink)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s2)) {
+                    OutlinedTextField(
+                        siteText, { siteText = it.take(253); siteError = null }, singleLine = true, placeholder = { Text("youtube.com") },
+                        isError = siteError != null, shape = RoundedCornerShape(Dim.radius), colors = fieldColors(),
+                        modifier = Modifier.weight(1f).semantics { contentDescription = "Website to block" },
+                    )
+                    SecondaryButton("Add", {
+                        val d = BlockPolicy.domainOf(siteText)
+                        if (d == null) siteError = "Enter a site like youtube.com"
+                        else { sites = (sites + d).take(MAX_SITES).toSet(); siteText = "" }
+                    })
+                }
+                siteError?.let { Text(it, style = UiType.caption, color = c.danger) }
+                if (sites.isEmpty()) Text("No websites blocked yet.", style = UiType.body, color = c.inkMuted)
+            }
+            LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
+                items(sites.sorted(), key = { it }) { d ->
+                    Row(Modifier.fillMaxWidth().heightIn(min = Dim.control + 4.dp).padding(start = Dim.gutter, end = Dim.s2), verticalAlignment = Alignment.CenterVertically) {
+                        Text(d, style = UiType.body, color = c.ink, modifier = Modifier.weight(1f))
+                        TextAction("Remove", { sites = sites - d })
+                    }
+                    HorizontalDivider(color = c.line, modifier = Modifier.padding(start = Dim.gutter))
+                }
+            }
+            return@Column
+        }
+        Column(Modifier.padding(horizontal = Dim.gutter, vertical = Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
             SegmentedChoice(
                 listOf(RuleMode.BLOCK_LIST to "Block these", RuleMode.APPROVED_ONLY to "Allow only these"),
                 mode, { mode = it }, label = "Rule type",

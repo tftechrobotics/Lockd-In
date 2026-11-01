@@ -178,14 +178,66 @@ sleep 2
 service_up && record service-stopped FAIL "FocusService still running after the end" || record service-stopped pass "FocusService stopped after the end"
 notif_has "Focusing until\|Break until" && record notification-cleared FAIL "session notification still shown" || record notification-cleared pass "session notification removed"
 
+# ---------------- Accessibility mode (owner decision 2026-11-01) ----------------
+adb logcat -d -s LockdInFocus LockdInTest > "$OUT/logcat-usage-phase.txt" 2>/dev/null || true
+adb logcat -c
+# Accessibility alone must be enough: take the usage-access permissions away first.
+adb shell appops set $A GET_USAGE_STATS deny
+adb shell appops set $A SYSTEM_ALERT_WINDOW deny
+adb shell settings put secure enabled_accessibility_services "$A/$A.enforce.FocusAccessibilityService"
+adb shell settings put secure accessibility_enabled 1
+sleep 4
+ctl --es cmd finish
+ctl --es cmd start --ei focus 4 --ei break 1 --ei rounds 1 --es block "$T" --es sites example.com
+T0=$(date +%s)
+adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 3; home
+pass=0
+for i in $(seq 1 10); do r=$(trial_blocked 5000) && pass=$((pass+1)); note "  a11y trial $i: $r"; done
+[ "$pass" = 10 ] && record a11y-block-screen pass "10/10 covered with only Accessibility on" || record a11y-block-screen FAIL "$pass/10 covered with only Accessibility on"
+
+# Website blocking in Chrome, if this emulator image has it.
+if adb shell pm path com.android.chrome >/dev/null 2>&1; then
+  adb shell am set-debug-app --persistent com.android.chrome >/dev/null 2>&1 || true
+  adb shell "echo 'chrome --disable-fre --no-default-browser-check --no-first-run' > /data/local/tmp/chrome-command-line"
+  adb shell am force-stop com.android.chrome
+  adb shell am start -a android.intent.action.VIEW -d "https://www.example.com/" com.android.chrome >/dev/null 2>&1
+  r=$(wait_top "${BLOCK//./\\.}" 15000) && record a11y-site-block pass "example.com covered in Chrome (${r} ms after opening)" \
+    || { adb exec-out uiautomator dump /dev/tty > "$OUT/chrome.xml" 2>/dev/null; record a11y-site-block FAIL "example.com not covered in Chrome: $r"; }
+  home
+  adb shell am start -a android.intent.action.VIEW -d "https://www.iana.org/" com.android.chrome >/dev/null 2>&1; sleep 6
+  t=$(top); home
+  [[ "$t" != *BlockActivity* ]] && record a11y-other-site-open pass "an unblocked site stayed open ($t)" || record a11y-other-site-open FAIL "an unblocked site was covered"
+else
+  record a11y-site-block info "Chrome isn't on this emulator image; site blocking not tested"
+fi
+
+# Turning Accessibility off with no fallback permissions: reported, not claimed.
+adb shell settings delete secure enabled_accessibility_services
+seen=""; start=$(now_ms)
+while (( $(now_ms) - start < 12000 )); do notif_has "Blocking paused" && { seen=$(( $(now_ms) - start )); break; }; sleep 0.5; done
+[ -n "$seen" ] && record a11y-off-reported pass "'Blocking paused' ${seen} ms after Accessibility was turned off" || record a11y-off-reported FAIL "no notice within 12 s"
+# Fallback: usage access + display over other apps keep blocking without Accessibility.
+adb shell appops set $A GET_USAGE_STATS allow
+adb shell appops set $A SYSTEM_ALERT_WINDOW allow
+sleep 3
+r=$(trial_blocked 10000) && record a11y-fallback-usage pass "usage access took over (${r} ms)" || record a11y-fallback-usage FAIL "$r"
+# Emergency recovery releases immediately.
+ctl --es cmd emergency; sleep 3
+r=$(trial_open) && record emergency-release pass "target opens right after emergency recovery" || record emergency-release FAIL "$r"
+
 adb logcat -d -s LockdInFocus LockdInTest ActivityTaskManager:W ActivityManager:W > "$OUT/logcat.txt" 2>/dev/null || true
 # On-device detection time: from Android's record of the app coming to the front to the
 # service asking for the block screen (no adb overhead). Logcat is cleared on reboot.
-det=$(cat "$OUT/logcat-before-reboot.txt" "$OUT/logcat.txt" 2>/dev/null | grep -oE 'detect_ms=[0-9]+' | cut -d= -f2 | sort -n)
+det=$(cat "$OUT/logcat-before-reboot.txt" "$OUT/logcat-usage-phase.txt" 2>/dev/null | grep -v 'source=a11y' | grep -oE 'detect_ms=[0-9]+' | cut -d= -f2 | sort -n)
+deta=$(grep 'source=a11y kind=app' "$OUT/logcat.txt" 2>/dev/null | grep -oE 'detect_ms=[0-9]+' | cut -d= -f2 | sort -n)
+if [ -n "$deta" ]; then
+  n=$(echo "$deta" | wc -l)
+  record a11y-detection-latency info "n=$n p50=$(echo "$deta" | awk -v n="$n" 'NR==int((n+1)/2)') ms max=$(echo "$deta" | tail -1) ms (window change → block requested, on-device)"
+fi
 if [ -n "$det" ]; then
   n=$(echo "$det" | wc -l)
   p50=$(echo "$det" | awk -v n="$n" 'NR==int((n+1)/2)'); p95=$(echo "$det" | awk -v n="$n" 'NR==int(n*0.95+0.999)'); mx=$(echo "$det" | tail -1)
-  record detection-latency info "n=$n p50=${p50} ms p95=${p95} ms max=${mx} ms (app to front → block requested, on-device)"
+  record usage-detection-latency info "n=$n p50=${p50} ms p95=${p95} ms max=${mx} ms (app to front → block requested, on-device)"
 fi
 enc() { sed 's/%/%25/g' | tr '\n' '\r' | sed 's/\r/%0A/g'; }
 echo "::notice title=Enforcement E2E (EMULATOR ONLY) — $(grep -c ' pass ' "$RESULTS") pass, $(grep -c ' FAIL ' "$RESULTS") fail::$(grep -vE '^  ' "$RESULTS" | enc)"

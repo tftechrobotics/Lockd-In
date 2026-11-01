@@ -14,7 +14,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Resume a running session after a restart. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- No QUERY_ALL_PACKAGES, no accessibility service, no VPN, no exact alarms. -->
+    <!-- Optional Accessibility mode (owner decision 2026-11-01): see FocusAccessibilityService.
+         No QUERY_ALL_PACKAGES, no VPN, no exact alarms. -->
 
     <!-- Package visibility: only apps with a launcher icon (to choose them in a profile),
          plus the home screen and Settings (never blocked). -->
@@ -66,6 +67,21 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="User-started focus session that blocks apps the user chose until the session ends." />
+        </service>
+
+        <!-- Optional, user-enabled in Settings after an in-app disclosure. Reads only which app
+             is in front and, in supported browsers, the address bar, during focus. -->
+        <service
+            android:name=".enforce.FocusAccessibilityService"
+            android:exported="false"
+            android:label="@string/a11y_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service" />
         </service>
 
         <receiver

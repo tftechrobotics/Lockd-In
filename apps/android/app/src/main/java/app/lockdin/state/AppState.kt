@@ -163,14 +163,16 @@ object StateCodec {
     }
 
     private fun rulesJson(r: AppRules): JSONObject =
-        JSONObject().put("mode", r.mode.name).put("packages", JSONArray(r.packages.sorted()))
+        JSONObject().put("mode", r.mode.name).put("packages", JSONArray(r.packages.sorted())).put("sites", JSONArray(r.sites.sorted()))
 
     /** Missing or invalid rules read as an empty block list (restricts nothing). */
     private fun rulesOf(o: JSONObject?): AppRules {
         if (o == null) return AppRules()
         val pkgs = o.optJSONArray("packages")?.let { a -> (0 until a.length()).mapNotNull { a.optString(it).takeIf(::validPackage) } }
             ?.take(AppState.MAX_RULE_PACKAGES)?.toSet() ?: emptySet()
-        return AppRules(enumOr(o.optString("mode"), RuleMode.BLOCK_LIST), pkgs)
+        val sites = o.optJSONArray("sites")?.let { a -> (0 until a.length()).mapNotNull { app.lockdin.enforce.BlockPolicy.domainOf(a.optString(it)) } }
+            ?.take(300)?.toSet() ?: emptySet()
+        return AppRules(enumOr(o.optString("mode"), RuleMode.BLOCK_LIST), pkgs, sites)
     }
 
     private val PACKAGE = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")

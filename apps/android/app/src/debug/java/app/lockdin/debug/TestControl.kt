@@ -24,9 +24,10 @@ class TestControl : BroadcastReceiver() {
                 val rounds = intent.getIntExtra("rounds", 1)
                 val pkgs = intent.getStringExtra("block")?.split(',')?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
                 val mode = if (intent.getStringExtra("mode") == "approved") RuleMode.APPROVED_ONLY else RuleMode.BLOCK_LIST
+                val sites = intent.getStringExtra("sites")?.split(',')?.mapNotNull { app.lockdin.enforce.BlockPolicy.domainOf(it) }?.toSet() ?: emptySet()
                 store.update { s ->
                     s.copy(
-                        profiles = s.profiles.map { if (it.id == "study") it.copy(rules = AppRules(mode, pkgs)) else it },
+                        profiles = s.profiles.map { if (it.id == "study") it.copy(rules = AppRules(mode, pkgs, sites)) else it },
                         commitment = Commitment.DELAYED,
                     )
                 }

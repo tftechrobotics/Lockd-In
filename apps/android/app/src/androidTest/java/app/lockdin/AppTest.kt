@@ -189,6 +189,32 @@ class AppTest {
         rule.onNodeWithText("Start timer").assertIsDisplayed()
     }
 
+    @Test fun accessibilityIsExplainedBeforeSettingsOpen() {
+        launch()
+        rule.onNodeWithText("Set up blocking").performClick()
+        rule.onNodeWithText("Accessibility (recommended)").performScrollTo().performClick()
+        rule.onNodeWithText("Use Accessibility for blocking?").assertIsDisplayed()
+        rule.onNodeWithText("doesn’t read what you type", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Not now").performClick()
+        rule.onNodeWithText("Use Accessibility for blocking?").assertDoesNotExist()
+    }
+
+    @Test fun websitesTabValidatesAndAdds() {
+        launch()
+        rule.onNodeWithTag("tab-profiles").performClick()
+        rule.onNodeWithText("Study").performClick()
+        rule.onNodeWithText("Websites").performClick()
+        rule.onNodeWithContentDescription("Website to block").performTextInput("not a site")
+        rule.onNodeWithText("Add").performClick()
+        rule.onNodeWithText("Enter a site like youtube.com").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Website to block").performTextClearance()
+        rule.onNodeWithContentDescription("Website to block").performTextInput("https://www.YouTube.com/watch")
+        rule.onNodeWithText("Add").performClick()
+        rule.onNodeWithText("youtube.com").assertIsDisplayed()
+        rule.onNodeWithText("Save").performClick()
+        rule.onNodeWithText("1 website blocked during focus").assertIsDisplayed()
+    }
+
     @Test fun invalidCustomLengthExplained() {
         launch()
         rule.onNodeWithContentDescription("Custom minutes").performClick()

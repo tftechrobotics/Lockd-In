@@ -114,5 +114,46 @@ class EnforcementRulesTest {
         assertEquals(Commitment.FLEXIBLE, a.commitment)
     }
 
+    @Test fun domainsNormalize() {
+        assertEquals("youtube.com", BlockPolicy.domainOf("https://www.YouTube.com/watch?v=x"))
+        assertEquals("m.youtube.com", BlockPolicy.domainOf("m.youtube.com"))
+        assertEquals("example.co.uk", BlockPolicy.domainOf("example.co.uk:443/path"))
+        assertEquals(null, BlockPolicy.domainOf("not a site"))
+        assertEquals(null, BlockPolicy.domainOf("localhost"))
+        assertEquals(null, BlockPolicy.domainOf(""))
+        assertEquals(null, BlockPolicy.domainOf("search for cats"))
+    }
+
+    @Test fun sitesMatchSubdomainsOnly() {
+        val sites = setOf("youtube.com")
+        assertTrue(BlockPolicy.isSiteBlocked("youtube.com", sites))
+        assertTrue(BlockPolicy.isSiteBlocked("https://m.youtube.com/feed", sites))
+        assertFalse(BlockPolicy.isSiteBlocked("notyoutube.com", sites))
+        assertFalse(BlockPolicy.isSiteBlocked("youtube.com.evil.example", sites))
+        assertFalse(BlockPolicy.isSiteBlocked(null, sites))
+    }
+
+    @Test fun detectionPrefersAccessibilityAndExplainsWhatIsMissing() {
+        assertEquals(app.lockdin.enforce.Detection.ACCESSIBILITY to emptySet<Capability>(), BlockPolicy.detection(true, false, false))
+        assertEquals(app.lockdin.enforce.Detection.USAGE_ACCESS to emptySet<Capability>(), BlockPolicy.detection(false, true, true))
+        assertEquals(setOf(Capability.DISPLAY_OVER_APPS), BlockPolicy.detection(false, true, false).second)
+        val sitesOnly = AppRules(sites = setOf("youtube.com"))
+        assertTrue(sitesOnly.restrictsAnything)
+        assertFalse(sitesOnly.restrictsApps)
+        // Usage access can't see web addresses: a sites-only session needs Accessibility.
+        assertEquals(setOf(Capability.ACCESSIBILITY), BlockPolicy.missingFor(sitesOnly, app.lockdin.enforce.Detection.USAGE_ACCESS, emptySet()))
+        assertEquals(emptySet<Capability>(), BlockPolicy.missingFor(sitesOnly, app.lockdin.enforce.Detection.ACCESSIBILITY, emptySet()))
+        assertEquals(setOf(Capability.USAGE_ACCESS), BlockPolicy.missingFor(block, app.lockdin.enforce.Detection.NONE, setOf(Capability.USAGE_ACCESS)))
+    }
+
+    @Test fun sitesRoundTripAndInvalidOnesDrop() {
+        val base = AppState()
+        val s = base.copy(profiles = base.profiles.map { if (it.id == "study") it.copy(rules = AppRules(sites = setOf("youtube.com", "reddit.com"))) else it })
+        assertEquals(s, StateCodec.decode(StateCodec.encode(s)))
+        val raw = """{"version":2,"profiles":[{"id":"study","name":"Study","description":"","builtIn":true,
+            "rules":{"mode":"BLOCK_LIST","packages":[],"sites":["https://www.YouTube.com/x","nope",""]}}]}"""
+        assertEquals(setOf("youtube.com"), StateCodec.decode(raw).profiles.single().rules.sites)
+    }
+
     private fun <T> assertNotNullAnd(v: T?): T { assertNotNull(v); return v!! }
 }

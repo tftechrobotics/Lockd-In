@@ -32,10 +32,18 @@ object Capabilities {
     fun batteryUnrestricted(ctx: Context): Boolean =
         ctx.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(ctx.packageName)
 
-    fun missing(ctx: Context): Set<Capability> = buildSet {
-        if (!usageAccess(ctx)) add(Capability.USAGE_ACCESS)
-        if (!displayOverApps(ctx)) add(Capability.DISPLAY_OVER_APPS)
+    /** Our accessibility service is switched on in Settings (it may still be connecting). */
+    fun accessibility(ctx: Context): Boolean {
+        val enabled = Settings.Secure.getString(ctx.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false
+        val ours = android.content.ComponentName(ctx, FocusAccessibilityService::class.java)
+        return enabled.split(':').any { android.content.ComponentName.unflattenFromString(it) == ours }
     }
+
+    fun detection(ctx: Context): Pair<Detection, Set<Capability>> =
+        BlockPolicy.detection(accessibility(ctx), usageAccess(ctx), displayOverApps(ctx))
+
+    /** What is missing for app blocking (empty when either detection method is ready). */
+    fun missing(ctx: Context): Set<Capability> = detection(ctx).second
 
     /** Device-specific apps that are never covered: home screen, keyboard, dialer, Settings, Lockd In. */
     fun essentials(ctx: Context): Set<String> = buildSet {
@@ -59,6 +67,8 @@ object Capabilities {
 
     fun displayOverAppsSettings(ctx: Context): Intent =
         Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.fromParts("package", ctx.packageName, null))
+
+    fun accessibilitySettings(): Intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
 
     fun notificationSettings(ctx: Context): Intent =
         Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName)

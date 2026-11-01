@@ -72,7 +72,8 @@ class BlockActivity : ComponentActivity() {
         setContent {
             LockdInTheme(isDark(store.state.theme)) {
                 BlockScreen(
-                    appLabel = InstalledApps.label(this, intent.getStringExtra(EXTRA_PKG) ?: ""),
+                    appLabel = intent.getStringExtra(EXTRA_SITE) ?: InstalledApps.label(this, intent.getStringExtra(EXTRA_PKG) ?: ""),
+                    isSite = intent.getStringExtra(EXTRA_SITE) != null,
                     onReturn = ::goHome,
                     onOptions = {
                         startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -114,15 +115,17 @@ class BlockActivity : ComponentActivity() {
 
     companion object {
         private const val EXTRA_PKG = "pkg"
+        private const val EXTRA_SITE = "site"
 
-        fun intent(ctx: Context, pkg: String): Intent = Intent(ctx, BlockActivity::class.java)
+        fun intent(ctx: Context, pkg: String, site: String? = null): Intent = Intent(ctx, BlockActivity::class.java)
             .putExtra(EXTRA_PKG, pkg)
+            .apply { if (site != null) putExtra(EXTRA_SITE, site) }
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NO_ANIMATION)
     }
 }
 
 @Composable
-private fun BlockScreen(appLabel: String, onReturn: () -> Unit, onOptions: () -> Unit, onLifted: () -> Unit) {
+private fun BlockScreen(appLabel: String, isSite: Boolean, onReturn: () -> Unit, onOptions: () -> Unit, onLifted: () -> Unit) {
     val c = LocalColors.current
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val store = Store.get(ctx)
@@ -168,7 +171,7 @@ private fun BlockScreen(appLabel: String, onReturn: () -> Unit, onOptions: () ->
                 Text(it, style = UiType.caption, color = c.inkMuted, textAlign = TextAlign.Center)
             }
             Text(
-                "It’s still open behind this screen, not closed. Nothing is lost.",
+                if (isSite) "The page is still open behind this screen. Nothing is lost." else "It’s still open behind this screen, not closed. Nothing is lost.",
                 style = UiType.caption, color = c.inkMuted, textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(Dim.s4))

@@ -142,7 +142,8 @@ class FocusService : Service() {
             stop(if (session == null) "no_session" else "session_over")
             return
         }
-        val missing = Capabilities.missing(this)
+        val (detection, appMissing) = Capabilities.detection(this)
+        val missing = BlockPolicy.missingFor(session.rules, detection, appMissing)
         val protection = BlockPolicy.protection(true, snap.restricting, session.rules, missing)
         EnforcerStatus.publish(EnforcerStatus.Report(session.id, protection, missing))
         updateNotification(session, snap, protection, missing)
@@ -155,7 +156,9 @@ class FocusService : Service() {
                 currentTop = null
                 currentTopAt = 0L
             }
-            if (interactive) {
+            // With the accessibility service connected it covers apps itself, instantly;
+            // polling usage events is then only a fallback for when it isn't bound.
+            if (interactive && session.rules.restrictsApps && !FocusAccessibilityService.connected) {
                 pollForeground(now)
                 currentTop?.let { top ->
                     if (BlockPolicy.isRestricted(top, session.rules, essentials(now))) cover(top)
@@ -165,7 +168,7 @@ class FocusService : Service() {
         wasRestricting = protection == Protection.PROTECTING
 
         scheduleWake(snap.nextTransition)
-        handler.postDelayed(tick, if (interactive && protection == Protection.PROTECTING) POLL_MS else IDLE_MS)
+        handler.postDelayed(tick, if (interactive && protection == Protection.PROTECTING && !FocusAccessibilityService.connected) POLL_MS else IDLE_MS)
     }
 
     private fun essentials(now: Long): Set<String> {
@@ -312,6 +315,7 @@ class FocusService : Service() {
             when (it) {
                 Capability.USAGE_ACCESS -> "Usage access"
                 Capability.DISPLAY_OVER_APPS -> "Display over other apps"
+                Capability.ACCESSIBILITY -> "Accessibility"
             }
         }.ifEmpty { "a permission" }
 

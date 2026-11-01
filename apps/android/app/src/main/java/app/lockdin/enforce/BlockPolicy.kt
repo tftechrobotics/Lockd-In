@@ -5,9 +5,18 @@ package app.lockdin.enforce
 /** Block list: the chosen apps are blocked. Approved only: everything except the chosen apps is blocked. */
 enum class RuleMode { BLOCK_LIST, APPROVED_ONLY }
 
-data class AppRules(val mode: RuleMode = RuleMode.BLOCK_LIST, val packages: Set<String> = emptySet()) {
+/**
+ * `sites` are domains blocked inside supported browsers (needs the Accessibility mode); they are
+ * always a block list, whatever `mode` says about apps.
+ */
+data class AppRules(
+    val mode: RuleMode = RuleMode.BLOCK_LIST,
+    val packages: Set<String> = emptySet(),
+    val sites: Set<String> = emptySet(),
+) {
     /** False for an empty block list: such a session is a timer only and must say so. */
-    val restrictsAnything: Boolean get() = mode == RuleMode.APPROVED_ONLY || packages.isNotEmpty()
+    val restrictsAnything: Boolean get() = mode == RuleMode.APPROVED_ONLY || packages.isNotEmpty() || sites.isNotEmpty()
+    val restrictsApps: Boolean get() = mode == RuleMode.APPROVED_ONLY || packages.isNotEmpty()
 }
 
 /** How early a session can end. Emergency recovery is always available and separate. */
@@ -32,7 +41,16 @@ enum class Protection {
     PROTECTING,
 }
 
-enum class Capability { USAGE_ACCESS, DISPLAY_OVER_APPS }
+enum class Capability { USAGE_ACCESS, DISPLAY_OVER_APPS, ACCESSIBILITY }
+
+/** How this phone detects the app in front. */
+enum class Detection {
+    /** Accessibility service: told immediately when an app opens; can read browser address bars. */
+    ACCESSIBILITY,
+    /** Usage access, polled about twice a second; can't see web addresses. */
+    USAGE_ACCESS,
+    NONE,
+}
 
 object BlockPolicy {
     /**
@@ -59,6 +77,51 @@ object BlockPolicy {
         "com.android.packageinstaller",
         "com.google.android.packageinstaller",
     )
+
+    /**
+     * Which detection works with the permissions granted, and what is still missing for app
+     * blocking. Accessibility alone is enough (an accessibility service may bring the block
+     * screen forward itself). Otherwise usage access plus "display over other apps" are needed.
+     */
+    fun detection(accessibility: Boolean, usageAccess: Boolean, displayOverApps: Boolean): Pair<Detection, Set<Capability>> = when {
+        accessibility -> Detection.ACCESSIBILITY to emptySet()
+        usageAccess && displayOverApps -> Detection.USAGE_ACCESS to emptySet()
+        else -> Detection.NONE to buildSet {
+            if (!usageAccess) add(Capability.USAGE_ACCESS)
+            if (!displayOverApps) add(Capability.DISPLAY_OVER_APPS)
+        }
+    }
+
+    /**
+     * What is missing for these rules: app blocking needs a detection method; a session that only
+     * blocks websites needs Accessibility (usage access can't see web addresses).
+     */
+    fun missingFor(rules: AppRules, detection: Detection, missingForApps: Set<Capability>): Set<Capability> = when {
+        !rules.restrictsApps && rules.sites.isNotEmpty() ->
+            if (detection == Detection.ACCESSIBILITY) emptySet() else setOf(Capability.ACCESSIBILITY)
+        else -> missingForApps
+    }
+
+    /** Lower-case domain, at most 253 characters, at least one dot, letters/digits/hyphens. */
+    private val DOMAIN = Regex("^(?=.{3,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$")
+
+    /** Normalizes what a user typed ("https://www.YouTube.com/watch") to a domain, or null. */
+    fun domainOf(input: String?): String? {
+        if (input == null) return null
+        var s = input.trim().lowercase()
+        if (s.isEmpty() || s.length > 2048 || s.any { it.isWhitespace() }) return null
+        s = s.substringAfter("://", s)
+        s = s.substringBefore('/').substringBefore('?').substringBefore('#')
+        s = s.substringAfter('@').substringBefore(':').trimEnd('.')
+        if (s.startsWith("www.")) s = s.removePrefix("www.")
+        return s.takeIf { DOMAIN.matches(it) }
+    }
+
+    /** True if `host` is a blocked domain or one of its subdomains (m.youtube.com for youtube.com). */
+    fun isSiteBlocked(host: String?, sites: Set<String>): Boolean {
+        val h = domainOf(host) ?: return false
+        return sites.any { d -> h == d || h.endsWith(".$d") }
+    }
 
     fun isRestricted(pkg: String, rules: AppRules, essentials: Set<String>): Boolean {
         if (pkg.isBlank() || pkg in ALWAYS_ALLOWED || pkg in essentials) return false
