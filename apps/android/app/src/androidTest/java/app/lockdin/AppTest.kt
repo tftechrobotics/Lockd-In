@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasSetTextAction
@@ -82,37 +83,47 @@ class AppTest {
         pickMenuItem(item)
     }
 
+    /** Opens "Change rounds and breaks" and picks a value from one of its menus. */
+    private fun pickRounds(row: String, item: String) {
+        rule.onNodeWithContentDescription("Change rounds and breaks").performScrollTo().performClick()
+        pickSetting(row, item)
+    }
+
     @Test fun configureStartFocusBreakResumeFinish() {
         val store = launch()
         rule.onNodeWithText("Start timer").assertExists()
-        rule.onNodeWithContentDescription("Task").performTextInput("TAM 212 · Practice problems")
-        rule.onNode(hasText("25 min") and isSelectable()).performClick()
-        pickSetting("Breaks", "5 min")
-        rule.onNodeWithText("2 rounds of 25 min, 5 min breaks").assertIsDisplayed()
+        rule.onNodeWithContentDescription("What are you working on?").performTextInput("TAM 212 · Practice problems")
+        rule.onNodeWithContentDescription("25 minutes").performClick()
+        rule.onNodeWithContentDescription("25 minutes").assertIsSelected()
+        pickRounds("Breaks", "5 min")
+        rule.onNodeWithText("2 rounds · 5 min break between").assertIsDisplayed()
+        rule.onNodeWithText("Ends at 6:55 PM", substring = true).assertIsDisplayed()
         rule.onNodeWithText("Start timer").performClick()
-        rule.onNodeWithText("Focus · round 1 of 2").assertIsDisplayed()
-        rule.onNodeWithContentDescription("left to focus: 25 minutes left").assertIsDisplayed()
+        rule.onNodeWithText("Focusing · round 1 of 2").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Focus: 25 minutes left").assertIsDisplayed()
         rule.onNodeWithText("Timer only. Apps stay available on this phone.").assertIsDisplayed()
+        // End now is not on screen until the person asks for a way out.
+        rule.onAllNodesWithText("End now").assertCountEquals(0)
 
         clock.advanceMinutes(25); tick(store)
-        rule.onNodeWithText("Break · round 1 of 2").assertIsDisplayed()
+        rule.onNodeWithText("On a break · round 1 of 2").assertIsDisplayed()
         rule.onNodeWithText("Focus resumes").assertIsDisplayed()
         clock.advanceMinutes(5); tick(store)
-        rule.onNodeWithText("Focus · round 2 of 2").assertIsDisplayed()
+        rule.onNodeWithText("Focusing · round 2 of 2").assertIsDisplayed()
         clock.advanceMinutes(25); tick(store)
         rule.onNodeWithText("Session complete").assertIsDisplayed()
-        rule.onNodeWithText("50 min focused", substring = true).assertIsDisplayed()
-        rule.onNodeWithText("Finished as planned.").assertIsDisplayed()
+        rule.onNodeWithText("50 min").assertIsDisplayed()
+        rule.onNodeWithText("Finished as planned.").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Done").performClick()
         rule.onNodeWithText("Start timer").assertExists()
     }
 
     @Test fun customLengthMatchingAPresetSelectsIt() {
         launch()
-        rule.onNodeWithText("Custom").performClick()
+        rule.onNodeWithContentDescription("Custom minutes").performClick()
         rule.onNodeWithContentDescription("Minutes").performTextClearance()
         rule.onNodeWithContentDescription("Minutes").performTextInput("25")
-        rule.onNode(hasText("25 min") and isSelectable()).assertIsSelected()
+        rule.onNodeWithContentDescription("25 minutes").assertIsSelected()
     }
 
     @Test fun unlockWaitsAndCanBeCancelled_emergencyIsImmediate() {
@@ -123,7 +134,8 @@ class AppTest {
         rule.onNodeWithText("Unlocking in 01:30", substring = true).assertIsDisplayed()
         rule.onNodeWithText("Cancel unlock").performClick()
         clock.advanceMinutes(2); tick(store)
-        rule.onNodeWithContentDescription("left to focus", substring = true).assertIsDisplayed()
+        rule.onNodeWithContentDescription("Focus:", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Need out?").performClick()
         rule.onNodeWithText("End now").performClick()
         rule.onNodeWithText("End session now").performClick()
         rule.onNodeWithText("Ended with emergency recovery.").assertIsDisplayed()
@@ -147,7 +159,7 @@ class AppTest {
 
     @Test fun invalidCustomLengthExplained() {
         launch()
-        rule.onNodeWithText("Custom").performClick()
+        rule.onNodeWithContentDescription("Custom minutes").performClick()
         rule.onNodeWithContentDescription("Minutes").performTextClearance()
         rule.onNodeWithContentDescription("Minutes").performTextInput("0")
         rule.onNodeWithText("Start timer").performClick()
@@ -186,7 +198,7 @@ class AppTest {
     @Test fun screenshotSetupLargeText() { launch(fontScale = 2f); shot("03-setup-font200") }
     @Test fun screenshotFocusAndBreak() {
         val store = launch()
-        rule.onNodeWithContentDescription("Task").performTextInput("TAM 212 · Practice problems")
+        rule.onNodeWithContentDescription("What are you working on?").performTextInput("TAM 212 · Practice problems")
         rule.onNodeWithText("Start timer").performClick()
         clock.advanceMinutes(16); tick(store)
         shot("04-focus-light")
@@ -196,11 +208,29 @@ class AppTest {
     }
     @Test fun screenshotFocusDark() {
         val store = launch(AppState(theme = ThemeChoice.DARK), dark = true)
-        rule.onNode(hasText("25 min") and isSelectable()).performClick()
-        pickSetting("Breaks", "5 min")
+        rule.onNodeWithContentDescription("25 minutes").performClick()
+        pickRounds("Breaks", "5 min")
         rule.onNodeWithText("Start timer").performClick()
         clock.advanceMinutes(27); tick(store)
         shot("06-break-dark")
+    }
+    @Test fun screenshotRunningLargeText() {
+        val store = launch(fontScale = 2f)
+        rule.onNodeWithText("Start timer").performClick()
+        clock.advanceMinutes(5); tick(store)
+        shot("11-focus-font200")
+    }
+    @Test fun screenshotSetupRoundsOpen() {
+        launch()
+        rule.onNodeWithContentDescription("What are you working on?").performTextInput("TAM 212 · Problem set 6")
+        rule.onNodeWithContentDescription("Change rounds and breaks").performScrollTo().performClick()
+        shot("12-setup-rounds-open")
+    }
+    @Test fun screenshotRecap() {
+        val store = launch()
+        rule.onNodeWithText("Start timer").performClick()
+        clock.advanceMinutes(120); tick(store)
+        shot("13-recap")
     }
     @Test fun screenshotSchedule() {
         launch()

@@ -126,40 +126,46 @@ fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T?, onSelect: 
  */
 @Composable
 fun LengthControl(minutes: Int, onChange: (Int) -> Unit, modifier: Modifier = Modifier, presets: List<Int> = listOf(25, 40, 60)) {
-    val c = LocalColors.current
     var customOpen by remember { mutableStateOf(minutes !in presets) }
-    // The field keeps what the user typed; it only resyncs when the length changes from
-    // elsewhere (a preset or the ± buttons), so typing is never rewritten mid-edit.
-    var text by remember { mutableStateOf(minutes.toString()) }
-    LaunchedEffect(minutes) { if ((text.toIntOrNull() ?: 0) != minutes) text = minutes.toString() }
     val selected = if (minutes in presets) minutes else -1
-    val focus = LocalFocusManager.current
     Column(modifier, verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
         SegmentedChoice(presets.map { it to "$it min" } + (-1 to "Custom"), selected, { v ->
             if (v == -1) customOpen = true else { customOpen = false; onChange(v) }
         }, label = "Focus length")
-        if (customOpen || minutes !in presets) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s2)) {
-                Text("Custom length", style = UiType.label, color = c.ink, modifier = Modifier.weight(1f))
-                IconButton(onClick = { onChange((minutes - 5).coerceAtLeast(1)) }, enabled = minutes > 1) {
-                    LockdIcon(LIcon.Minus, description = "5 minutes shorter", tint = if (minutes > 1) c.ink else c.line)
-                }
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { t -> text = t.filter(Char::isDigit).take(3); onChange(text.toIntOrNull() ?: 0) },
-                    singleLine = true,
-                    suffix = { Text("min", style = UiType.value, color = c.inkMuted) },
-                    textStyle = UiType.body.copy(color = c.ink),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
-                    shape = RoundedCornerShape(Dim.radius),
-                    colors = fieldColors(),
-                    modifier = Modifier.width(112.dp).semantics { contentDescription = "Minutes" },
-                )
-                IconButton(onClick = { onChange((minutes + 5).coerceAtMost(240)) }, enabled = minutes < 240) {
-                    LockdIcon(LIcon.Plus, description = "5 minutes longer", tint = if (minutes < 240) c.ink else c.line)
-                }
-            }
+        if (customOpen || minutes !in presets) CustomLengthRow(minutes, onChange)
+    }
+}
+
+/**
+ * Custom length editor: − / minutes field / +. The field keeps what the user typed; it only
+ * resyncs when the length changes from elsewhere (a preset or the ± buttons), so typing is
+ * never rewritten mid-edit.
+ */
+@Composable
+fun CustomLengthRow(minutes: Int, onChange: (Int) -> Unit, label: String = "Custom length") {
+    val c = LocalColors.current
+    var text by remember { mutableStateOf(minutes.toString()) }
+    LaunchedEffect(minutes) { if ((text.toIntOrNull() ?: 0) != minutes) text = minutes.toString() }
+    val focus = LocalFocusManager.current
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s2)) {
+        Text(label, style = UiType.label, color = c.ink, modifier = Modifier.weight(1f))
+        IconButton(onClick = { onChange((minutes - 5).coerceAtLeast(1)) }, enabled = minutes > 1) {
+            LockdIcon(LIcon.Minus, description = "5 minutes shorter", tint = if (minutes > 1) c.ink else c.line)
+        }
+        OutlinedTextField(
+            value = text,
+            onValueChange = { t -> text = t.filter(Char::isDigit).take(3); onChange(text.toIntOrNull() ?: 0) },
+            singleLine = true,
+            suffix = { Text("min", style = UiType.value, color = c.inkMuted) },
+            textStyle = UiType.body.copy(color = c.ink),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
+            shape = RoundedCornerShape(Dim.radius),
+            colors = fieldColors(),
+            modifier = Modifier.width(112.dp).semantics { contentDescription = "Minutes" },
+        )
+        IconButton(onClick = { onChange((minutes + 5).coerceAtMost(240)) }, enabled = minutes < 240) {
+            LockdIcon(LIcon.Plus, description = "5 minutes longer", tint = if (minutes < 240) c.ink else c.line)
         }
     }
 }
