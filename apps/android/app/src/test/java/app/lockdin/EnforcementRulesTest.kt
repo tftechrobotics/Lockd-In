@@ -165,5 +165,37 @@ class EnforcementRulesTest {
         assertEquals(store.state, StateCodec.decode(StateCodec.encode(store.state)))
     }
 
+    @Test fun allowOnlySitesBlockEverythingElse() {
+        val allow = AppRules(sites = setOf("wikipedia.org"), siteMode = RuleMode.APPROVED_ONLY)
+        assertTrue(allow.restrictsSites)
+        assertFalse(allow.restrictsApps)
+        assertFalse(BlockPolicy.isSiteRestricted("en.wikipedia.org", allow))
+        assertTrue(BlockPolicy.isSiteRestricted("youtube.com", allow))
+        assertTrue(BlockPolicy.isSiteRestricted("wikipedia.org.evil.example", allow))
+        // Allow only with nothing added still restricts (every site is covered).
+        assertTrue(AppRules(siteMode = RuleMode.APPROVED_ONLY).restrictsSites)
+        val blockList = AppRules(sites = setOf("youtube.com"))
+        assertTrue(BlockPolicy.isSiteRestricted("m.youtube.com", blockList))
+        assertFalse(BlockPolicy.isSiteRestricted("wikipedia.org", blockList))
+        assertFalse(AppRules().restrictsSites)
+    }
+
+    @Test fun siteModeRoundTripsAndOldDataDefaultsToBlockList() {
+        val base = AppState()
+        val rules = AppRules(sites = setOf("wikipedia.org"), siteMode = RuleMode.APPROVED_ONLY)
+        val s = base.copy(profiles = base.profiles.map { if (it.id == "study") it.copy(rules = rules) else it })
+        assertEquals(s, StateCodec.decode(StateCodec.encode(s)))
+        val raw = """{"version":2,"profiles":[{"id":"study","name":"Study","description":"","builtIn":true,
+            "rules":{"mode":"BLOCK_LIST","packages":[],"sites":["youtube.com"]}}]}"""
+        assertEquals(RuleMode.BLOCK_LIST, StateCodec.decode(raw).profiles.single().rules.siteMode)
+    }
+
+    @Test fun walletsAndBasicPhoneAppsAreNeverBlocked() {
+        val everything = AppRules(RuleMode.APPROVED_ONLY, emptySet())
+        for (pkg in listOf("com.samsung.android.spay", "com.google.android.apps.walletnfcrel", "com.google.android.deskclock",
+            "com.sec.android.app.camera", "com.samsung.android.app.contacts"))
+            assertFalse(pkg, BlockPolicy.isRestricted(pkg, everything, essentials))
+    }
+
     private fun <T> assertNotNullAnd(v: T?): T { assertNotNull(v); return v!! }
 }

@@ -34,6 +34,11 @@
         <intent>
             <action android:name="android.settings.SETTINGS" />
         </intent>
+        <!-- Browsers (apps that open web links): for "allow only these websites". -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
     </queries>
 
     <application

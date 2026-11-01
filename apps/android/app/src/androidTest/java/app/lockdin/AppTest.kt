@@ -234,6 +234,34 @@ class AppTest {
         rule.onNodeWithText("1 website blocked during focus").assertIsDisplayed()
     }
 
+    @Test fun websitesAllowOnlyModeSaves() {
+        launch()
+        rule.onNodeWithTag("tab-profiles").performClick()
+        rule.onNodeWithText("Study").performClick()
+        rule.onNodeWithText("Websites").performClick()
+        rule.onAllNodesWithText("Allow only these").onFirst().performClick()
+        rule.onNodeWithText("No sites allowed yet", substring = true).assertIsDisplayed()
+        rule.onNodeWithContentDescription("Website to allow").performTextInput("wikipedia.org")
+        rule.onNodeWithText("Add").performClick()
+        rule.onNodeWithText("Save").performClick()
+        rule.onNodeWithText("Only 1 website allowed during focus").assertIsDisplayed()
+    }
+
+    @Test fun newProfileOpensEditorAndCanBeDeleted() {
+        launch()
+        rule.onNodeWithTag("tab-profiles").performClick()
+        rule.onNodeWithText("New profile").performClick()
+        rule.onNodeWithContentDescription("New profile name").performTextInput("Lab report")
+        rule.onNodeWithText("Create").performClick()
+        // The editor opens straight away, with the essentials note.
+        rule.onNodeWithText("Never blocked", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Delete").performClick()
+        rule.onNodeWithText("Delete “Lab report”?").assertIsDisplayed()
+        rule.onAllNodesWithText("Delete").onLast().performClick()
+        rule.onNodeWithText("Lab report").assertDoesNotExist()
+        rule.onNodeWithText("Study").assertIsDisplayed()
+    }
+
     @Test fun invalidCustomLengthExplained() {
         launch()
         rule.onNodeWithContentDescription("Custom minutes").performClick()

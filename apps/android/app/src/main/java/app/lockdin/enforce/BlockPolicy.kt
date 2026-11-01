@@ -6,17 +6,19 @@ package app.lockdin.enforce
 enum class RuleMode { BLOCK_LIST, APPROVED_ONLY }
 
 /**
- * `sites` are domains blocked inside supported browsers (needs the Accessibility mode); they are
- * always a block list, whatever `mode` says about apps.
+ * App rules (`mode` + `packages`) and website rules (`siteMode` + `sites`, domains, checked in
+ * supported browsers with the Accessibility mode). Each can be a block list or "allow only".
  */
 data class AppRules(
     val mode: RuleMode = RuleMode.BLOCK_LIST,
     val packages: Set<String> = emptySet(),
     val sites: Set<String> = emptySet(),
+    val siteMode: RuleMode = RuleMode.BLOCK_LIST,
 ) {
-    /** False for an empty block list: such a session is a timer only and must say so. */
-    val restrictsAnything: Boolean get() = mode == RuleMode.APPROVED_ONLY || packages.isNotEmpty() || sites.isNotEmpty()
     val restrictsApps: Boolean get() = mode == RuleMode.APPROVED_ONLY || packages.isNotEmpty()
+    val restrictsSites: Boolean get() = siteMode == RuleMode.APPROVED_ONLY || sites.isNotEmpty()
+    /** False for empty block lists: such a session is a timer only and must say so. */
+    val restrictsAnything: Boolean get() = restrictsApps || restrictsSites
 }
 
 /** How early a session can end. Emergency recovery is always available and separate. */
@@ -76,6 +78,32 @@ object BlockPolicy {
         "com.google.android.permissioncontroller",
         "com.android.packageinstaller",
         "com.google.android.packageinstaller",
+        // Payments and wallets: blocking them can break tap-to-pay and their system panels
+        // (owner report 2026-11-01: a blocked Wallet made the home screen unusable).
+        "com.samsung.android.spay",
+        "com.samsung.android.samsungpay.gear",
+        "com.google.android.apps.walletnfcrel",
+        // Clock/alarms, camera, contacts: basic phone functions.
+        "com.sec.android.app.clockpackage",
+        "com.google.android.deskclock",
+        "com.android.deskclock",
+        "com.sec.android.app.camera",
+        "com.google.android.GoogleCamera",
+        "com.android.camera2",
+        "com.samsung.android.app.contacts",
+        "com.google.android.contacts",
+        "com.android.contacts",
+        // System panels and tools that draw over the home screen.
+        "com.samsung.android.app.cocktailbarservice",
+        "com.samsung.android.app.smartcapture",
+        "com.samsung.android.lool",
+        // Sign-in codes: blocking them can lock someone out of their accounts.
+        "com.google.android.apps.authenticator2",
+        "com.azure.authenticator",
+        // Accessibility tools.
+        "com.google.android.marvin.talkback",
+        "com.samsung.accessibility",
+        "com.samsung.android.accessibility.talkback",
     )
 
     /**
@@ -97,7 +125,7 @@ object BlockPolicy {
      * blocks websites needs Accessibility (usage access can't see web addresses).
      */
     fun missingFor(rules: AppRules, detection: Detection, missingForApps: Set<Capability>): Set<Capability> = when {
-        !rules.restrictsApps && rules.sites.isNotEmpty() ->
+        !rules.restrictsApps && rules.restrictsSites ->
             if (detection == Detection.ACCESSIBILITY) emptySet() else setOf(Capability.ACCESSIBILITY)
         else -> missingForApps
     }
@@ -120,7 +148,22 @@ object BlockPolicy {
     /** True if `host` is a blocked domain or one of its subdomains (m.youtube.com for youtube.com). */
     fun isSiteBlocked(host: String?, sites: Set<String>): Boolean {
         val h = domainOf(host) ?: return false
-        return sites.any { d -> h == d || h.endsWith(".$d") }
+        return matches(h, sites)
+    }
+
+    private fun matches(h: String, sites: Set<String>) = sites.any { d -> h == d || h.endsWith(".$d") }
+
+    /**
+     * Website rule for an address shown in a browser. Block list: listed sites are blocked.
+     * Allow only: every site except the listed ones (and their subdomains) is blocked. Pages
+     * without a web address (new tab, browser settings) are never blocked.
+     */
+    fun isSiteRestricted(host: String?, rules: AppRules): Boolean {
+        val h = domainOf(host) ?: return false
+        return when (rules.siteMode) {
+            RuleMode.BLOCK_LIST -> matches(h, rules.sites)
+            RuleMode.APPROVED_ONLY -> !matches(h, rules.sites)
+        }
     }
 
     fun isRestricted(pkg: String, rules: AppRules, essentials: Set<String>): Boolean {

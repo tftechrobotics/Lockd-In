@@ -57,40 +57,60 @@ fun ScrollScreen(content: @Composable () -> Unit) {
 @Composable
 fun ProfilesScreen(store: Store, onEdit: (Profile) -> Unit = {}) {
     val c = LocalColors.current
-    var name by rememberSaveable { mutableStateOf("") }
+    var naming by rememberSaveable { mutableStateOf(false) }
     ScrollScreen {
         Column(verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
             ScreenTitle("Profiles")
-            Text("Which apps are blocked during focus. Each device keeps its own list; this is this phone’s.", style = UiType.caption, color = c.inkMuted)
+            Text("What each profile blocks on this phone.", style = UiType.caption, color = c.inkMuted)
         }
         SettingsGroup {
             store.state.profiles.forEachIndexed { i, p ->
                 if (i > 0) GroupDivider()
-                Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable(role = Role.Button, onClickLabel = "Choose apps") { onEdit(p) }
-                    .padding(horizontal = Dim.s4, vertical = Dim.s3), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}) {
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 64.dp)
+                        .clickable(role = Role.Button, onClickLabel = "Edit") { onEdit(p) }
+                        .semantics(mergeDescendants = true) {}
+                        .padding(horizontal = Dim.s4, vertical = Dim.s3),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(p.name, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
-                        Text(p.description, style = UiType.caption, color = c.inkMuted)
-                        Text(rulesSummary(p.rules), style = UiType.caption, color = c.ink)
+                        Text(rulesSummary(p.rules), style = UiType.caption, color = c.inkMuted, maxLines = 2)
                     }
-                    if (!p.builtIn) TextAction("Delete", { store.update { s -> s.copy(profiles = s.profiles.filter { it.id != p.id }) } }, danger = true)
+                    LockdIcon(LIcon.Chevron, size = 18.dp, tint = c.inkMuted)
                 }
             }
         }
-        Text("Tap a profile to choose its apps. Phone, Settings, your keyboard and Lockd In are never blocked.", style = UiType.caption, color = c.inkMuted)
-        Column(verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
-            SectionLabel("New profile")
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s2)) {
-                OutlinedTextField(name, { name = it.take(40) }, placeholder = { Text("e.g. Lab report") },
-                    singleLine = true, shape = RoundedCornerShape(Dim.radius), colors = fieldColors(),
-                    modifier = Modifier.weight(1f).semantics { contentDescription = "New profile name" })
-                SecondaryButton("Add", {
-                    val n = name.trim()
-                    if (n.isNotEmpty()) { store.update { it.copy(profiles = it.profiles + Profile(Store.newId(), n, "Only what you add", false)) }; name = "" }
-                })
-            }
-        }
+        SecondaryButton("New profile", { naming = true }, modifier = Modifier.fillMaxWidth())
     }
+    if (naming) NewProfileDialog(onDismiss = { naming = false }) { n ->
+        val p = Profile(Store.newId(), n, "Only what you add", false)
+        store.update { it.copy(profiles = it.profiles + p) }
+        naming = false
+        onEdit(p)
+    }
+}
+
+@Composable
+private fun NewProfileDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
+    val c = LocalColors.current
+    var name by rememberSaveable { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.surface,
+        title = { Text("New profile", style = Type.title, color = c.ink) },
+        text = {
+            OutlinedTextField(name, { name = it.take(40) }, placeholder = { Text("e.g. Lab report") },
+                singleLine = true, shape = RoundedCornerShape(Dim.radius), colors = fieldColors(),
+                modifier = Modifier.fillMaxWidth().semantics { contentDescription = "New profile name" })
+        },
+        confirmButton = {
+            TextButton(onClick = { name.trim().takeIf { it.isNotEmpty() }?.let(onCreate) }, enabled = name.isNotBlank()) {
+                Text("Create", style = UiType.label, color = if (name.isNotBlank()) c.ink else c.inkMuted)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", style = UiType.label, color = c.ink) } },
+    )
 }
 
 // ---------------- Devices ----------------

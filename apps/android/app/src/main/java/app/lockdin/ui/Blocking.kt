@@ -16,10 +16,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -27,6 +29,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -39,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -95,16 +99,22 @@ fun rulesSummary(rules: AppRules): String {
     val n = rules.packages.size
     val apps = "$n app${if (n == 1) "" else "s"}"
     val appPart = when {
-        rules.mode == RuleMode.APPROVED_ONLY && n == 0 -> "Only essential apps (phone, Settings, keyboard)"
+        rules.mode == RuleMode.APPROVED_ONLY && n == 0 -> "Only essential apps"
         rules.mode == RuleMode.APPROVED_ONLY -> "Only $apps plus essentials"
         n == 0 -> null
         else -> "$apps blocked"
     }
     val m = rules.sites.size
-    val sitePart = if (m == 0) null else "$m website${if (m == 1) "" else "s"} blocked"
+    val sites = "$m website${if (m == 1) "" else "s"}"
+    val sitePart = when {
+        rules.siteMode == RuleMode.APPROVED_ONLY && m == 0 -> "all websites blocked"
+        rules.siteMode == RuleMode.APPROVED_ONLY -> "only $sites allowed"
+        m == 0 -> null
+        else -> "$sites blocked"
+    }
     return when {
-        appPart == null && sitePart == null -> "No apps chosen on this phone yet"
-        else -> listOfNotNull(appPart, sitePart).joinToString(" · ") + " during focus"
+        appPart == null && sitePart == null -> "Nothing blocked yet"
+        else -> listOfNotNull(appPart, sitePart).joinToString(" · ").replaceFirstChar { it.uppercase() } + " during focus"
     }
 }
 
@@ -235,18 +245,21 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
     var mode by remember { mutableStateOf(profile.rules.mode) }
     var chosen by remember { mutableStateOf(profile.rules.packages) }
     var sites by remember { mutableStateOf(profile.rules.sites) }
+    var siteMode by remember { mutableStateOf(profile.rules.siteMode) }
     var tab by remember { mutableStateOf(0) }
     var siteText by remember { mutableStateOf("") }
     var siteError by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
+    var confirmDelete by remember { mutableStateOf(false) }
     val a11y = remember(Resumes.tick) { Capabilities.accessibility(ctx) }
     val apps by produceState<List<LaunchableApp>?>(null) {
         value = withContext(Dispatchers.IO) { runCatching { InstalledApps.launchable(ctx) }.getOrDefault(emptyList()) }
     }
     val running = store.state.active?.profileId == profile.id
+    val allowSites = siteMode == RuleMode.APPROVED_ONLY
 
     fun save() {
-        store.update { s -> s.copy(profiles = s.profiles.map { if (it.id == profile.id) it.copy(rules = AppRules(mode, chosen, sites)) else it }) }
+        store.update { s -> s.copy(profiles = s.profiles.map { if (it.id == profile.id) it.copy(rules = AppRules(mode, chosen, sites, siteMode)) else it }) }
         onClose()
     }
 
@@ -254,23 +267,36 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
         Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose) { LockdIcon(LIcon.Close, description = "Close without saving") }
             Text(profile.name, style = UiType.title, color = c.ink, modifier = Modifier.weight(1f))
+            if (!profile.builtIn) TextAction("Delete", { confirmDelete = true }, danger = true)
             TextAction("Save", ::save)
         }
         Column(Modifier.padding(horizontal = Dim.gutter), verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
             SegmentedChoice(listOf(0 to "Apps", 1 to "Websites"), tab, { tab = it }, label = "Edit apps or websites")
+            if (running) Text("A session with this profile is running. Changes apply from the next session.", style = UiType.caption, color = c.ink)
         }
         if (tab == 1) {
             Column(Modifier.padding(horizontal = Dim.gutter, vertical = Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
+                SegmentedChoice(
+                    listOf(RuleMode.BLOCK_LIST to "Block these", RuleMode.APPROVED_ONLY to "Allow only these"),
+                    siteMode, { siteMode = it }, label = "Website rule",
+                )
                 Text(
-                    "Sites you add are covered during focus in Chrome, Samsung Internet, Edge, Firefox, Brave and Opera, including their subdomains (youtube.com covers m.youtube.com). Other browsers can be blocked as apps.",
+                    if (!allowSites) "The sites you add are covered during focus, including their subdomains (youtube.com covers m.youtube.com). Every other site works."
+                    else "During focus, only the sites you add open. Every other site is covered. Add google.com if you need search.",
                     style = UiType.caption, color = c.inkMuted,
                 )
-                if (!a11y) Text("Website blocking needs Accessibility. Turn it on in Devices › Set up blocking.", style = UiType.caption, color = c.ink)
+                Text(
+                    if (!allowSites) "Works in Chrome, Samsung Internet, Edge, Firefox, Brave and Opera. Other browsers can be blocked as apps."
+                    else "Works in Chrome, Samsung Internet, Edge, Firefox, Brave and Opera. Other browsers are blocked completely during focus, because Lockd In can’t see which site they show.",
+                    style = UiType.caption, color = c.inkMuted,
+                )
+                if (!a11y) Text("Website rules need Accessibility. Turn it on in Devices › Set up blocking.", style = UiType.caption, color = c.ink)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s2)) {
                     OutlinedTextField(
-                        siteText, { siteText = it.take(253); siteError = null }, singleLine = true, placeholder = { Text("youtube.com") },
+                        siteText, { siteText = it.take(253); siteError = null }, singleLine = true,
+                        placeholder = { Text(if (allowSites) "wikipedia.org" else "youtube.com") },
                         isError = siteError != null, shape = RoundedCornerShape(Dim.radius), colors = fieldColors(),
-                        modifier = Modifier.weight(1f).semantics { contentDescription = "Website to block" },
+                        modifier = Modifier.weight(1f).semantics { contentDescription = if (allowSites) "Website to allow" else "Website to block" },
                     )
                     SecondaryButton("Add", {
                         val d = BlockPolicy.domainOf(siteText)
@@ -279,7 +305,10 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
                     })
                 }
                 siteError?.let { Text(it, style = UiType.caption, color = c.danger) }
-                if (sites.isEmpty()) Text("No websites blocked yet.", style = UiType.body, color = c.inkMuted)
+                if (sites.isEmpty()) Text(
+                    if (allowSites) "No sites allowed yet, so every website is covered during focus." else "No websites blocked yet.",
+                    style = UiType.body, color = c.inkMuted,
+                )
             }
             LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
                 items(sites.sorted(), key = { it }) { d ->
@@ -290,54 +319,88 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
                     HorizontalDivider(color = c.line, modifier = Modifier.padding(start = Dim.gutter))
                 }
             }
-            return@Column
-        }
-        Column(Modifier.padding(horizontal = Dim.gutter, vertical = Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
-            SegmentedChoice(
-                listOf(RuleMode.BLOCK_LIST to "Block these", RuleMode.APPROVED_ONLY to "Allow only these"),
-                mode, { mode = it }, label = "Rule type",
-            )
-            Text(
-                if (mode == RuleMode.BLOCK_LIST) "The apps you tick are covered during focus. Everything else stays available."
-                else "During focus, only the apps you tick open normally. Phone, Settings, your keyboard and Lockd In always work.",
-                style = UiType.caption, color = c.inkMuted,
-            )
-            if (running) Text("A session with this profile is running. Changes apply from the next session.", style = UiType.caption, color = c.ink)
-            OutlinedTextField(
-                query, { query = it.take(40) }, singleLine = true, placeholder = { Text("Search apps") },
-                shape = RoundedCornerShape(Dim.radius), colors = fieldColors(),
-                modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Search apps" },
-            )
-        }
-        val list = apps
-        when {
-            list == null -> Box(Modifier.fillMaxWidth().padding(Dim.s6), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = c.ink, modifier = Modifier.semantics { contentDescription = "Loading apps" })
-            }
-            list.isEmpty() -> Text("No apps found. Apps without a home-screen icon can’t be chosen.", style = UiType.body, color = c.inkMuted, modifier = Modifier.padding(Dim.gutter))
-            else -> {
-                val shown = list.filter { query.isBlank() || it.label.contains(query, ignoreCase = true) }
-                Text(
-                    "${chosen.size} chosen", style = UiType.caption, color = c.inkMuted,
-                    modifier = Modifier.padding(horizontal = Dim.gutter, vertical = Dim.s2),
+        } else {
+            Column(Modifier.padding(horizontal = Dim.gutter, vertical = Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
+                SegmentedChoice(
+                    listOf(RuleMode.BLOCK_LIST to "Block these", RuleMode.APPROVED_ONLY to "Allow only these"),
+                    mode, { mode = it }, label = "Rule type",
                 )
-                LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
-                    items(shown, key = { it.packageName }) { app ->
-                        val on = app.packageName in chosen
-                        Row(
-                            Modifier.fillMaxWidth().heightIn(min = Dim.control + 4.dp)
-                                .clickable(role = Role.Checkbox) { chosen = if (on) chosen - app.packageName else chosen + app.packageName }
-                                .semantics(mergeDescendants = true) { stateDescription = if (on) "Chosen" else "Not chosen" }
-                                .padding(horizontal = Dim.gutter),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(app.label, style = UiType.body, color = c.ink, modifier = Modifier.weight(1f))
-                            Checkbox(on, onCheckedChange = null, colors = CheckboxDefaults.colors(checkedColor = c.ink, uncheckedColor = c.controlLine, checkmarkColor = c.onInk))
+                Text(
+                    if (mode == RuleMode.BLOCK_LIST) "The apps you tick are covered during focus. Everything else stays available."
+                    else "During focus, only the apps you tick open normally. Everything else is covered.",
+                    style = UiType.caption, color = c.inkMuted,
+                )
+                Text(
+                    "Never blocked, so your phone keeps working: phone and emergency calls, contacts, Settings, keyboard, home screen, wallet and tap-to-pay, clock, camera and Lockd In. They aren’t listed here.",
+                    style = UiType.caption, color = c.inkMuted,
+                )
+                OutlinedTextField(
+                    query, { query = it.take(40) }, singleLine = true, placeholder = { Text("Search apps") },
+                    shape = RoundedCornerShape(Dim.radius), colors = fieldColors(),
+                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Search apps" },
+                )
+            }
+            val list = apps
+            when {
+                list == null -> Box(Modifier.fillMaxWidth().padding(Dim.s6), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = c.ink, modifier = Modifier.semantics { contentDescription = "Loading apps" })
+                }
+                list.isEmpty() -> Text("No apps found. Apps without a home-screen icon can’t be chosen.", style = UiType.body, color = c.inkMuted, modifier = Modifier.padding(Dim.gutter))
+                else -> {
+                    val shown = list.filter { query.isBlank() || it.label.contains(query, ignoreCase = true) }
+                    Text(
+                        "${chosen.size} chosen", style = UiType.caption, color = c.inkMuted,
+                        modifier = Modifier.padding(horizontal = Dim.gutter, vertical = Dim.s2),
+                    )
+                    LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
+                        items(shown, key = { it.packageName }) { app ->
+                            val on = app.packageName in chosen
+                            Row(
+                                Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                                    .clickable(role = Role.Checkbox) { chosen = if (on) chosen - app.packageName else chosen + app.packageName }
+                                    .semantics(mergeDescendants = true) { stateDescription = if (on) "Chosen" else "Not chosen" }
+                                    .padding(horizontal = Dim.gutter),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(Dim.s3),
+                            ) {
+                                AppIcon(app.packageName)
+                                Text(app.label, style = UiType.body, color = c.ink, modifier = Modifier.weight(1f))
+                                Checkbox(on, onCheckedChange = null, colors = CheckboxDefaults.colors(checkedColor = c.ink, uncheckedColor = c.controlLine, checkmarkColor = c.onInk))
+                            }
+                            HorizontalDivider(color = c.line, modifier = Modifier.padding(start = Dim.gutter + 36.dp + Dim.s3))
                         }
-                        HorizontalDivider(color = c.line, modifier = Modifier.padding(start = Dim.gutter))
                     }
                 }
             }
         }
+    }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            containerColor = c.surface,
+            title = { Text("Delete “${profile.name}”?", style = UiType.title, color = c.ink) },
+            text = { Text("Planned sessions that use it switch to timer only. A running session keeps its rules until it ends.", style = UiType.body, color = c.inkMuted) },
+            confirmButton = {
+                TextButton(onClick = {
+                    store.update { s -> s.copy(profiles = s.profiles.filter { it.id != profile.id }) }
+                    confirmDelete = false; onClose()
+                }) { Text("Delete", style = UiType.label, color = c.danger) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Keep", style = UiType.label, color = c.ink) } },
+        )
+    }
+}
+
+/** The app's own launcher icon, loaded off the main thread. Decorative: the label is read instead. */
+@Composable
+fun AppIcon(pkg: String, size: androidx.compose.ui.unit.Dp = 36.dp) {
+    val ctx = LocalContext.current
+    val px = with(androidx.compose.ui.platform.LocalDensity.current) { size.roundToPx() }
+    val bmp by produceState<android.graphics.Bitmap?>(null, pkg, px) {
+        value = withContext(Dispatchers.IO) { InstalledApps.icon(ctx, pkg, px) }
+    }
+    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+        bmp?.let { androidx.compose.foundation.Image(it.asImageBitmap(), contentDescription = null, modifier = Modifier.size(size)) }
     }
 }

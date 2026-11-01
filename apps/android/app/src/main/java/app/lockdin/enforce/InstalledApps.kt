@@ -25,6 +25,21 @@ object InstalledApps {
             .sortedBy { it.label.lowercase() }
     }
 
+    private val icons = android.util.LruCache<String, android.graphics.Bitmap>(200)
+
+    /** The app's launcher icon as a small bitmap (cached). Call off the main thread. */
+    fun icon(ctx: Context, pkg: String, sizePx: Int): android.graphics.Bitmap? {
+        icons.get(pkg)?.let { return it }
+        return runCatching {
+            val d = ctx.packageManager.getApplicationIcon(pkg)
+            val b = android.graphics.Bitmap.createBitmap(sizePx, sizePx, android.graphics.Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(b)
+            d.setBounds(0, 0, sizePx, sizePx)
+            d.draw(canvas)
+            b.also { icons.put(pkg, it) }
+        }.getOrNull()
+    }
+
     fun label(ctx: Context, pkg: String): String = runCatching {
         val pm = ctx.packageManager
         pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()

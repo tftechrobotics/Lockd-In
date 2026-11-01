@@ -40,11 +40,13 @@ class FocusAccessibilityService : AccessibilityService() {
             try {
                 val session = Store.get(this@FocusAccessibilityService).state.active
                 val now = System.currentTimeMillis()
-                if (session != null && session.rules.restrictsApps && FocusService.evaluate(session, now).restricting && !BlockActivity.showing) {
+                if (session != null && (session.rules.restrictsApps || session.rules.siteMode == RuleMode.APPROVED_ONLY) &&
+                    FocusService.evaluate(session, now).restricting && !BlockActivity.showing) {
                     val root = rootInActiveWindow
                     val pkg = root?.packageName?.toString()
                     root?.recycleCompat()
-                    if (pkg != null && pkg != packageName && BlockPolicy.isRestricted(pkg, session.rules, essentials(now))) {
+                    if (pkg != null && pkg != packageName &&
+                        (BlockPolicy.isRestricted(pkg, session.rules, essentials(now)) || unsupportedBrowserBlocked(pkg, session.rules))) {
                         Log.i(TAG, "safety_net_cover")
                         cover(pkg, null, null)
                     }
@@ -91,18 +93,44 @@ class FocusAccessibilityService : AccessibilityService() {
         val rules = session.rules
         when (e.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
-                if (BlockPolicy.isRestricted(pkg, rules, essentials(now))) {
-                    // Event time is on the uptime clock; report the delay to our request.
-                    cover(pkg, null, SystemClock.uptimeMillis() - e.eventTime)
-                } else checkAddress(pkg, rules, force = true)
+                // Only act on the app that actually owns the window in front. Panels, pop-ups and
+                // quick-access sheets (e.g. a wallet's swipe-up card on the home screen) also send
+                // this event; covering them made the home screen unusable.
+                if (!ownsActiveWindow(pkg)) return
+                when {
+                    BlockPolicy.isRestricted(pkg, rules, essentials(now)) ->
+                        // Event time is on the uptime clock; report the delay to our request.
+                        cover(pkg, null, SystemClock.uptimeMillis() - e.eventTime)
+                    unsupportedBrowserBlocked(pkg, rules) -> cover(pkg, null, null)
+                    else -> checkAddress(pkg, rules, force = true)
+                }
             }
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> checkAddress(pkg, rules, force = false)
         }
     }
 
-    /** Reads the address bar of a supported browser and covers it if the site is blocked. */
+    private fun ownsActiveWindow(pkg: String): Boolean {
+        val root = rootInActiveWindow ?: return false
+        return try { root.packageName?.toString() == pkg } finally { root.recycleCompat() }
+    }
+
+    /**
+     * "Allow only these websites" can't be checked in browsers whose address bar we can't read,
+     * so those browsers are blocked as a whole during focus (the block screen says why).
+     */
+    private fun unsupportedBrowserBlocked(pkg: String, rules: AppRules): Boolean {
+        if (rules.siteMode != RuleMode.APPROVED_ONLY || pkg in BROWSER_URL_BARS) return false
+        val now = SystemClock.elapsedRealtime()
+        if (now - browsersAt > 60_000) { browsers = Capabilities.browsers(this); browsersAt = now }
+        return pkg in browsers && pkg !in essentials(System.currentTimeMillis())
+    }
+
+    private var browsers: Set<String> = emptySet()
+    private var browsersAt = 0L
+
+    /** Reads the address bar of a supported browser and covers it if the site is restricted. */
     private fun checkAddress(pkg: String, rules: AppRules, force: Boolean) {
-        if (rules.sites.isEmpty()) return
+        if (!rules.restrictsSites) return
         val id = BROWSER_URL_BARS[pkg] ?: return
         val t = SystemClock.elapsedRealtime()
         if (!force && t - lastUrlCheck < URL_CHECK_MS) return
@@ -117,7 +145,7 @@ class FocusAccessibilityService : AccessibilityService() {
             nodes.forEach { it.recycleCompat() }
             if (editing) return
             val host = BlockPolicy.domainOf(text) ?: return
-            if (BlockPolicy.isSiteBlocked(host, rules.sites)) cover(pkg, host, null)
+            if (BlockPolicy.isSiteRestricted(host, rules)) cover(pkg, host, null)
         } finally {
             root.recycleCompat()
         }

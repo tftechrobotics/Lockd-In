@@ -53,7 +53,16 @@ object Capabilities {
         Settings.Secure.getString(ctx.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
             ?.substringBefore('/')?.takeIf { it.isNotBlank() }?.let(::add)
         runCatching { ctx.getSystemService(TelecomManager::class.java)?.defaultDialerPackage }.getOrNull()?.let(::add)
+        // The default tap-to-pay app, whatever wallet it is.
+        Settings.Secure.getString(ctx.contentResolver, "nfc_payment_default_component")
+            ?.substringBefore('/')?.takeIf { it.isNotBlank() }?.let(::add)
     }
+
+    /** Apps that open web links (browsers), via the manifest's narrow VIEW https query. */
+    fun browsers(ctx: Context): Set<String> = runCatching {
+        ctx.packageManager.queryIntentActivities(Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com")), PackageManager.MATCH_ALL)
+            .map { it.activityInfo.packageName }.toSet()
+    }.getOrDefault(emptySet())
 
     private fun resolve(ctx: Context, intent: Intent): String? =
         ctx.packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName

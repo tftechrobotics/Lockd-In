@@ -232,7 +232,7 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
     val appMissing = rememberMissing()
     val ctx = androidx.compose.ui.platform.LocalContext.current
     // A profile that only blocks websites needs Accessibility (usage access can't see addresses).
-    val missing = if (!rules.restrictsApps && rules.sites.isNotEmpty() && !app.lockdin.enforce.Capabilities.accessibility(ctx))
+    val missing = if (!rules.restrictsApps && rules.restrictsSites && !app.lockdin.enforce.Capabilities.accessibility(ctx))
         setOf(app.lockdin.enforce.Capability.ACCESSIBILITY) else appMissing
     val blockingReady = rules.restrictsAnything && missing.isEmpty()
 
