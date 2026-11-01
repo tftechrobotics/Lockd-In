@@ -164,7 +164,7 @@ class AppTest {
         launch(AppState(commitment = app.lockdin.enforce.Commitment.LOCKED))
         rule.onNodeWithText("Start timer").performClick()
         rule.onNodeWithText("Need out?").assertDoesNotExist()
-        rule.onNodeWithText("Emergency recovery").performScrollTo().performClick()
+        rule.onNodeWithText("Emergency recovery").performClick()
         rule.onNodeWithText("End session now").performClick()
         rule.onNodeWithText("Ended with emergency recovery.").assertIsDisplayed()
     }

@@ -55,6 +55,7 @@ class FocusService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private var lastQueryMs = 0L
     private var currentTop: String? = null
+    private var currentTopAt = 0L
     private var lastCoverElapsed = 0L
     private var wasRestricting = false
     private var essentials: Set<String> = emptySet()
@@ -181,7 +182,7 @@ class FocusService : Service() {
         val e = UsageEvents.Event()
         while (events.hasNextEvent()) {
             events.getNextEvent(e)
-            if (e.eventType == UsageEvents.Event.ACTIVITY_RESUMED) currentTop = e.packageName
+            if (e.eventType == UsageEvents.Event.ACTIVITY_RESUMED) { currentTop = e.packageName; currentTopAt = e.timeStamp }
         }
     }
 
@@ -191,7 +192,8 @@ class FocusService : Service() {
         lastCoverElapsed = t
         try {
             startActivity(BlockActivity.intent(this, pkg))
-            Log.i(TAG, "cover_requested")
+            // Time from the app coming to the front (as Android recorded it) to our request.
+            Log.i(TAG, "cover_requested detect_ms=${System.currentTimeMillis() - currentTopAt}")
         } catch (e: Exception) {
             // Background activity starts can be refused; the next tick retries and the
             // permission check reports "Display over other apps" if that is the cause.
@@ -244,6 +246,7 @@ class FocusService : Service() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(Notification.CATEGORY_SERVICE)
+            .apply { if (Build.VERSION.SDK_INT >= 31) setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE) }
             .build()
     }
 

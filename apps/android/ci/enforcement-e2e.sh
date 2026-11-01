@@ -19,9 +19,12 @@ FAILED=0
 
 now_ms() { date +%s%3N; }
 note() { echo "$*" | tee -a "$RESULTS"; }
+# Results are collected and reported as two annotations at the end (GitHub shows at most
+# 10 annotations of each kind per step).
 record() { # record <id> <pass|FAIL|info> <detail>
   note "$1 $2 $3"
-  if [ "$2" = FAIL ]; then FAILED=1; echo "::error title=$1 (EMULATOR)::$3"; else echo "::notice title=$1 (EMULATOR)::$2 — $3"; fi
+  [ "$2" = FAIL ] && FAILED=1
+  return 0
 }
 
 boot_wait() {
@@ -90,7 +93,8 @@ adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 3
 adb shell screencap -p /sdcard/app-running.png; adb pull /sdcard/app-running.png "$OUT/" >/dev/null 2>&1
 home
 if service_up; then record M1.11-android-service pass "FocusService running after start"; else record M1.11-android-service FAIL "FocusService not running after start"; fi
-notif_has "Focusing until" && record session-notification pass "ongoing notification shown" || record session-notification FAIL "no ongoing session notification"
+seen=""; for _ in $(seq 1 15); do notif_has "Focusing until" && { seen=1; break; }; sleep 1; done
+[ -n "$seen" ] && record session-notification pass "ongoing notification shown" || record session-notification FAIL "no ongoing session notification within 15 s"
 
 # M1.5: 20 trials.
 pass=0; lat=()
@@ -157,6 +161,7 @@ until_s $(( 6 * 60 + 5 ))
 r=$(trial_blocked 6000) && record M1.7-focus-resumes pass "blocked again in round 2 (${r} ms)" || record M1.7-focus-resumes FAIL "$r"
 
 # M1.8 (part): reboot mid-session → blocking resumes after boot.
+adb logcat -d -s LockdInFocus LockdInTest > "$OUT/logcat-before-reboot.txt" 2>/dev/null || true
 adb reboot; rebooted=$(now_ms)
 boot_wait
 back=""
@@ -174,6 +179,16 @@ service_up && record service-stopped FAIL "FocusService still running after the 
 notif_has "Focusing until\|Break until" && record notification-cleared FAIL "session notification still shown" || record notification-cleared pass "session notification removed"
 
 adb logcat -d -s LockdInFocus LockdInTest ActivityTaskManager:W ActivityManager:W > "$OUT/logcat.txt" 2>/dev/null || true
-echo "::notice title=Enforcement E2E summary (EMULATOR ONLY)::$(grep -cE ' pass ' "$RESULTS") pass, $(grep -cE ' FAIL ' "$RESULTS") fail — see $OUT/results.txt"
+# On-device detection time: from Android's record of the app coming to the front to the
+# service asking for the block screen (no adb overhead). Logcat is cleared on reboot.
+det=$(cat "$OUT/logcat-before-reboot.txt" "$OUT/logcat.txt" 2>/dev/null | grep -oE 'detect_ms=[0-9]+' | cut -d= -f2 | sort -n)
+if [ -n "$det" ]; then
+  n=$(echo "$det" | wc -l)
+  p50=$(echo "$det" | awk -v n="$n" 'NR==int((n+1)/2)'); p95=$(echo "$det" | awk -v n="$n" 'NR==int(n*0.95+0.999)'); mx=$(echo "$det" | tail -1)
+  record detection-latency info "n=$n p50=${p50} ms p95=${p95} ms max=${mx} ms (app to front → block requested, on-device)"
+fi
+enc() { sed 's/%/%25/g' | tr '\n' '\r' | sed 's/\r/%0A/g'; }
+echo "::notice title=Enforcement E2E (EMULATOR ONLY) — $(grep -c ' pass ' "$RESULTS") pass, $(grep -c ' FAIL ' "$RESULTS") fail::$(grep -vE '^  ' "$RESULTS" | enc)"
+grep -q ' FAIL ' "$RESULTS" && echo "::error title=Enforcement E2E failures (EMULATOR)::$(grep ' FAIL ' "$RESULTS" | enc)"
 cat "$RESULTS"
 exit $FAILED
