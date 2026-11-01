@@ -1,0 +1,42 @@
+# Builds a sideloadable TEST APK of the Android app (debug build, public test key) and puts it on
+# the `test-apk` branch, so it can be fetched where artifact downloads are blocked. For owner
+# testing only; not a release. Play builds are separate and signed with the upload key.
+name: Android test APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["apps/android/**", ".github/workflows/android-test-apk.yml"]
+permissions:
+  contents: write
+concurrency:
+  group: test-apk
+  cancel-in-progress: true
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gradle/actions/wrapper-validation@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build
+        working-directory: apps/android
+        env:
+          LOCKDIN_VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew --no-daemon assembleDebug
+      - name: Publish to the test-apk branch
+        run: |
+          set -e
+          sha=$(git rev-parse --short HEAD)
+          apk=apps/android/app/build/outputs/apk/debug/app-debug.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git worktree add --orphan -b test-apk-new ../apk
+          cp "$apk" ../apk/lockd-in-test.apk
+          printf 'Lockd In TEST build from %s (run %s). Debug build, public test key. Not for distribution.\n' "$sha" "${{ github.run_number }}" > ../apk/README.txt
+          cd ../apk && git add -A && git commit -qm "Test APK for $sha" && git push -qf origin test-apk-new:test-apk
+          echo "::notice title=Test APK::$(stat -c %s lockd-in-test.apk) bytes from $sha"
