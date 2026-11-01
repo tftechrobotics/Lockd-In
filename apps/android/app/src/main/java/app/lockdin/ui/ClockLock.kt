@@ -5,7 +5,8 @@
 // verified, applied restriction.
 //
 // Start sequence (R42): when the person starts a session in the app, the tick ring turns one full
-// revolution in 12 clicks, then — only once blocking is confirmed — the shackle drops shut with a
+// revolution in 12 clicks with clock hands painted on it (the digits are hidden), the hands fade
+// into the countdown, and — only once blocking is confirmed — the shackle drops shut with a
 // short settle. The digits never move and always show the real session clock. It plays once per
 // manual start (see StartIntro) and never for scheduled starts, reopening, rotation or breaks.
 package app.lockdin.ui
@@ -167,7 +168,9 @@ fun ClockLock(
     // Shackle: 0 open, 1 shut. Without a start sequence it shows the true state directly.
     val dial = remember { Animatable(0f) }
     val shackleAnim = remember { Animatable(if (introFor == null && locked) 1f else 0f) }
-    val face = remember { Animatable(if (introFor == null) 1f else 0.3f) }
+    val face = remember { Animatable(if (introFor == null) 1f else 0f) }
+    // Clock hands shown on the dial only while it turns; they fade into the countdown.
+    val hands = remember { Animatable(0f) }
     var turning by remember { mutableStateOf(introFor != null) }
     var introClosed by remember { mutableStateOf(false) }
     val startedAt = remember { android.os.SystemClock.uptimeMillis() }
@@ -188,17 +191,20 @@ fun ClockLock(
         if (introFor == null) return@LaunchedEffect
         android.util.Log.i("LockdInIntro", "played session=$introFor reduced=$reduced")
         if (reduced) {
+            turning = false
             face.animateTo(1f, tween(220))
         } else {
-            launch { face.animateTo(1f, tween(700, delayMillis = 200)) }
+            hands.snapTo(1f)
             for (i in 1..STEPS) {
                 dial.animateTo(i * 360f / STEPS, tween(STEP_MS, easing = FastOutSlowInEasing))
                 click()
                 delay(STEP_GAP_MS)
             }
             dial.snapTo(0f) // a full turn looks identical; keeps later drawing simple
+            turning = false // the shackle may drop now, while the hands give way to the digits
+            launch { hands.animateTo(0f, tween(280)) }
+            face.animateTo(1f, tween(320, delayMillis = 60))
         }
-        turning = false
     }
 
     // After the turn, the shackle follows the verified state. It drops shut with a settle only
@@ -303,6 +309,20 @@ fun ClockLock(
                         strokeWidth = (if (i == 0) 4.5f else if (hour) 3.5f else 2.5f) * s,
                         cap = StrokeCap.Round,
                     )
+                }
+                // Hands painted on the turning dial (start sequence only): minute hand at 12,
+                // hour hand at 10, so it reads as a clock face clicking round.
+                if (hands.value > 0f) {
+                    val ink = c.ink.copy(alpha = 0.88f * hands.value)
+                    fun hand(deg: Float, len: Float, w: Float) {
+                        val a = Math.toRadians(deg.toDouble()).toFloat()
+                        drawLine(ink, Offset(center.x - sin(a) * 9f * s, center.y + cos(a) * 9f * s),
+                            Offset(center.x + sin(a) * len * s, center.y - cos(a) * len * s), w * s, StrokeCap.Round)
+                    }
+                    hand(300f, 40f, 6.5f)
+                    hand(0f, 62f, 4.5f)
+                    drawCircle(ink, 6f * s, center)
+                    drawCircle(bodyColor.copy(alpha = hands.value), 2.2f * s, center)
                 }
             }
         }
