@@ -30,7 +30,47 @@ export function useNow(active: boolean): number {
 
 export function FocusPage() {
   const active = useStore((s) => s.active);
-  return active ? <SessionView session={active} /> : <Setup />;
+  // Phone: when nothing is running, Focus opens on the lock with the time and the next planned
+  // session; the composer opens on request.
+  const [composing, setComposing] = useState(false);
+  useEffect(() => { if (active) setComposing(false); }, [active]);
+  if (active) return <SessionView session={active} />;
+  if (layout === 'android' && !composing) return <Home onNew={() => setComposing(true)} />;
+  return <Setup onCancel={layout === 'android' ? () => setComposing(false) : undefined} />;
+}
+
+/* ------------------------------- Home (phone, idle) ------------------------------- */
+
+function Home({ onNew }: { onNew: () => void }) {
+  const schedule = useStore((s) => s.schedule);
+  const now = useNow(true);
+  const upcoming = nextUp(schedule, now);
+  const time = clockTime(now);
+  const [hm, period = ''] = time.split(' ');
+  const weekday = new Date(now).toLocaleDateString(undefined, { weekday: 'long' });
+  const inProgress = upcoming !== null && upcoming.start <= now;
+  const until = upcoming && !inProgress ? durationLabel(Math.max(1, Math.round((upcoming.start - now) / 60_000))) : null;
+  return (
+    <div className={`page focus focus--${layout} focus--home`}>
+      <h1 className="sr-only">Focus</h1>
+      <div className="home">
+        <CircleLock state="ready" remainingMs={0} totalMs={1} locked={false} label={`It's ${time}, ${weekday}`}
+          caption={[period, weekday].filter(Boolean).join(' · ')} text={hm} />
+        <a className="home__next" href="#/schedule">
+          <span className="home__label">{inProgress ? 'Scheduled now' : 'Next session'}</span>
+          <strong className="home__title">{upcoming ? upcoming.session.title : 'Nothing planned'}</strong>
+          <span className="home__when">
+            {upcoming
+              ? `${dayLabel(upcoming.start)} · ${clockTime(upcoming.start)}–${clockTime(upcoming.end)}${until ? ` · in ${until}` : ''}`
+              : 'Plan one on Schedule'}
+          </span>
+        </a>
+      </div>
+      <div className="home__go">
+        <button type="button" className="button button--primary button--start" onClick={onNew}>New session</button>
+      </div>
+    </div>
+  );
 }
 
 const LENGTHS = [25, 40, 60];
@@ -46,7 +86,7 @@ export function useCanBlock(): boolean {
 
 /* ------------------------------- Setup ------------------------------- */
 
-function Setup() {
+function Setup({ onCancel }: { onCancel?: () => void }) {
   const last = useStore((s) => s.last);
   const profiles = useStore((s) => s.profiles);
   const recent = useStore((s) => s.recentIntentions);
@@ -93,6 +133,11 @@ function Setup() {
       <h1 className="sr-only">Plan a focus session</h1>
       <div className="composer-layout">
         <form className="composer" onSubmit={(e) => { e.preventDefault(); start(); }} noValidate>
+          {onCancel && (
+            <button type="button" className="button button--quiet composer__back" onClick={onCancel}>
+              <Icon name="chevron" size={16} />Back
+            </button>
+          )}
           <div className="q">
             <label className="q__label" htmlFor={ids.intent}>What are you working on?</label>
             <input id={ids.intent} className="bigfield" value={intention} maxLength={120} list={ids.list}

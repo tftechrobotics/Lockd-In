@@ -40,7 +40,7 @@ const SHACKLE = { ro: 74.5, stroke: 21, top: 36, lift: 28 };
 const GEO = { cx: LK.cx, cy: LK.cy, r: LK.r, ro: SHACKLE.ro, stroke: SHACKLE.stroke, top: SHACKLE.top };
 const SILHOUETTE = { closed: lockSilhouette(GEO, false), open: lockSilhouette(GEO, true, SHACKLE.lift) };
 
-export function CircleLock({ state, remainingMs, totalMs, locked, label, caption, size }: {
+export function CircleLock({ state, remainingMs, totalMs, locked, label, caption, size, text }: {
   state: TimerState; remainingMs: number; totalMs: number; locked: boolean;
   /** Spoken summary, minute-level ("Focus: 23 minutes left"). */
   label: string;
@@ -48,6 +48,8 @@ export function CircleLock({ state, remainingMs, totalMs, locked, label, caption
   caption: string;
   /** CSS width; the height follows. */
   size?: string;
+  /** Face text in place of the countdown (the idle lock shows the time of day). */
+  text?: string;
 }) {
   const f = state === 'done' ? 0 : totalMs > 0 ? Math.max(0, Math.min(1, remainingMs / totalMs)) : 0;
   // The frame hugs the shape: an open shackle sits higher, so it needs a little more room.
@@ -64,7 +66,7 @@ export function CircleLock({ state, remainingMs, totalMs, locked, label, caption
           <circle className="clock-lock__arc" cx={LK.cx} cy={LK.cy} r={LK.ring} fill="none" pathLength={1000}
             strokeDasharray={`${(f * 1000).toFixed(1)} 1000`} transform={`rotate(-90 ${LK.cx} ${LK.cy})`} />
         )}
-        <text className="clock-lock__time" x={LK.cx} y={LK.cy + 14} textAnchor="middle">{state === 'done' ? 'Done' : countdown(remainingMs)}</text>
+        <text className="clock-lock__time" x={LK.cx} y={LK.cy + 14} textAnchor="middle">{text ?? (state === 'done' ? 'Done' : countdown(remainingMs))}</text>
         <text className="clock-lock__caption" x={LK.cx} y={LK.cy + 44} textAnchor="middle">{caption}</text>
       </svg>
     </div>

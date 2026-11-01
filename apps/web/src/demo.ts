@@ -38,6 +38,13 @@ export function applyPreviewScene(): void {
   const scene = (p.get('scene') ?? '') as Scene | '';
   if (!scene) return;
   const now = Date.now();
+  // Sample plan so the idle screen has a next session to show (local data, like a user's own).
+  const at = new Date(now + 2 * 60 * MIN);
+  const startTime = `${String(at.getHours()).padStart(2, '0')}:00`;
+  update((s) => (s.schedule.length ? s : {
+    ...s,
+    schedule: [{ id: newId(), title: 'Physics review', days: [0, 1, 2, 3, 4, 5, 6], startTime, focusMinutes: 40, breakMinutes: 10, rounds: 2, profileId: s.profiles[0]?.id ?? s.last.profileId }],
+  }));
   const segments = [
     { kind: 'focus' as const, minutes: 40 },
     { kind: 'break' as const, minutes: 10 },
