@@ -1,6 +1,6 @@
 # Handoff — read this first
 
-**Last session:** 2026-10-29 (fifth session, design pass) · **Milestone:** 1 — **OPEN**; M2 (design + main flow) **in progress**
+**Last session:** 2026-10-31 (design pass 4) · **Milestone:** 1 — **OPEN**; M2 (design + main flow) **in progress**
 **Read first:** `docs/product-spec.md` (v2, owner direction) and `docs/backlog.md`.
 **Repository:** github.com/tftechrobotics/Lockd-In (private).
 **Next:** owner sets up Azure Artifact Signing (Windows app + probe) and
@@ -32,16 +32,24 @@ not free trial — Artifact Signing doesn't support trials) and Play wait.
 spike self-test, Kotlin type-check with an R stand-in, VM script lint,
 actionlint).
 
-## Design pass 4 — exploration, awaiting owner's pick (2026-10-31)
-- Two isolated directions, same sample session: **A** session composer + refined padlock with
-  integrated countdown; **B** sentence composer + typography-led numerals with a mini lock and a
-  session rail. Web: `apps/web/lab.html` + `src/lab/` (dev server only, not in the build:
-  `npx vite`, then `/lab.html?dir=a|b&screen=setup|focus|break|done|states&shell=web|desktop&theme=light|dark`).
-  Android: `app/src/androidTest/.../lab/` (never ships); `LabScreenshotTest` → `ci-screenshots` (lab-*.png).
-- Lock rule in both: shackle closes only when blocking is verified; timer-only focus shows an open shackle.
-- Known lab defect: A's "rounds · Change" row squeezes at 2× text on Android (fix with FlowRow when applied).
-- CI: upload-artifact steps are now non-fatal (GitHub artifact storage quota was hit); retention 7 days.
-- Next: apply the chosen direction to production Focus (web, Windows, Android), then the remaining screens.
+## Design pass 4 — "A setup, B timer" applied to Focus (2026-10-31, R34)
+- Owner picked the mix from the two lab directions. Rules: pass-4 block at the top of `docs/design-spec.md`.
+- **Web + Windows layout** (`apps/web/src/ui/FocusPage.tsx`, new `ui/Timer.tsx`, `styles/app.css`):
+  question composer (What / How long tiles / rounds line with Change / Which profile / Start timer),
+  web-wide preview column; running = task, mini-lock status, numerals, session rail, facts,
+  Need out? (End now inside). Recap uses the same column. **Tested:** 32 Playwright (flow,
+  axe light/dark incl. active session, keyboard, 320/390 px at 200% text incl. running) +
+  23 unit — Chromium, Linux. Rendered screenshots checked at 1280/390 web, 640/480 desktop layout,
+  dark break, 320 px at 200% (numerals overflowed → fixed with container-sized numerals).
+- **Android** (`ui/FocusScreen.kt`, new `ui/Timer.kt`, `Kit.kt` `CustomLengthRow`; `Components.kt`
+  LockTimer removed): same structure natively; tiles 2 × 2 at large text; rounds line is a FlowRow;
+  "Ends at … · total" + Start timer pinned; running facts as divided rows; Need out? only.
+  `AppTest.kt` updated + new screenshots 11 (running 200%), 12 (rounds open), 13 (recap).
+  Compiles/tests only in CI (no Android SDK in the sandbox) — see CI status below.
+- Windows real window: check `ci-screenshots-windows` after the next Windows CI run.
+- Lab sources (`apps/web/lab.html`, `src/lab/`, androidTest `lab/`) are kept for reference; dev/test only.
+- Next: carry the system to Schedule / Profiles / Devices / Settings; refresh the prototype artifact.
+- CI: upload-artifact steps are non-fatal (GitHub artifact storage quota was hit); retention 7 days.
 
 ## What changed this session (design pass 3 — R33)
 - Owner: the mockup is a mood reference; fix hierarchy and usability. Rules now live in the pass-3

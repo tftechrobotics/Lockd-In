@@ -1,4 +1,31 @@
-# Lockd In design specification — Cream & Ink, pass 3
+# Lockd In design specification — Cream & Ink, pass 4
+
+> **Pass 4 (2026-10-31, R34) supersedes pass 3 for the Focus screen.** Owner picked "A setup, B timer"
+> from two isolated directions (lab: `apps/web/lab.html`, `apps/android/.../androidTest/.../lab/`).
+>
+> - **Setup is a question composer**, grouped by spacing, not cards: *What are you working on?*
+>   (large underlined field, Outfit 500) → *How long?* (tiles 25 / 40 / 60 / Custom; 2 × 2 on narrow
+>   screens and at large text; a custom value equal to a preset selects it) → a rounds line
+>   ("2 rounds · 10 min break between" with **Change**, which reveals Focus rounds + Breaks) →
+>   *Which profile?* (chips) → **Start timer**. Web wide adds a preview column (Ready status,
+>   medium numerals, rail, "If you start now, you're done at…"); single-column layouts show
+>   "Ends at … · 1 h 30 min with breaks" next to the action instead. Android pins that line and the
+>   button above the bottom navigation.
+> - **Running is numerals-led**: task (heading) → status with a mini lock ("Focusing · round 1 of 2",
+>   "On a break · …", "Unlocked · …", "Session complete") → display numerals (Outfit 500, tabular,
+>   tight tracking) → session rail (segment widths follow minutes, elapsed filled, breaks dashed,
+>   start / break / end labels) → facts (Next break or Focus resumes, Session ends, Profile) →
+>   nudge → honest protection line → **Need out?** only. *End now* lives inside the Need-out panel
+>   and the pending-unlock row, so it never competes with the timer.
+> - **States:** ready and done numerals use muted ink; break numerals use taupe mixed toward ink;
+>   focus uses ink. The mini lock is closed **only** when restriction is verified on that device
+>   (web never; Windows when the agent is running and the phase restricts; Android when
+>   `PHONE_BLOCKING_AVAILABLE` and the phase restricts).
+> - **Weights:** Outfit 500 for questions, task, numerals; Figtree 400/500/600 for interface text.
+> - **Large text:** numerals size from the available width (web `min(clamp(...), 34cqi)`, Android
+>   `min(104dp, 31% of width)`), so 200% text never pushes them off-screen; the lock icon follows
+>   the text size; the rounds line wraps (FlowRow) instead of squeezing.
+> - The padlock `LockTimer` (pass 3) is retired from Focus on web and Android.
 
 > **Pass 3 (2026-10-29 night, R33) supersedes the "faithful to the mockup" rules below where they
 > conflict.** The mockup is now a mood reference. Current rules:
