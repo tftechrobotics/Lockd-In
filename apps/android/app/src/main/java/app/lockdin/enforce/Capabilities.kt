@@ -53,9 +53,8 @@ object Capabilities {
         Settings.Secure.getString(ctx.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
             ?.substringBefore('/')?.takeIf { it.isNotBlank() }?.let(::add)
         runCatching { ctx.getSystemService(TelecomManager::class.java)?.defaultDialerPackage }.getOrNull()?.let(::add)
-        // The default tap-to-pay app, whatever wallet it is.
-        Settings.Secure.getString(ctx.contentResolver, "nfc_payment_default_component")
-            ?.substringBefore('/')?.takeIf { it.isNotBlank() }?.let(::add)
+        // Wallets are in BlockPolicy.ALWAYS_ALLOWED. (The default tap-to-pay app has no public
+        // lookup; reading its hidden setting throws a SecurityException on recent Android.)
     }
 
     /** Apps that open web links (browsers), via the manifest's narrow VIEW https query. */

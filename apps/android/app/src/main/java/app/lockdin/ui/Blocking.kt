@@ -331,7 +331,7 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
                     style = UiType.caption, color = c.inkMuted,
                 )
                 Text(
-                    "Never blocked, so your phone keeps working: phone and emergency calls, contacts, Settings, keyboard, home screen, wallet and tap-to-pay, clock, camera and Lockd In. They aren’t listed here.",
+                    "Never blocked, so your phone keeps working: phone and emergency calls, contacts, Settings, keyboard, home screen, Samsung and Google Wallet, clock, camera and Lockd In. They aren’t listed here.",
                     style = UiType.caption, color = c.inkMuted,
                 )
                 OutlinedTextField(

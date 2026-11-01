@@ -15,7 +15,7 @@
   person. Code: `engine/Planner.kt` (pure, `PlannerTest`), `sched/` (Scheduler, PlanReceiver, PlanActions, Notifier).
   Not yet checked on the phone: reminders before a session, the missed follow-up, quiet hours, a reboot before a plan.
 - **Profiles pass (R41, commit 26e40d3):** allow-only websites (`AppRules.siteMode`, `BlockPolicy.isSiteRestricted`;
-  unsupported browsers blocked whole in allow-only), wallets/NFC default/clock/camera/contacts never blocked, covers
+  unsupported browsers blocked whole in allow-only), wallets/clock/camera/contacts never blocked, covers
   only for the app owning the active window (Wallet panel bug), app icons in the editor (`InstalledApps.icon`),
   delete moved into the editor, Profiles list simplified. Needs the owner's phone check (Wallet + home screen).
 
