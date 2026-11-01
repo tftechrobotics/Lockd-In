@@ -10,6 +10,9 @@
   `BootReceiver`; state v2 (per-profile rules, commitment, session snapshot) with v1 migration; Store is a process
   singleton shared by UI and service. Lock closes only on a fresh PROTECTING report (`EnforcerStatus`).
   Emulator E2E: `apps/android/ci/enforcement-e2e.sh` (job "Blocking end-to-end"); debug-only adb control in `src/debug`.
+- **Accessibility mode (R38):** `FocusAccessibilityService` covers apps on window change and blocks sites by
+  domain via browser address bars (`BROWSER_URL_BARS`). Setup screen shows a disclosure first. Usage access is
+  the fallback. Emulator E2E has an Accessibility phase (Chrome site test runs only if the image has Chrome).
 - **Windows agent** (`apps/windows/LockdIn.Agent`, rules in `LockdIn.Enforcement`): minimize + mute after launch,
   mute ledger + guardian, plan/status files in `%LOCALAPPDATA%\LockdIn\agent`. Shell writes the plan from the UI's
   `ui.restriction` message, starts the agent, relays `host.agent_status`; Profiles page has a PC app picker
