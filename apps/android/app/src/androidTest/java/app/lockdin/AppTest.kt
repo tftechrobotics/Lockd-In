@@ -412,7 +412,7 @@ class AppTest {
         rule.onNodeWithText("Rain").performClick()
         rule.onNodeWithContentDescription("Playlist link").performTextInput("not a playlist")
         rule.onNodeWithText("Save").performClick()
-        rule.onNodeWithText("Paste a playlist link from Spotify", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Paste a playlist link from Spotify, YouTube Music, Apple Music or SoundCloud").assertIsDisplayed()
         rule.onNodeWithContentDescription("Playlist link").performTextClearance()
         rule.onNodeWithContentDescription("Playlist link").performTextInput("https://open.spotify.com/playlist/37i9dQZF1DX8NTLI2TtZa6")
         rule.onNodeWithText("Controls your Spotify app", substring = true).assertIsDisplayed()
