@@ -14,6 +14,10 @@
   exact alarm and blocks, the 'starts now' notice is posted for non-automatic plans, and nothing starts without the
   person. Code: `engine/Planner.kt` (pure, `PlannerTest`), `sched/` (Scheduler, PlanReceiver, PlanActions, Notifier).
   Not yet checked on the phone: reminders before a session, the missed follow-up, quiet hours, a reboot before a plan.
+- **Notifications + icon (R43, 674010d):** Settings › Notifications main switch + per-kind incl. blocking problems
+  (`ReminderSettings.permits`, `Notifier.permitted`); new adaptive icon (`design/icon/gen.py`). Emulator blocking
+  E2E 37/37 pass. Delivery policy (owner asked about wait times): UI-only builds go out as soon as the APK
+  builds with the full suite running after; blocking/scheduling changes wait for the full suite.
 - **Sculpted dial + start sequence (R42; latest app build 2927c56, all emulator checks passed in run for ae6a998):**
   clock hands on the turning dial (hour hand counter-clockwise) fade into the digits. Review video is rendered
   frame by frame by `AppTest.recordStartSequenceFrames` (`ci-screenshots/android/seq`); the emulator's realtime
