@@ -32,14 +32,14 @@ Steps run in this order. Release-readiness work runs alongside every step. Windo
 
 | Step | Scope | Status |
 |---|---|---|
-| 1 | Physical-phone checks of everything built so far; fix every failure | **In progress:** waiting on the owner's phone results |
-| 2 | **B:** persistent history and reusable study presets | Next: acceptance criteria below |
-| 3 | **B2:** profile-based study audio | Not started; streaming research happens during B |
-| 4 | **C:** Google Calendar and home-screen widgets | Not started |
-| 5 | **C2:** optional backgrounds and quotes | Not started |
-| 6 | **D:** coaching: own block-screen messages, question timing, inactivity check-ins | Not started |
-| 7 | **E:** location routines | Not started |
-| Alongside | Release readiness: onboarding, privacy controls, defaults screen, phone battery measurements (repeated after B2), Play listing | Not started |
+| 1 | Physical-phone checks of everything built so far; fix every failure | **Waiting on the owner's phone results**; later steps continued meanwhile (owner, 2026-11-02: keep building, document issues, don't stop) |
+| 2 | **B:** persistent history and reusable study presets | **Implemented** (6b2a9ab). Emulator UI 53/53; history persistence E2E added |
+| 3 | **B2:** profile-based study audio | **Implemented** (970bf7b): generated ambient sounds plus control of Spotify, YouTube Music, Apple Music and SoundCloud through their own apps (owner: free options now, Apple embedded later) |
+| 4 | **C:** Google Calendar and home-screen widgets | **Implemented** (f06c648): device calendar provider (read-only), free-time suggestions, clash warning, RemoteViews widget |
+| 5 | **C2:** optional backgrounds and quotes | **Implemented** (61036c4, build fix 1161ff1) |
+| 6 | **D:** coaching: own block-screen messages, question timing, inactivity check-ins | **Implemented** (14ecef6) |
+| 7 | **E:** location routines | **Implemented** (c78d39a): Play services geofences, reminders by default, auto start opt-in |
+| Alongside | Release readiness: onboarding, privacy controls, defaults screen, phone battery measurements (repeated after B2), Play listing | **Partial** (0a601cf): onboarding, privacy section, defaults done; battery protocol written (needs the phone); Play listing needs the owner's developer account |
 
 ### Step 1: pending phone checks (owner's Galaxy S24+, test APK)
 
@@ -115,6 +115,27 @@ The checklist is in `docs/device-test-checklist.md` under "Pending phone checks 
 - Backgrounds are static images only, with no animated scenery. Text contrast must stay AA (checked).
 - Quotes are short, shown at session start and on the block screen. There are no rotating quotes and no extra interruptions during a round.
 - Backgrounds and quotes have separate switches.
+
+## Known limitations (2026-11-02)
+
+- **Phone checks:** none of B–E has been checked on a physical phone yet. Only the emulator and unit tests ran.
+- **Music:** external control uses Android media keys and media volume. It can't show what's playing, and play/pause goes to whichever app last played audio.
+  - Opening a playlist brings that app to the front for about 2.5 s, then Lockd In returns. That return can be blocked on Android without "display over other apps"; the person then switches back themselves.
+  - Scheduled and place-based starts never open playlists.
+- **Ambient sound:** procedurally generated (no recordings). Plays from the session service, which also declares `mediaPlayback`. Battery cost is not yet measured on the phone.
+- **Calendar:** sees only calendars synced to the phone (Google accounts added in Android settings). Free time is 8 AM–10 PM, ≥ 25 min, with 10-min buffers. These are not yet configurable.
+- **Widget:** shows state and a live countdown only. Tapping opens the app; nothing starts from the widget itself. It refreshes on state changes and planner runs; the "Today/Tomorrow" label may be stale until the next refresh (30 min at most).
+- **Inactivity check-ins:**
+  - The only signal is when the screen was last on. Android shows at most 3 notification buttons, so "Take a break" is reached by tapping the notification.
+  - There is no emulator test, because a check-in needs 10+ real minutes.
+- **Places:**
+  - Need Google Play services and location "All the time".
+  - Arrival can be late or missed indoors or with weak signal.
+  - Geofences are re-registered whenever the app process starts (including after reboot, via boot receivers).
+  - A Play Console background-location declaration will be needed before Play release.
+- **Release:**
+  - The Play listing needs the owner's developer account.
+  - Calendar and location permissions will need Play data-safety answers (data stays on device).
 
 ## Milestone A: acceptance criteria
 

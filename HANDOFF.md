@@ -4,8 +4,13 @@
 **Read first:** `docs/audit-2026-11.md` (inventory, Freedom, platform limits, architecture) and `docs/milestones.md` (new M1–M5 criteria + evidence table).
 **Repository:** github.com/tftechrobotics/Lockd-In (public since 2026-11-01).
 
-**Roadmap (R44, 2026-11-02):** see `docs/android-backlog.md` › Roadmap. Current step 1: owner's phone checks
-(`docs/device-test-checklist.md` › Pending phone checks); then B history + presets (draft criteria in the backlog).
+**Roadmap (R44/R45, 2026-11-02):** see `docs/android-backlog.md` › Roadmap and › Known limitations. B, B2, C,
+C2, D, E and release-readiness basics are implemented (commits 6b2a9ab … 0a601cf); none phone-checked yet. Step 1 (owner's
+phone checks, `docs/device-test-checklist.md`) and battery measurements are waiting on the owner. Code map for the new
+work: `engine/History.kt`, `state/HistoryStore.kt`, `ui/HistoryScreen.kt`, `ui/PresetEditor.kt` (B); `audio/` (B2);
+`engine/CalendarPlan.kt`, `cal/`, `ui/CalendarUi.kt`, `widget/` (C); `ui/Backdrop.kt` (C2); `engine/Coaching.kt`,
+`sched/CheckInNotice.kt` (D); `engine/Places.kt`, `loc/`, `ui/PlacesUi.kt` (E); `ui/Onboarding.kt` (release).
+Next: Apple Music embedded playback (MusicKit; owner pays $99/yr) when the owner decides; Play listing needs the account.
 
 **Where things stand (2026-11-01, Android-only — R40)**
 - Owner paused Windows and web; the Android backlog map is in `docs/android-backlog.md`.
