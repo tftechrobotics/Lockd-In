@@ -295,7 +295,7 @@ class AppTest {
         rule.onNodeWithText("New session").performClick()
         rule.onNodeWithText("Start timer").performClick(); rule.waitForIdle()
         clock.advanceMinutes(26); tick(store)
-        rule.onNodeWithText("Same again").performScrollTo().performClick(); rule.waitForIdle()
+        rule.onNodeWithText("Same again").performClick(); rule.waitForIdle()
         org.junit.Assert.assertEquals("requests consumed", p0 + 3, app.lockdin.ui.StartIntro.plays)
         org.junit.Assert.assertEquals("sequences drawn", d0 + 3, app.lockdin.ui.StartIntro.drawn)
     }
