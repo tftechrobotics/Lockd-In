@@ -1,5 +1,5 @@
 // Optional backgrounds and quotes (roadmap step 5, C2). Off by default. Scenes are the owner's own
-// images (dark and light version of each, owner holds the rights, R46), shown at full strength.
+// images (dark and light version of each, owner holds the rights, R46), faded into the theme's ground (80%, words 50%).
 // The sculpted lock and the screen's text are never changed. All scenes are static: nothing moves.
 package app.lockdin.ui
 
@@ -115,7 +115,7 @@ fun BackdropLayer(choice: Backdrop, words: String, modifier: Modifier) {
             }
             // The owner's image for the default line; a person's own line is drawn in the same style.
             Backdrop.WORDS -> if (words.trim().ifEmpty { DEFAULT_BACKDROP_WORDS }.equals(DEFAULT_BACKDROP_WORDS, ignoreCase = true)) Scene(choice, dark)
-                else Words(words, c.ink.copy(alpha = if (dark) 0.22f else 0.2f))
+                else Words(words, c.ink.copy(alpha = if (dark) 0.12f else 0.1f))
             Backdrop.BLUEPRINT -> Blueprint(c.ink.copy(alpha = if (dark) 0.24f else 0.2f))
         }
     }
@@ -128,7 +128,9 @@ private fun Scene(choice: Backdrop, dark: Boolean) {
         Backdrop.MOUNTAINS -> if (dark) R.drawable.bg_mountains else R.drawable.bg_mountains_light
         else -> if (dark) R.drawable.bg_words else R.drawable.bg_words_light
     }
-    Image(painterResource(res), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+    // Faded into the theme's ground so the scene stays in the background; the words fade most.
+    val alpha = if (choice == Backdrop.WORDS) 0.5f else 0.8f
+    Image(painterResource(res), contentDescription = null, contentScale = ContentScale.Crop, alpha = alpha, modifier = Modifier.fillMaxSize())
 }
 
 /**
