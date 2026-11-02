@@ -1,6 +1,6 @@
-# Android backlog: what exists (2026-11-01, R40)
+# Android backlog and roadmap (updated 2026-11-02, R44)
 
-This doc follows the owner's Android-only product direction. Windows and web are paused, with their code kept as it is. Implementation order is A → E, as listed at the end.
+This doc follows the owner's Android-only product direction. Windows, web and cross-device sync are paused, with their code kept as it is. The order of work is the **Roadmap** section below (R44); it replaces the earlier A → E order.
 
 Status values:
 - **Done** = implemented and tested (environment named).
@@ -12,17 +12,90 @@ Status values:
 | # | Area | Status | What exists / what's missing |
 |---|---|---|---|
 | 1 | Focus sessions & blocking | **Done (Emu + Phone)** | **Exists:** <br>• Quick start with a task name; 25/40/60 or custom lengths; rounds and breaks. <br>• Restrictions lift during breaks and return afterwards. <br>• Per-profile "Block these" / "Allow only these" for apps; websites by domain, block list or allow-only (R41), in Chrome, Samsung Internet, Edge, Firefox, Brave and Opera (needs Accessibility); allow-only blocks other browsers whole. App icons in the picker. <br>• No VPN. <br>• Flexible / Delayed / Locked commitment, plus emergency recovery. <br>• Honest blocking status; permission-loss notice. <br>• Restart after process kill and reboot. <br>• Essentials are never blocked. <br>• The block screen says the app is still open behind it. <br>**Missing:** a quick start from a saved preset (needs #5). |
-| 2 | Automatic schedules | **Done (Emu); phone check pending** | **Exists:** one-time and weekly sessions with add/edit/disable/delete, overlap check, next session on Home, DST-correct times (JVM tests). <br>**Missing:** starting automatically, skipping an occurrence, missed-start handling, time-zone/clock-change rescheduling, and the explanation shown before turning it on. |
-| 3 | Reminders | **Done (Emu: start notice); rest unit-tested; phone check pending** | Missing: <br>• reminders before a session; <br>• focus/break/end notifications; <br>• follow-up after a missed session with Start now / Remind me later / Reschedule; <br>• quiet hours, frequency limit, per-type controls. |
-| 4 | Google Calendar | Missing (C) | — |
-| 5 | Study tasks & presets | Partial (B) | Exists: recent task names only. Missing: saved tasks/courses with profile/duration/breaks, due dates, steps, spreading exam prep, "Open my study resources". |
-| 6 | History & analytics | Partial (B) | Exists: the end-of-session summary with blocked attempts (per app/site, counted once per cover). Missing: persistent history, daily/weekly views, planned vs completed, usage stats, export/retention/deletion. |
-| 7 | Block screen & encouragement | Partial (D) | Exists: task, next break, tone setting (Calm/Direct/Playful/Off), template messages. Missing: user-written and per-app messages. |
-| 8 | Question timing | Missing (D) | — |
-| 9 | Inactivity check-ins | Missing (D) | — |
-| 10 | Location routines | Missing (E) | — |
-| 11 | Home-screen widgets | Missing (C) | — |
-| 12 | Settings & release quality | Partial | **Exists:** <br>• Themes; tone; commitment default; delete data. <br>• 200% text and TalkBack labels (UI tests). <br>• Permission setup with explanations. <br>• Excluded from backups. <br>**Missing:** <br>• session/break defaults screen; notification controls (A); privacy screen; onboarding flow; battery measurements. <br>• Completion summary kept until dismissed: the summary returns to Home after 30 s (owner request); A adds a "Last session" card on Home that stays until dismissed, so both requests hold. |
+| 2 | Automatic schedules | **Done (Emu); phone check pending** | One-time and weekly sessions, automatic start with an explanation first, skip one occurrence, late and missed starts, time-zone/clock changes, next session on Home (milestone A). |
+| 3 | Reminders & notifications | **Done (Emu); phone check pending** | Reminders before sessions, start notice, focus/break/complete notices, missed follow-up, quiet hours, hourly limit; main "Allow notifications" switch plus one per kind incl. blocking problems (R43). |
+| 4 | Google Calendar | Missing (roadmap 4, C) | — |
+| 5 | Study tasks & presets | Partial (roadmap 2, B) | Exists: recent task names only. Missing: saved tasks/courses with profile/duration/breaks, due dates, steps, spreading exam prep, "Open my study resources". |
+| 6 | History & analytics | Partial (roadmap 2, B) | Exists: the end-of-session summary with blocked attempts (per app/site, counted once per cover). Missing: persistent history, daily/weekly views, planned vs completed, usage stats, export/retention/deletion. |
+| 7 | Block screen & encouragement | Partial (roadmap 6, D) | Exists: task, next break, tone setting (Calm/Direct/Playful/Off), template messages. Missing: user-written and per-app messages. |
+| 8 | Question timing | Missing (roadmap 6, D) | — |
+| 9 | Inactivity check-ins | Missing (roadmap 6, D) | — |
+| 10 | Location routines | Missing (roadmap 7, E) | — |
+| 11 | Home-screen widgets | Missing (roadmap 4, C) | — |
+| 12 | Settings & release quality | Partial | **Exists:** <br>• Themes; tone; commitment default; delete data. <br>• 200% text and TalkBack labels (UI tests). <br>• Permission setup with explanations. <br>• Excluded from backups. <br>• Notification controls (R43); app icon (R43); sculpted dial and start sequence (R42). <br>**Missing (runs alongside the roadmap):** <br>• onboarding flow; privacy screen and controls; session/break defaults screen; battery measurements on the phone (again after audio). <br>• Completion summary kept until dismissed: the summary returns to Home after 30 s (owner request); A adds a "Last session" card on Home that stays until dismissed, so both requests hold. |
+| 13 | Study audio (B2) | Missing (roadmap 3) | — |
+| 14 | Backgrounds & quotes (C2) | Missing (roadmap 5) | — |
+
+## Roadmap (owner, 2026-11-02, R44)
+
+Steps run in this order. Release-readiness work runs alongside every step. Windows, web and cross-device sync stay paused.
+
+| Step | Scope | Status |
+|---|---|---|
+| 1 | Physical-phone checks of everything built so far; fix every failure | **In progress:** waiting on the owner's phone results |
+| 2 | **B:** persistent history and reusable study presets | Next: acceptance criteria below |
+| 3 | **B2:** profile-based study audio | Not started; streaming research happens during B |
+| 4 | **C:** Google Calendar and home-screen widgets | Not started |
+| 5 | **C2:** optional backgrounds and quotes | Not started |
+| 6 | **D:** coaching: own block-screen messages, question timing, inactivity check-ins | Not started |
+| 7 | **E:** location routines | Not started |
+| Alongside | Release readiness: onboarding, privacy controls, defaults screen, phone battery measurements (repeated after B2), Play listing | Not started |
+
+### Step 1: pending phone checks (owner's Galaxy S24+, test APK)
+
+The checklist is in `docs/device-test-checklist.md` under "Pending phone checks (2026-11-02)". Every failure becomes a fix plus a test before step 2 closes. Step 2 design work may start meanwhile, but no B build is sent until step 1's failures are fixed.
+
+### Step 2 (B): acceptance criteria (draft)
+
+1. **History is kept.**
+   - Every session (manual, automatic, ended early, emergency) is saved on the phone when it ends: planned and actual times, rounds, profile, task, blocked attempts per app or site, and how it ended.
+   - It survives restarts and app updates (state migration with tests).
+2. **History views.**
+   - A list by day.
+   - A week view with focused minutes and planned vs completed.
+   - Each entry opens its summary.
+   - No scores, streak pressure or guilt wording.
+   - Empty, loading and error states.
+3. **Basic analytics.**
+   - Local only and opt-in where it uses usage access (time in blocked apps outside sessions is off by default).
+   - Exact numbers, no estimates.
+4. **Retention and deletion.**
+   - Keep for 30 / 90 / 365 days / forever.
+   - Delete one entry, a day, or everything.
+   - Export as CSV via Android's share sheet.
+5. **Presets.**
+   - Save a session setup as a preset: name, length, breaks, rounds, profile, optional due date and steps.
+   - Start a preset in one tap from Home and setup.
+   - A preset used by a planned session can't be deleted without a choice.
+6. **Tests.**
+   - JVM: history codec and migration, retention.
+   - Compose UI: list, week view, delete, presets.
+   - Emulator E2E: a finished session appears in history after a process kill.
+   - Phone checklist.
+
+### Step 3 (B2): study audio: scope and rules
+
+- **Ambient first, offline, licence-clean.**
+  - Sounds come with the app, or are generated on the device (noise and rain-like textures need no licence).
+  - Any recorded sound must have a licence that allows redistribution in an app (e.g. CC0), recorded in `docs/audio-licences.md`.
+- **Per profile.**
+  - Each profile chooses ambient sound, music, both or silence (as far as each option is technically possible).
+  - Optional automatic playback when focus starts.
+- **During focus:** play/pause, skip (music only) and volume. No browsing.
+- **Breaks:** audio pauses at breaks unless the person chooses otherwise. Audio stops at session end and on emergency recovery.
+- **Streaming.**
+  - Feasibility is researched during B, against current provider documentation.
+  - Services are then added one at a time. The person attaches an existing playlist while setting up a profile.
+  - The app states clearly whether it **plays the audio itself** (embedded) or **controls another music app** (external control, which needs that app installed and signed in).
+  - Provider limits never block ambient audio or later steps.
+- **Battery** is measured on the phone again after B2.
+
+### Step 5 (C2): backgrounds and quotes: rules
+
+- Both are optional and off by default. The plain cream/espresso design and the sculpted lock stay the default and stay unchanged.
+- Backgrounds are static images only, with no animated scenery. Text contrast must stay AA (checked).
+- Quotes are short, shown at session start and on the block screen. There are no rotating quotes and no extra interruptions during a round.
+- Backgrounds and quotes have separate switches.
 
 ## Milestone A: acceptance criteria
 

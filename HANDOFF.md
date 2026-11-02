@@ -4,6 +4,9 @@
 **Read first:** `docs/audit-2026-11.md` (inventory, Freedom, platform limits, architecture) and `docs/milestones.md` (new M1–M5 criteria + evidence table).
 **Repository:** github.com/tftechrobotics/Lockd-In (public since 2026-11-01).
 
+**Roadmap (R44, 2026-11-02):** see `docs/android-backlog.md` › Roadmap. Current step 1: owner's phone checks
+(`docs/device-test-checklist.md` › Pending phone checks); then B history + presets (draft criteria in the backlog).
+
 **Where things stand (2026-11-01, Android-only — R40)**
 - Owner paused Windows and web; the Android backlog map is in `docs/android-backlog.md`.
 - **Repository is public since 2026-11-01** (owner), so GitHub-hosted CI is free again. Emulator jobs run only on

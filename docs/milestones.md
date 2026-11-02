@@ -1,5 +1,8 @@
 # Milestones, acceptance criteria and evidence
 
+> **Android-only roadmap (R44, 2026-11-02):** the current order of work and its acceptance criteria are in
+> `docs/android-backlog.md` › Roadmap. The M1–M5 plan below is kept for the paused cross-device product.
+
 Replanned 2026-10-31 (R37) when functional development began. See
 `docs/audit-2026-11.md` for the inventory behind it. The earlier M2–M7
 plan is superseded. Its design-system criteria are met by the approved UI

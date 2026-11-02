@@ -22,3 +22,32 @@ can reveal what you use. Review before sharing:
 - Windows: `%LOCALAPPDATA%\LockdInProbe\`
 - Android: "Share log" in each app
 - VM: `C:\LockdInProbeVM\results.jsonl`
+
+## Pending phone checks (2026-11-02, roadmap step 1)
+
+Run these on the Galaxy S24+ with the latest test APK. Answer each with pass or fail plus what you saw. A screenshot helps for any failure.
+
+**Blocking**
+1. With Accessibility on, open a blocked app three times quickly. It should be covered every time.
+2. Block youtube.com, start focus, and open it in Chrome from a link (e.g. in Messages). It should be covered.
+3. With "Allow only these" websites and one site added, the allowed site opens and any other site is covered.
+4. Open a browser that isn't in the supported list (if you have one) during allow-only focus. It should be blocked.
+5. During focus, swipe up on the home screen (Wallet card). The home screen should keep working.
+6. Phone, camera, clock and Settings open normally during focus.
+
+**Start sequence**
+7. Start focus. The dial clicks round with the hands (small hand counter-clockwise), the hands fade into the time, and the shackle drops after "Blocking active" appears. Haptic clicks are felt.
+8. Open a blocked app, tap "Return to work", end the session, and start another. The sequence plays again. Then try "Same again" on the summary screen.
+9. Leaving and reopening the app, or rotating the phone, doesn't replay it.
+10. A profile with nothing blocked ("Start timer"): the dial turns, but the shackle stays open.
+
+**Milestone A**
+11. Plan a session 15 minutes ahead with a 10-minute reminder. The reminder arrives and its buttons work.
+12. Plan an automatic session 3 minutes ahead and close the app. It starts on time, blocks, and doesn't open the app.
+13. "Skip this time" moves Home's next session to the following occurrence.
+14. Finish a session. The "Last session" card stays on Home until dismissed.
+
+**Settings and look**
+15. Settings › Notifications: "Allow notifications" off hides the switches and stops reminders. Turning it on brings them back.
+16. The new padlock-with-clock icon is on the home screen and in the app drawer. With themed icons on, it turns one colour.
+17. The Profiles list is readable, and app logos show in the editor.
