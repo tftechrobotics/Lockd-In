@@ -17,6 +17,10 @@ data class PlanEvent(val at: Long, val kind: EventKind, val occ: Upcoming) {
 }
 
 data class ReminderSettings(
+    /** All of Lockd In's notifications except the ongoing session notice Android requires. */
+    val notificationsOn: Boolean = true,
+    /** "Blocking paused" and similar: blocking stopped working, e.g. a permission was turned off. */
+    val blockingAlertsOn: Boolean = true,
     /** Reminders before sessions (each session sets how long before). */
     val remindersOn: Boolean = true,
     /** Focus starting, break starting, break ending, session complete. */
@@ -28,7 +32,17 @@ data class ReminderSettings(
     val quietEnd: LocalTime? = null,
     /** Reminders + follow-ups per rolling hour. */
     val maxPerHour: Int = 4,
-)
+) {
+    /** Whether a notification of this kind may be shown (the master switch and its own switch). */
+    fun permits(kind: NotifyKind): Boolean = notificationsOn && when (kind) {
+        NotifyKind.REMINDER -> remindersOn
+        NotifyKind.SESSION_EVENT -> sessionEventsOn
+        NotifyKind.FOLLOW_UP -> missedFollowUpOn
+        NotifyKind.BLOCKING_ALERT -> blockingAlertsOn
+    }
+}
+
+enum class NotifyKind { REMINDER, SESSION_EVENT, FOLLOW_UP, BLOCKING_ALERT }
 
 sealed interface StartDecision {
     /** Start now. `start` is the occurrence start (earlier than now if late: past phases are skipped). */

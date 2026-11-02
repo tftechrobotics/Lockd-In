@@ -446,6 +446,19 @@ class AppTest {
         rule.onAllNodesWithText("Starts automatically", substring = true).onFirst().assertExists()
     }
 
+    @Test fun allNotificationsCanBeTurnedOffAndOn() {
+        val store = launch()
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.onNodeWithText("Allow notifications").performScrollTo().performClick()
+        org.junit.Assert.assertFalse(store.state.reminders.notificationsOn)
+        rule.onNodeWithText("Reminders before sessions").assertDoesNotExist()
+        rule.onNodeWithText("All Lockd In notifications are off", substring = true).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Allow notifications").performScrollTo().performClick()
+        org.junit.Assert.assertTrue(store.state.reminders.notificationsOn)
+        rule.onNodeWithText("Blocking problems").performScrollTo().performClick()
+        org.junit.Assert.assertFalse(store.state.reminders.blockingAlertsOn)
+    }
+
     @Test fun reminderSettingsAndQuietHours() {
         val store = launch()
         rule.onNodeWithContentDescription("Settings").performClick()

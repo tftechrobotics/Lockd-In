@@ -238,36 +238,58 @@ private fun RemindersSettings(store: Store) {
     fun set(f: (app.lockdin.engine.ReminderSettings) -> app.lockdin.engine.ReminderSettings) = store.update { it.copy(reminders = f(it.reminders)) }
     val allowed = remember(Resumes.tick) { app.lockdin.sched.Notifier.allowed(ctx) }
     val fmt = java.time.format.DateTimeFormatter.ofPattern("h:mm a")
+    val systemSettings = {
+        ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, ctx.packageName))
+    }
+    // Android 13+: ask once in the app; if Android won't ask again, open its settings page.
+    val ask = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted -> Resumes.bump(); if (!granted) systemSettings() }
     Column {
-        SectionLabel("Reminders and notifications")
+        SectionLabel("Notifications")
         SettingsGroup {
-            SwitchRow("Reminders before sessions", "Each planned session sets how long before", r.remindersOn) { v -> set { it.copy(remindersOn = v) } }
-            GroupDivider()
-            SwitchRow("Focus and break notices", "Break starting, focus back on, session complete", r.sessionEventsOn) { v -> set { it.copy(sessionEventsOn = v) } }
-            GroupDivider()
-            SwitchRow("Follow-up after a missed session", "One gentle note offering a 10-minute start", r.missedFollowUpOn) { v -> set { it.copy(missedFollowUpOn = v) } }
-            GroupDivider()
-            SwitchRow(
-                "Quiet hours", r.quietStart?.let { "${it.format(fmt)} – ${r.quietEnd!!.format(fmt)}: reminders and follow-ups wait" } ?: "Off",
-                r.quietStart != null,
-            ) { v -> set { if (v) it.copy(quietStart = java.time.LocalTime.of(22, 0), quietEnd = java.time.LocalTime.of(7, 0)) else it.copy(quietStart = null, quietEnd = null) } }
-            if (r.quietStart != null) {
+            SwitchRow("Allow notifications", "Reminders, focus and break notices, and blocking alerts from Lockd In", r.notificationsOn) { v -> set { it.copy(notificationsOn = v) } }
+            if (r.notificationsOn) {
                 GroupDivider()
-                SettingRow("Quiet from", r.quietStart.format(fmt), onClick = {
-                    android.app.TimePickerDialog(ctx, { _, h, m -> set { it.copy(quietStart = java.time.LocalTime.of(h, m)) } }, r.quietStart.hour, r.quietStart.minute, false).show()
-                })
+                SwitchRow("Reminders before sessions", "Each planned session sets how long before", r.remindersOn) { v -> set { it.copy(remindersOn = v) } }
                 GroupDivider()
-                SettingRow("Quiet until", r.quietEnd!!.format(fmt), onClick = {
-                    android.app.TimePickerDialog(ctx, { _, h, m -> set { it.copy(quietEnd = java.time.LocalTime.of(h, m)) } }, r.quietEnd.hour, r.quietEnd.minute, false).show()
-                })
+                SwitchRow("Focus and break notices", "Break starting, focus back on, session complete", r.sessionEventsOn) { v -> set { it.copy(sessionEventsOn = v) } }
+                GroupDivider()
+                SwitchRow("Follow-up after a missed session", "One gentle note offering a 10-minute start", r.missedFollowUpOn) { v -> set { it.copy(missedFollowUpOn = v) } }
+                GroupDivider()
+                SwitchRow("Blocking problems", "If blocking stops during focus, for example when a permission is turned off", r.blockingAlertsOn) { v -> set { it.copy(blockingAlertsOn = v) } }
+                GroupDivider()
+                SwitchRow(
+                    "Quiet hours", r.quietStart?.let { "${it.format(fmt)} – ${r.quietEnd!!.format(fmt)}: reminders and follow-ups wait" } ?: "Off",
+                    r.quietStart != null,
+                ) { v -> set { if (v) it.copy(quietStart = java.time.LocalTime.of(22, 0), quietEnd = java.time.LocalTime.of(7, 0)) else it.copy(quietStart = null, quietEnd = null) } }
+                if (r.quietStart != null) {
+                    GroupDivider()
+                    SettingRow("Quiet from", r.quietStart.format(fmt), onClick = {
+                        android.app.TimePickerDialog(ctx, { _, h, m -> set { it.copy(quietStart = java.time.LocalTime.of(h, m)) } }, r.quietStart.hour, r.quietStart.minute, false).show()
+                    })
+                    GroupDivider()
+                    SettingRow("Quiet until", r.quietEnd!!.format(fmt), onClick = {
+                        android.app.TimePickerDialog(ctx, { _, h, m -> set { it.copy(quietEnd = java.time.LocalTime.of(h, m)) } }, r.quietEnd.hour, r.quietEnd.minute, false).show()
+                    })
+                }
+                GroupDivider()
+                SettingMenuRow("At most", listOf(2, 4, 6).map { it to "$it per hour" }, r.maxPerHour, { v -> set { it.copy(maxPerHour = v) } })
             }
             GroupDivider()
-            SettingMenuRow("At most", listOf(2, 4, 6).map { it to "$it per hour" }, r.maxPerHour, { v -> set { it.copy(maxPerHour = v) } })
+            if (!allowed) SettingRow("Turn on notifications", "Off in Android", supporting = "Android is blocking Lockd In’s notifications", onClick = {
+                if (android.os.Build.VERSION.SDK_INT >= 33) ask.launch(android.Manifest.permission.POST_NOTIFICATIONS) else systemSettings()
+            })
+            else SettingRow("Android notification settings", "", supporting = "Sound, vibration and each kind’s own switch", onClick = systemSettings)
         }
         Spacer(Modifier.height(Dim.s2))
         Text(
-            if (allowed) "Each kind also has its own switch in Android’s notification settings for Lockd In."
-            else "Notifications are off for Lockd In, so none of these can be shown. Turn them on in Devices › Set up blocking.",
+            when {
+                !allowed -> "Notifications are off for Lockd In in Android, so none of these can be shown."
+                !r.notificationsOn -> "All Lockd In notifications are off. While blocking runs, Android still shows the small ongoing “Focusing” notice; you can minimise it in Android’s settings."
+                else -> "While blocking runs, Android requires an ongoing “Focusing” notice. It can’t be turned off, but you can minimise it in Android’s settings."
+            },
             style = UiType.caption, color = c.inkMuted,
         )
     }

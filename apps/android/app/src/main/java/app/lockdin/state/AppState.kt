@@ -104,7 +104,8 @@ object StateCodec {
                 .put("autoStart", it.autoStart).put("remindMinutes", it.remindMinutes)
                 .put("skipped", JSONArray(it.skipped.map { d -> d.toString() }.sorted()))
         }))
-        put("reminders", JSONObject().put("remindersOn", s.reminders.remindersOn).put("sessionEventsOn", s.reminders.sessionEventsOn)
+        put("reminders", JSONObject().put("notificationsOn", s.reminders.notificationsOn).put("blockingAlertsOn", s.reminders.blockingAlertsOn)
+            .put("remindersOn", s.reminders.remindersOn).put("sessionEventsOn", s.reminders.sessionEventsOn)
             .put("missedFollowUpOn", s.reminders.missedFollowUpOn)
             .put("quietStart", s.reminders.quietStart?.toString() ?: JSONObject.NULL)
             .put("quietEnd", s.reminders.quietEnd?.toString() ?: JSONObject.NULL)
@@ -206,6 +207,8 @@ object StateCodec {
         fun time(k: String) = if (r.isNull(k) || !r.has(k)) null else runCatching { LocalTime.parse(r.getString(k)) }.getOrNull()
         val qs = time("quietStart"); val qe = time("quietEnd")
         return ReminderSettings(
+            notificationsOn = r.optBoolean("notificationsOn", true),
+            blockingAlertsOn = r.optBoolean("blockingAlertsOn", true),
             remindersOn = r.optBoolean("remindersOn", true),
             sessionEventsOn = r.optBoolean("sessionEventsOn", true),
             missedFollowUpOn = r.optBoolean("missedFollowUpOn", true),

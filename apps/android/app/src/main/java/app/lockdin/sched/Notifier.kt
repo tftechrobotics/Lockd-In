@@ -36,9 +36,21 @@ object Notifier {
 
     data class Action(val title: String, val intent: PendingIntent)
 
+    /** The person's switches in Settings › Notifications, by channel. */
+    fun permitted(ctx: Context, channel: String): Boolean {
+        val kind = when (channel) {
+            CH_REMINDERS -> app.lockdin.engine.NotifyKind.REMINDER
+            CH_EVENTS -> app.lockdin.engine.NotifyKind.SESSION_EVENT
+            CH_FOLLOW_UP -> app.lockdin.engine.NotifyKind.FOLLOW_UP
+            "alerts" -> app.lockdin.engine.NotifyKind.BLOCKING_ALERT
+            else -> return true
+        }
+        return app.lockdin.state.Store.get(ctx).state.reminders.permits(kind)
+    }
+
     fun post(ctx: Context, id: Int, channel: String, title: String, text: String, actions: List<Action> = emptyList(), openRoute: String? = null) {
         channels(ctx)
-        if (!allowed(ctx)) return
+        if (!allowed(ctx) || !permitted(ctx, channel)) return
         val open = PendingIntent.getActivity(
             ctx, id, Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 .apply { if (openRoute != null) putExtra(MainActivity.EXTRA_ROUTE, openRoute) },

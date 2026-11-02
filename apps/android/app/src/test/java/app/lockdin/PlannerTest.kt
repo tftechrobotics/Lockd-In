@@ -131,4 +131,15 @@ class PlannerTest {
         assertEquals(10, old.schedule.single().remindMinutes)
         assertEquals(ReminderSettings(), old.reminders)
     }
+
+    @Test fun notificationSwitchesGateEachKind() {
+        val kinds = app.lockdin.engine.NotifyKind.values()
+        val on = app.lockdin.engine.ReminderSettings()
+        kinds.forEach { org.junit.Assert.assertTrue(it.name, on.permits(it)) }
+        val off = on.copy(notificationsOn = false)
+        kinds.forEach { org.junit.Assert.assertFalse(it.name, off.permits(it)) }
+        val noAlerts = on.copy(blockingAlertsOn = false)
+        org.junit.Assert.assertFalse(noAlerts.permits(app.lockdin.engine.NotifyKind.BLOCKING_ALERT))
+        org.junit.Assert.assertTrue(noAlerts.permits(app.lockdin.engine.NotifyKind.REMINDER))
+    }
 }

@@ -362,6 +362,7 @@ class FocusService : Service() {
 
         fun alert(ctx: Context, title: String, text: String) {
             createChannels(ctx)
+            if (!app.lockdin.sched.Notifier.permitted(ctx, CHANNEL_ALERTS)) return
             val n = Notification.Builder(ctx, CHANNEL_ALERTS)
                 .setContentTitle(title)
                 .setContentText(text)

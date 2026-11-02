@@ -197,5 +197,11 @@ class EnforcementRulesTest {
             assertFalse(pkg, BlockPolicy.isRestricted(pkg, everything, essentials))
     }
 
+    @Test fun notificationSwitchesAndStartFeedbackPersist() {
+        val s = AppState(startHaptics = false, startSound = true,
+            reminders = app.lockdin.engine.ReminderSettings(notificationsOn = false, blockingAlertsOn = false))
+        assertEquals(s, StateCodec.decode(StateCodec.encode(s)))
+    }
+
     private fun <T> assertNotNullAnd(v: T?): T { assertNotNull(v); return v!! }
 }
