@@ -572,10 +572,10 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
     val minutesLeft = ((remaining + 59_999) / 60_000).coerceAtLeast(0)
     val label = "${if (isBreak) "Break" else "Focus"}: $minutesLeft minute${if (minutesLeft == 1L) "" else "s"} left"
     val nudge = when {
-        isBreak && remaining <= 60_000 -> message(tone, Moment.BREAK_ENDING, task)
+        isBreak && remaining <= 60_000 -> message(tone, Moment.BREAK_ENDING, task, custom = store.state.customMessages, seed = session.id)
         isBreak -> message(tone, Moment.BREAK_START, time = Fmt.clock(phase.end, zone))
         lifted -> "Unlocked until ${Fmt.clock((snap.overrideState as OverrideState.ActiveForFocusPeriod).until, zone)}. Later rounds start as planned."
-        else -> message(tone, Moment.FOCUS_START, task)
+        else -> message(tone, Moment.FOCUS_START, task, custom = store.state.customMessages, seed = session.id)
     }
     val facts = buildList {
         when {
@@ -638,6 +638,8 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
             Spacer(Modifier.height(Dim.s3))
             SoundControls(session)
         }
+        Spacer(Modifier.height(Dim.s3))
+        QuestionTimer(store, session, now)
         Spacer(Modifier.height(Dim.s3))
         MoreToggle("Details and options", more || pending) { more = !more }
         if (more || pending) {
@@ -703,6 +705,61 @@ private fun SoundControls(session: ActiveSession) {
         }
     }
 }
+
+/**
+ * Question timing (D): optional and explicit. Time per item is just information; nothing here
+ * changes blocking. A gentle note appears only when an item runs well past the person's own usual.
+ */
+@Composable
+private fun QuestionTimer(store: Store, session: ActiveSession, now: Long) {
+    val c = LocalColors.current
+    val q = session.questions
+    fun set(f: (app.lockdin.engine.QuestionLog) -> app.lockdin.engine.QuestionLog) = store.setQuestions(session.id) { f(it) }
+    val cur = q.current
+    if (cur == null) {
+        val done = app.lockdin.engine.Questions.durations(q)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (done.isEmpty()) "Working through questions?" else "${done.size} question${if (done.size == 1) "" else "s"} timed",
+                style = UiType.caption, color = c.inkMuted, modifier = Modifier.weight(1f),
+            )
+            TextAction(if (done.isEmpty()) "Time questions" else "Start another", { set { app.lockdin.engine.Questions.start(it, now) } })
+        }
+        return
+    }
+    val t = app.lockdin.engine.Questions.elapsed(cur, q, now)
+    val long = app.lockdin.engine.Questions.runningLong(q, store.state.questionTimes + app.lockdin.engine.Questions.durations(q), now)
+    Surface(shape = RoundedCornerShape(Dim.radius), color = c.surface, border = BorderStroke(1.dp, c.line), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Question ${cur.n}", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink, modifier = Modifier.weight(1f))
+                Text(
+                    (if (q.pausedAt != null) "Paused · " else "") + "%d:%02d".format(t / 60_000, (t / 1000) % 60),
+                    style = UiType.label.copy(fontFeatureSettings = "tnum"), color = c.ink,
+                    modifier = Modifier.semantics { contentDescription = "Question ${cur.n}: ${t / 60_000} minutes" + if (q.pausedAt != null) ", paused" else "" },
+                )
+            }
+            if (long) Text(
+                "This one is taking longer than your usual. Keep going, mark it for review, or give it 10 more minutes.",
+                style = UiType.caption, color = c.ink, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            )
+            FlowRowCompat {
+                TextAction("Next question", { set { app.lockdin.engine.Questions.next(it, now) } })
+                TextAction("Mark for review", { set { app.lockdin.engine.Questions.stuck(it, now) } })
+                if (long) TextAction("10 more minutes", { set { app.lockdin.engine.Questions.addTenMinutes(it, now) } })
+                TextAction(if (q.pausedAt != null) "Resume" else "Pause", {
+                    set { if (it.pausedAt != null) app.lockdin.engine.Questions.resume(it, now) else app.lockdin.engine.Questions.pause(it, now) }
+                })
+                TextAction("Finish", { set { app.lockdin.engine.Questions.finish(it, now) } })
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FlowRowCompat(content: @Composable () -> Unit) =
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(Dim.s1)) { content() }
 
 /** The preset's steps, ticked off during this session only (not saved). */
 @Composable
@@ -909,7 +966,18 @@ private fun Recap(
                 )
             }
             Column(verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
-                SectionLabel("Blocked during this session")
+                val qd = app.lockdin.engine.Questions.durations(session.questions)
+                if (qd.isNotEmpty()) {
+                    SectionLabel("Questions")
+                    val review = session.questions.items.count { it.stuck }
+                    Text(
+                        "${qd.size} timed · typical ${(app.lockdin.engine.Questions.median(qd)!! + 30_000) / 60_000} min" +
+                            if (review > 0) " · $review marked for review" else "",
+                        style = UiType.body, color = c.ink,
+                    )
+                    Spacer(Modifier.height(Dim.s3))
+                }
+                                SectionLabel("Blocked during this session")
                 when {
                     !session.rules.restrictsAnything -> Text("Timer only: nothing was blocked on this phone.", style = UiType.body, color = c.inkMuted)
                     blocked.isEmpty() -> Text("You didn’t open any blocked apps or sites.", style = UiType.body, color = c.inkMuted)

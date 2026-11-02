@@ -64,6 +64,7 @@ class FocusService : Service() {
     private var lastMissing: Set<Capability> = emptySet()
     private var screenReceiver: BroadcastReceiver? = null
     private var foreground = false
+    private var lastInteraction = System.currentTimeMillis()
 
     private val tick = Runnable { runTick() }
 
@@ -170,6 +171,20 @@ class FocusService : Service() {
         updateNotification(session, snap, protection, missing)
 
         val interactive = getSystemService(PowerManager::class.java).isInteractive
+        // Check-ins (D): the only signal is when the screen was last on, never what's on it.
+        if (interactive) lastInteraction = now
+        val checkInMin = Store.get(this).state.checkInMinutes
+        val inFocusNow = snap.phase?.kind == PhaseKind.FOCUS
+        val ci = session.checkIn
+        if (app.lockdin.engine.CheckIns.due(now, checkInMin, inFocusNow, session.start, lastInteraction, ci.answeredAt, ci.snoozedUntil, ci.askedAt)) {
+            app.lockdin.sched.CheckInNotice.post(this)
+            Store.get(this).setCheckIn(session.id) { it.copy(askedAt = now) }
+        }
+        if (interactive || !inFocusNow) app.lockdin.sched.CheckInNotice.cancel(this)
+        val nextCheckIn = if (checkInMin > 0 && inFocusNow) maxOf(
+            lastInteraction + checkInMin * 60_000L, session.start + app.lockdin.engine.CheckIns.GRACE_MS,
+            (ci.answeredAt ?: 0) + checkInMin * 60_000L, ci.snoozedUntil ?: 0,
+        ) else null
         if (protection == Protection.PROTECTING) {
             if (!wasRestricting) {
                 // A focus period just began: look back so an app already open is covered too.
@@ -188,7 +203,7 @@ class FocusService : Service() {
         }
         wasRestricting = protection == Protection.PROTECTING
 
-        scheduleWake(snap.nextTransition)
+        scheduleWake(listOfNotNull(snap.nextTransition, nextCheckIn?.takeIf { it > now }).minOrNull())
         handler.postDelayed(tick, if (interactive && protection == Protection.PROTECTING && !FocusAccessibilityService.connected) POLL_MS else IDLE_MS)
     }
 

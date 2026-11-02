@@ -49,8 +49,9 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
     fun startSession(
         now: Long, segments: List<Segment>, intention: String?, profileId: String, last: LastChoice,
         occurrenceKey: String? = null, presetId: String? = null,
-    ) = update { s ->
-        leaving(s)
+    ) = update { s0 ->
+        leaving(s0)
+        val s = keepQuestionTimes(s0)
         val text = intention?.trim()?.take(120)?.takeIf { it.isNotEmpty() }
         s.copy(
             last = last,
@@ -77,7 +78,23 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
      * Leaves the finished session. `dismissed` = the person tapped Done; otherwise (the recap
      * timed out) Home keeps a "Last session" card until they dismiss it.
      */
-    fun finish(dismissed: Boolean = true) = update { leaving(it); it.copy(active = null, lastSession = if (dismissed) null else it.active) }
+    fun finish(dismissed: Boolean = true) = update { leaving(it); keepQuestionTimes(it).copy(active = null, lastSession = if (dismissed) null else it.active) }
+
+    /** Saves a leaving session's question durations for later "longer than usual" comparisons. */
+    private fun keepQuestionTimes(s: AppState): AppState {
+        val d = s.active?.let { app.lockdin.engine.Questions.durations(it.questions) } ?: return s
+        return if (d.isEmpty()) s else s.copy(questionTimes = (s.questionTimes + d).takeLast(50))
+    }
+
+    fun setQuestions(sessionId: String, fn: (app.lockdin.engine.QuestionLog) -> app.lockdin.engine.QuestionLog) = update { s ->
+        val a = s.active
+        if (a == null || a.id != sessionId) s else s.copy(active = a.copy(questions = fn(a.questions)))
+    }
+
+    fun setCheckIn(sessionId: String, fn: (CheckInState) -> CheckInState) = update { s ->
+        val a = s.active
+        if (a == null || a.id != sessionId) s else s.copy(active = a.copy(checkIn = fn(a.checkIn)))
+    }
 
     fun dismissLastSession() = update { it.copy(lastSession = null) }
 

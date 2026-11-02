@@ -461,6 +461,45 @@ class AppTest {
         shot("14-focus-paper-quote")
     }
 
+    @Test fun ownMessagesShowDuringTheSession() {
+        val store = launch(home = true)
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.onNodeWithText("My own words").performScrollTo().performClick()
+        rule.onNodeWithContentDescription("New message").performScrollTo().performTextInput("Problem set first, then rest.")
+        rule.onAllNodesWithText("Add").onFirst().performClick()
+        org.junit.Assert.assertEquals(listOf("Problem set first, then rest."), store.state.customMessages)
+        rule.onNodeWithTag("tab-focus").performClick()
+        rule.onNodeWithText("New session").performClick()
+        rule.onNodeWithText("Start timer").performClick()
+        openDetails()
+        rule.onNodeWithText("Problem set first, then rest.").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test fun questionTimerRecordsItemsAndShowsThemInTheSummary() {
+        val store = launch(AppState(last = app.lockdin.state.LastChoice(25, 5, 1, "study")))
+        rule.onNodeWithText("Start timer").performClick()
+        rule.onNodeWithText("Time questions").performScrollTo().performClick()
+        rule.onNodeWithText("Question 1").assertIsDisplayed()
+        clock.advanceMinutes(3); tick(store)
+        rule.onNodeWithText("Next question").performScrollTo().performClick()
+        clock.advanceMinutes(2); tick(store)
+        rule.onNodeWithText("Mark for review").performScrollTo().performClick()
+        rule.onNodeWithText("Finish").performScrollTo().performClick()
+        org.junit.Assert.assertEquals(3, app.lockdin.engine.Questions.durations(store.state.active!!.questions).size)
+        clock.advanceMinutes(25); tick(store)
+        rule.onNodeWithText("3 timed", substring = true).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("1 marked for review", substring = true).assertExists()
+    }
+
+    @Test fun checkInsAreOffByDefaultAndCanBeTurnedOn() {
+        val store = launch(home = true)
+        org.junit.Assert.assertEquals(0, store.state.checkInMinutes)
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.onNodeWithText("Still working? check-in").performScrollTo().performClick()
+        rule.onNodeWithText("After 15 min idle").performClick()
+        org.junit.Assert.assertEquals(15, store.state.checkInMinutes)
+    }
+
     @Test fun invalidCustomLengthExplained() {
         launch()
         rule.onNodeWithContentDescription("Custom minutes").performClick()

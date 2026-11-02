@@ -60,8 +60,12 @@ object Fmt {
 enum class Moment { FOCUS_START, BREAK_START, BREAK_ENDING, DONE }
 
 /** Never shaming, never claims to know feelings. QUIET shows none. */
-fun message(tone: Tone, moment: Moment, task: String? = null, time: String? = null): String? = when (tone) {
+fun message(tone: Tone, moment: Moment, task: String? = null, time: String? = null, custom: List<String> = emptyList(), seed: String? = null): String? = when (tone) {
     Tone.QUIET -> null
+    // The person's own lines for focus moments (one per session); breaks and the end use Calm.
+    Tone.CUSTOM -> if (custom.isNotEmpty() && (moment == Moment.FOCUS_START || moment == Moment.BREAK_ENDING))
+        custom[Math.floorMod((seed ?: "").hashCode(), custom.size)]
+        else message(Tone.CALM, moment, task, time)
     Tone.CALM -> when (moment) {
         Moment.FOCUS_START -> "Start with one small step."
         Moment.BREAK_START -> "Break until $time. Step away for a bit."

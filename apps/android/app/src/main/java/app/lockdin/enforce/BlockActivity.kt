@@ -74,6 +74,7 @@ class BlockActivity : ComponentActivity() {
                 BlockScreen(
                     appLabel = intent.getStringExtra(EXTRA_SITE) ?: InstalledApps.label(this, intent.getStringExtra(EXTRA_PKG) ?: ""),
                     isSite = intent.getStringExtra(EXTRA_SITE) != null,
+                    pkg = intent.getStringExtra(EXTRA_PKG),
                     onReturn = ::goHome,
                     onOptions = {
                         startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
@@ -139,7 +140,7 @@ class BlockActivity : ComponentActivity() {
 }
 
 @Composable
-private fun BlockScreen(appLabel: String, isSite: Boolean, onReturn: () -> Unit, onOptions: () -> Unit, onLifted: () -> Unit) {
+private fun BlockScreen(appLabel: String, isSite: Boolean, pkg: String? = null, onReturn: () -> Unit, onOptions: () -> Unit, onLifted: () -> Unit) {
     val c = LocalColors.current
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val store = Store.get(ctx)
@@ -185,7 +186,9 @@ private fun BlockScreen(appLabel: String, isSite: Boolean, onReturn: () -> Unit,
                 app.lockdin.ui.Quotes.forSession(session.id), style = UiType.caption.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
                 color = c.inkMuted, textAlign = TextAlign.Center,
             )
-            message(store.state.tone, Moment.FOCUS_START, session?.intention)?.let {
+            // A message the person wrote for this app comes first; then their tone (D).
+            (pkg?.let { store.state.appMessages[it] }?.takeIf { !isSite && store.state.tone != app.lockdin.state.Tone.QUIET }
+                ?: message(store.state.tone, Moment.FOCUS_START, session?.intention, custom = store.state.customMessages, seed = session?.id))?.let {
                 Text(it, style = UiType.caption, color = c.inkMuted, textAlign = TextAlign.Center)
             }
             Text(

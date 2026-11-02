@@ -187,16 +187,19 @@ fun SettingsScreen(store: Store, history: app.lockdin.state.HistoryStore, zone: 
             SectionLabel("Messages")
             SettingsGroup {
                 Column(Modifier.selectableGroup()) {
-                    listOf(Tone.CALM to "Calm", Tone.DIRECT to "Direct", Tone.PLAYFUL to "Playful", Tone.QUIET to "Off").forEachIndexed { i, (v, l) ->
+                    listOf(Tone.CALM to "Calm", Tone.DIRECT to "Direct", Tone.PLAYFUL to "Playful", Tone.CUSTOM to "My own words", Tone.QUIET to "Off").forEachIndexed { i, (v, l) ->
                         if (i > 0) GroupDivider()
                         RadioRow(l, store.state.tone == v) { store.update { it.copy(tone = v) } }
                     }
                 }
             }
             Spacer(Modifier.height(Dim.s2))
-            Text(message(store.state.tone, Moment.BREAK_ENDING, "TAM 212")?.let { "Example: “$it”" } ?: "No messages during sessions.", style = UiType.caption, color = c.inkMuted,
+            Text(message(store.state.tone, Moment.BREAK_ENDING, "TAM 212", custom = store.state.customMessages, seed = "example")?.let { "Example: “$it”" } ?: "No messages during sessions.", style = UiType.caption, color = c.inkMuted,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+            if (store.state.tone == Tone.CUSTOM) { Spacer(Modifier.height(Dim.s3)); MessageListEditor(store) }
+            if (store.state.tone != Tone.QUIET) { Spacer(Modifier.height(Dim.s3)); AppMessagesEditor(store) }
         }
+        CoachingSettings(store)
         LookSettings(store)
         RemindersSettings(store)
         CalendarSettings(store)
@@ -439,3 +442,105 @@ private fun savePhoto(ctx: android.content.Context, uri: android.net.Uri): Boole
     photoFile(ctx).outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, it) }
     true
 }.getOrDefault(false)
+
+
+/** "My own words": up to 10 lines; one is shown per session (D). */
+@Composable
+private fun MessageListEditor(store: Store) {
+    val c = LocalColors.current
+    var text by remember { mutableStateOf("") }
+    Column(verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+        Text("Your lines. One is used per session, on the session and block screens.", style = UiType.caption, color = c.inkMuted)
+        if (store.state.customMessages.isNotEmpty()) SettingsGroup {
+            store.state.customMessages.forEachIndexed { i, m ->
+                if (i > 0) GroupDivider()
+                Row(Modifier.fillMaxWidth().heightIn(min = Dim.control + 4.dp).padding(start = Dim.s4, end = Dim.s2), verticalAlignment = Alignment.CenterVertically) {
+                    Text(m, style = UiType.body, color = c.ink, modifier = Modifier.weight(1f))
+                    TextAction("Remove", { store.update { s -> s.copy(customMessages = s.customMessages.filterIndexed { j, _ -> j != i }) } })
+                }
+            }
+        } else Text("No lines yet: Calm messages are used until you add one.", style = UiType.caption, color = c.inkMuted)
+        if (store.state.customMessages.size < 10) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s2)) {
+            OutlinedTextField(text, { text = it.take(140) }, singleLine = true, placeholder = { Text("e.g. Finish the problem set, then rest.") },
+                shape = RoundedCornerShape(Dim.radius), colors = fieldColors(), modifier = Modifier.weight(1f).semantics { contentDescription = "New message" })
+            SecondaryButton("Add", {
+                text.trim().takeIf { it.isNotEmpty() }?.let { m -> store.update { s -> s.copy(customMessages = (s.customMessages + m).take(10)) }; text = "" }
+            })
+        }
+    }
+}
+
+/** A message for a specific app's block screen (D), e.g. "Instagram can wait until 9." */
+@Composable
+private fun AppMessagesEditor(store: Store) {
+    val c = LocalColors.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var adding by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+        Text("Messages for specific apps", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
+        if (store.state.appMessages.isNotEmpty()) SettingsGroup {
+            store.state.appMessages.entries.sortedBy { it.key }.forEachIndexed { i, (pkg, m) ->
+                if (i > 0) GroupDivider()
+                Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = Dim.s4, end = Dim.s2, top = Dim.s2, bottom = Dim.s2), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(remember(pkg) { app.lockdin.enforce.InstalledApps.label(ctx, pkg) }, style = UiType.label, color = c.ink)
+                        Text(m, style = UiType.caption, color = c.inkMuted)
+                    }
+                    TextAction("Remove", { store.update { s -> s.copy(appMessages = s.appMessages - pkg) } })
+                }
+            }
+        }
+        if (store.state.appMessages.size < 50) SecondaryButton("Add a message for an app", { adding = true }, modifier = Modifier.fillMaxWidth())
+    }
+    if (adding) AppMessageDialog(onDismiss = { adding = false }) { pkg, m ->
+        store.update { s -> s.copy(appMessages = s.appMessages + (pkg to m)) }
+        adding = false
+    }
+}
+
+@Composable
+private fun AppMessageDialog(onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
+    val c = LocalColors.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val apps by androidx.compose.runtime.produceState<List<app.lockdin.enforce.LaunchableApp>>(emptyList()) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { app.lockdin.enforce.InstalledApps.launchable(ctx) }.getOrDefault(emptyList()) }
+    }
+    var pkg by remember { mutableStateOf<String?>(null) }
+    var text by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss, containerColor = c.surface,
+        title = { Text("Message for an app", style = Type.title, color = c.ink) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
+                if (apps.isEmpty()) Text("Loading apps…", style = UiType.caption, color = c.inkMuted)
+                else SettingMenuRow("App", apps.map { it.packageName to it.label }, pkg ?: "", { pkg = it })
+                OutlinedTextField(text, { text = it.take(140) }, placeholder = { Text("e.g. Instagram can wait until 9.") },
+                    shape = RoundedCornerShape(Dim.radius), colors = fieldColors(), modifier = Modifier.fillMaxWidth().semantics { contentDescription = "App message" })
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { val p = pkg; if (p != null && text.isNotBlank()) onSave(p, text.trim()) }, enabled = pkg != null && text.isNotBlank()) {
+                Text("Save", style = UiType.label, color = c.ink)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", style = UiType.label, color = c.ink) } },
+    )
+}
+
+/** Settings › Coaching (D): question timing is offered in each session; check-ins are opt-in. */
+@Composable
+private fun CoachingSettings(store: Store) {
+    val c = LocalColors.current
+    Column {
+        SectionLabel("Check-ins")
+        SettingsGroup {
+            SettingMenuRow("Still working? check-in", app.lockdin.engine.CheckIns.IDLE_CHOICES.map { it to if (it == 0) "Off" else "After $it min idle" },
+                store.state.checkInMinutes, { v -> store.update { it.copy(checkInMinutes = v) } })
+        }
+        Spacer(Modifier.height(Dim.s2))
+        Text(
+            "During focus, if the phone hasn’t been used for that long, a silent notification asks if you’re still working. Working on paper counts. It only looks at when the screen was last used, never what’s on it, and isn’t sent in a session’s first 10 minutes.",
+            style = UiType.caption, color = c.inkMuted,
+        )
+    }
+}

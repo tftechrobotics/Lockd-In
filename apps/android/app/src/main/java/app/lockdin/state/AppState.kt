@@ -20,7 +20,7 @@ import java.time.DayOfWeek
 import java.time.LocalTime
 
 enum class ThemeChoice { SYSTEM, LIGHT, DARK }
-enum class Tone { CALM, DIRECT, PLAYFUL, QUIET }
+enum class Tone { CALM, DIRECT, PLAYFUL, CUSTOM, QUIET }
 
 /** `rules` are this phone's own app rules for the profile (each device keeps its own). */
 data class Profile(val id: String, val name: String, val description: String, val builtIn: Boolean, val rules: AppRules = AppRules(), val audio: ProfileAudio = ProfileAudio())
@@ -58,6 +58,14 @@ data class Preset(
     val steps: List<String> = emptyList(),
 )
 
+data class CheckInState(
+    val askedAt: Long? = null,
+    val answeredAt: Long? = null,
+    val snoozedUntil: Long? = null,
+    /** Answers in this session, e.g. "paper" -> 2. */
+    val answers: Map<String, Int> = emptyMap(),
+)
+
 data class LastChoice(val focusMinutes: Int, val breakMinutes: Int, val rounds: Int, val profileId: String)
 
 data class ActiveSession(
@@ -82,6 +90,10 @@ data class ActiveSession(
     val presetId: String? = null,
     /** The profile's study audio when the session started. */
     val audio: ProfileAudio = ProfileAudio(),
+    /** Question timing for this session (D), if the person used it. */
+    val questions: app.lockdin.engine.QuestionLog = app.lockdin.engine.QuestionLog(),
+    /** Inactivity check-ins in this session (D). */
+    val checkIn: CheckInState = CheckInState(),
 )
 
 data class AppState(
@@ -95,6 +107,13 @@ data class AppState(
     /** Default commitment for new sessions. */
     val commitment: Commitment = Commitment.DELAYED,
     val presets: List<Preset> = emptyList(),
+    /** Coaching (D): the person's own messages (Custom tone) and a message for specific apps' block screens. */
+    val customMessages: List<String> = emptyList(),
+    val appMessages: Map<String, String> = emptyMap(),
+    /** Durations (ms) of recently finished timed questions, for the "taking longer than usual" note. */
+    val questionTimes: List<Long> = emptyList(),
+    /** Inactivity check-in after this many idle minutes during focus; 0 = off (default). */
+    val checkInMinutes: Int = 0,
     /** Optional look (C2), both off by default: a background behind Focus, and a quote per session. */
     val backdrop: String = "NONE",
     val quotesOn: Boolean = false,
@@ -145,6 +164,10 @@ object StateCodec {
                 .put("due", p.due?.toString() ?: JSONObject.NULL).put("steps", JSONArray(p.steps))
         }))
         put("historyDays", s.historyDays)
+        put("customMessages", JSONArray(s.customMessages))
+        put("appMessages", JSONObject().apply { s.appMessages.forEach { (k, v) -> put(k, v) } })
+        put("questionTimes", JSONArray(s.questionTimes.takeLast(50)))
+        put("checkInMinutes", s.checkInMinutes)
         put("backdrop", s.backdrop)
         put("quotesOn", s.quotesOn)
         put("calendarOn", s.calendarOn)
@@ -203,6 +226,12 @@ object StateCodec {
                 commitment = enumOr(o.optString("commitment"), Commitment.DELAYED),
                 presets = o.optJSONArray("presets")?.objects()?.mapNotNull(::presetOf)?.take(MAX_PRESETS) ?: emptyList(),
                 historyDays = o.optInt("historyDays", 365).let { if (it in app.lockdin.engine.History.RETENTION_CHOICES) it else 365 },
+                customMessages = o.optJSONArray("customMessages")?.let { a -> (0 until a.length()).mapNotNull { a.optString(it).trim().take(140).ifEmpty { null } } }?.take(10) ?: emptyList(),
+                appMessages = o.optJSONObject("appMessages")?.let { m ->
+                    m.keys().asSequence().filter(::validPackage).take(50).associateWith { m.optString(it).trim().take(140) }.filterValues { it.isNotEmpty() }
+                } ?: emptyMap(),
+                questionTimes = longs(o.optJSONArray("questionTimes")).takeLast(50),
+                checkInMinutes = o.optInt("checkInMinutes", 0).let { if (it in app.lockdin.engine.CheckIns.IDLE_CHOICES) it else 0 },
                 backdrop = o.optString("backdrop", "NONE").takeIf { it in BACKDROPS } ?: "NONE",
                 quotesOn = o.optBoolean("quotesOn", false),
                 calendarOn = o.optBoolean("calendarOn", false),
@@ -273,6 +302,12 @@ object StateCodec {
             if (a.isNull("occurrenceKey") || !a.has("occurrenceKey")) null else a.getString("occurrenceKey").take(120),
             if (a.isNull("presetId") || !a.has("presetId")) null else a.getString("presetId").take(64),
             audioOf(a.optJSONObject("audio")),
+            questionsOf(a.optJSONObject("questions")),
+            a.optJSONObject("checkIn")?.let { c ->
+                fun t(k: String) = if (c.isNull(k) || !c.has(k)) null else c.getLong(k)
+                CheckInState(t("askedAt"), t("answeredAt"), t("snoozedUntil"),
+                    c.optJSONObject("answers")?.let { m -> m.keys().asSequence().take(8).associateWith { m.optInt(it, 0).coerceIn(0, 1000) } } ?: emptyMap())
+            } ?: CheckInState(),
         )
     } catch (e: Exception) {
         null
@@ -315,6 +350,24 @@ object StateCodec {
         .put("occurrenceKey", a.occurrenceKey ?: JSONObject.NULL)
         .put("presetId", a.presetId ?: JSONObject.NULL)
         .put("audio", audioJson(a.audio))
+        .put("questions", questionsJson(a.questions))
+        .put("checkIn", JSONObject().put("askedAt", a.checkIn.askedAt ?: JSONObject.NULL).put("answeredAt", a.checkIn.answeredAt ?: JSONObject.NULL)
+            .put("snoozedUntil", a.checkIn.snoozedUntil ?: JSONObject.NULL).put("answers", JSONObject().apply { a.checkIn.answers.forEach { (k, v) -> put(k, v) } }))
+
+    private fun questionsJson(q: app.lockdin.engine.QuestionLog): JSONObject = JSONObject()
+        .put("items", JSONArray(q.items.takeLast(200).map {
+            JSONObject().put("n", it.n).put("startedAt", it.startedAt).put("endedAt", it.endedAt ?: JSONObject.NULL).put("pausedMs", it.pausedMs).put("stuck", it.stuck)
+        }))
+        .put("pausedAt", q.pausedAt ?: JSONObject.NULL).put("quietUntil", q.quietUntil ?: JSONObject.NULL).put("finished", q.finished)
+
+    private fun questionsOf(o: JSONObject?): app.lockdin.engine.QuestionLog {
+        if (o == null) return app.lockdin.engine.QuestionLog()
+        fun t(j: JSONObject, k: String) = if (j.isNull(k) || !j.has(k)) null else j.getLong(k)
+        val items = o.optJSONArray("items")?.objects()?.mapNotNull { j ->
+            runCatching { app.lockdin.engine.QuestionItem(j.getInt("n"), j.getLong("startedAt"), t(j, "endedAt"), j.optLong("pausedMs", 0).coerceAtLeast(0), j.optBoolean("stuck")) }.getOrNull()
+        }?.take(200) ?: emptyList()
+        return app.lockdin.engine.QuestionLog(items, t(o, "pausedAt"), t(o, "quietUntil"), o.optBoolean("finished"))
+    }
 
     private fun audioJson(a: ProfileAudio): JSONObject = JSONObject().put("ambient", a.ambient.name).put("level", a.level.toDouble())
         .put("musicLink", a.musicLink ?: JSONObject.NULL).put("autoPlay", a.autoPlay).put("duringBreaks", a.duringBreaks)
