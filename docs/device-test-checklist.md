@@ -81,8 +81,21 @@ Report the three Lockd In percentages and total drops. Targets: blocking alone â
 25. **Places:** add a place where you are, set it to remind, and allow location "All the time". Leave and come back during its hours. A reminder should come once.
 26. **Battery:** follow the battery protocol above.
 
-27. **Music control (R47).** For each music app you use (Spotify, YouTube Music, Apple Music, SoundCloud):
-    - Save a playlist and choose it in a profile.
-    - Without music control: start focus. The lock animation plays and the app doesn't switch. Note what plays.
-    - Allow music control (Sound tab or session). Start focus with the music app closed, then again with it open. Does that exact playlist start? Note any messages under the controls.
-    - In a session, use Change to switch playlists. Check that "Open in â€¦" appears only when that app isn't blocked.
+27. **Study audio and music apps (R48), on the S24+.**
+    - **Built-in:**
+      - Turn on Piano with "Play when focus starts" and start focus. Music starts after the lock animation.
+      - Lock the phone: lock-screen controls work, and audio continues with the screen off and while an allowed app is open.
+      - Unplug headphones or disconnect Bluetooth: it pauses.
+      - A phone call pauses it.
+      - Start Spotify: built-in audio pauses. Press play in Lockd In: Spotify pauses.
+      - With breaks set to pause, a break pauses it and focus resumes it.
+      - The session end fades it out.
+      - Reboot mid-session: no audio starts by itself.
+    - **Limited:**
+      - Choose Spotify and YouTube Music, 2 min. Browse Spotify about 1 min, switch to YouTube Music; the remaining time continues and doesn't reset.
+      - Go Home with music playing for 2 min: the remaining time doesn't change.
+      - One warning at 30 s.
+      - When time is up the app is covered with "Music browsing time is up". **Confirm Spotify and YouTube Music keep playing**, and lock-screen and notification controls still work.
+      - Change the clock: the allowance doesn't refill.
+      - Reboot: it keeps the remaining time.
+    - **Always allow:** the chosen apps are never covered during focus.

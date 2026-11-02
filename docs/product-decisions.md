@@ -119,3 +119,27 @@ Three kinds of entry, kept apart on purpose:
 - Without access, Lockd In can only resume the music app, which plays whatever it played last. "Open in …" opens the playlist in its app; for YouTube Music this uses the `watch?list=` form, which plays on its own.
 - Not possible for an individual developer: Spotify's App Remote SDK (development mode is limited to 5 users, Feb 2026). Apple MusicKit is the $99/yr item deferred in R45. SoundCloud has no playback API.
 - Which apps honour `playFromUri` is unverified; it must be checked on a phone (checklist item 27).
+
+## R48 — Study audio: built-in player and music-app access (2026-11-02, owner spec)
+- **Supersedes R47 and the B2 music parts.** Removed: playlist links, notification access (the listener service is gone), generated live ambient sound, and opening the music app at start. Old saves migrate: an ambient choice becomes built-in Rain with the same start and break options, and playlist links are dropped.
+- **Two independent per-profile settings (profile › Audio):**
+  - **Built-in study audio** (off by default): Piano, Strings or Rain, with preview, volume, "Play when focus starts", and pause or continue during breaks.
+  - **Music apps during focus:** Follow blocking rules (default), Limited browsing (5 min suggested, shared across the chosen apps), or Always allow.
+- **Player:** Media3 ExoPlayer 1.11.1 with a MediaSession, hosted in FocusService. That service is already a foreground service of type mediaPlayback, so scheduled starts don't need a new background foreground-service start, which Android restricts.
+  - The session notification turns into a media-style notification with play/pause and next while audio is loaded, which gives lock-screen and quick-settings controls.
+  - Audio focus is handled by ExoPlayer, so built-in audio and external music never play over each other. It pauses on headphone or Bluetooth disconnect.
+  - It fades out at session end and on emergency recovery.
+  - It starts by itself only within 60 s of a focus period beginning, so it never restarts after a reboot or recovery. No playback state is saved.
+- **Allowance accounting:**
+  - **What counts:** time only while a chosen app is the front window, the screen is on, and a focus period is restricting. FocusService checks this once a second, using Accessibility's active window or usage events.
+  - **Clock safety:** each step uses the elapsedRealtime gap, capped at 3 s, so wall-clock changes can't refill it.
+  - **Persistence:** saved on ActiveSession every 5 s and on every change, so restarts and reboots keep it.
+  - **Breaks and new sessions:** breaks don't refill it; a new session gets a new allowance.
+  - **Warning:** one quiet notification at 30 s left.
+  - **When spent:** the chosen apps are covered.
+- **Narrow exception:** the block screen normally requests audio focus to stop the covered app's sound. It skips that only for a chosen music app whose allowance is spent, and while Lockd In's own audio is playing.
+- **Rules snapshot:** limited apps are added to the session's restricted set at start and let through until the allowance is spent; always-allowed apps are removed. The session keeps this snapshot, so profile edits mid-session apply next session and can't become a bypass.
+- **Eligible apps:** apps with a media browser service and a launcher icon. The editor warns that allowing an app allows all of its content.
+- **Setup:** a one-line audio summary plus "Choose music": collection, play-on-start and allowance for this session only, and "Open <app>" before the countdown starts.
+- **Session screen:** one collapsible line under the timer, with remaining browsing time shown only for limited access.
+- **Recordings:** development recordings synthesised by `design/audio/gen.py`, owned by the project and labelled in the app. See `docs/audio-assets.md` for the content needed before release.
