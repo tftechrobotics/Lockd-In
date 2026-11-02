@@ -1,7 +1,6 @@
-// Optional backgrounds and quotes (roadmap step 5, C2; scene set revised by the owner 2026-11-02).
-// Off by default. The sculpted lock and the screen's text are never changed: scenes are low-key
-// (the image under the text is capped for 4.5:1 with light text, see design/backgrounds/gen.py)
-// and the light theme lays a cream scrim over them. All scenes are static: nothing moves.
+// Optional backgrounds and quotes (roadmap step 5, C2). Off by default. Scenes are the owner's own
+// images (dark and light version of each, owner holds the rights, R46), shown at full strength.
+// The sculpted lock and the screen's text are never changed. All scenes are static: nothing moves.
 package app.lockdin.ui
 
 import android.graphics.BitmapFactory
@@ -104,15 +103,7 @@ fun BackdropLayer(choice: Backdrop, words: String, modifier: Modifier) {
     Box(modifier.clearAndSetSemantics { }.background(if (choice == Backdrop.NONE) Color.Transparent else c.ground)) {
         when (choice) {
             Backdrop.NONE -> Unit
-            Backdrop.LIBRARY, Backdrop.MOUNTAINS -> {
-                // Each scene has a dark (night) and a light (faded print) version, both checked for
-                // text contrast by design/backgrounds/gen.py.
-                val res = when (choice) {
-                    Backdrop.LIBRARY -> if (dark) R.drawable.bg_library else R.drawable.bg_library_light
-                    else -> if (dark) R.drawable.bg_mountains else R.drawable.bg_mountains_light
-                }
-                Image(painterResource(res), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            }
+            Backdrop.LIBRARY, Backdrop.MOUNTAINS -> Scene(choice, dark)
             Backdrop.PHOTO -> {
                 val bmp by produceState<android.graphics.Bitmap?>(null) {
                     value = withContext(Dispatchers.IO) { runCatching { BitmapFactory.decodeFile(photoFile(ctx).path) }.getOrNull() }
@@ -122,10 +113,22 @@ fun BackdropLayer(choice: Backdrop, words: String, modifier: Modifier) {
                     Box(Modifier.fillMaxSize().background(c.ground.copy(alpha = if (dark) 0.72f else 0.8f)))
                 }
             }
-            Backdrop.WORDS -> Words(words, c.ink.copy(alpha = if (dark) 0.11f else 0.08f))
-            Backdrop.BLUEPRINT -> Blueprint(c.ink.copy(alpha = if (dark) 0.16f else 0.13f))
+            // The owner's image for the default line; a person's own line is drawn in the same style.
+            Backdrop.WORDS -> if (words.trim().ifEmpty { DEFAULT_BACKDROP_WORDS }.equals(DEFAULT_BACKDROP_WORDS, ignoreCase = true)) Scene(choice, dark)
+                else Words(words, c.ink.copy(alpha = if (dark) 0.22f else 0.2f))
+            Backdrop.BLUEPRINT -> Blueprint(c.ink.copy(alpha = if (dark) 0.24f else 0.2f))
         }
     }
+}
+
+@Composable
+private fun Scene(choice: Backdrop, dark: Boolean) {
+    val res = when (choice) {
+        Backdrop.LIBRARY -> if (dark) R.drawable.bg_library else R.drawable.bg_library_light
+        Backdrop.MOUNTAINS -> if (dark) R.drawable.bg_mountains else R.drawable.bg_mountains_light
+        else -> if (dark) R.drawable.bg_words else R.drawable.bg_words_light
+    }
+    Image(painterResource(res), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
 }
 
 /**

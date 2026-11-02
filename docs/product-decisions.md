@@ -103,3 +103,9 @@ Three kinds of entry, kept apart on purpose:
 | 2026-10-29 | "Launch gating" by detect-and-terminate | Not prevention (R12) |
 | 2026-10-29 | "App Control authoring not on Home, so impractical" | Wrong: enforcement works on all editions; authoring can be done in-app (see comparison) |
 | 2026-10-29 | "Service reports tamper events" | An abrupt stop can't self-report (R16) |
+
+## R46 — Owner-supplied background images (2026-11-02)
+- Library after hours, Quiet ambition and Words to work by now use the owner's own images (owner holds the rights), one dark and one light version each, shown at full strength. They replace the procedural renders from `design/backgrounds/gen.py`, which is kept only for reference.
+- Words to work by: the owner's image is shown for the default line; a custom line is still drawn live, at higher contrast (alpha 0.22 dark / 0.20 light).
+- Your reason (blueprint) stays drawn in code, with stronger lines (alpha 0.24 / 0.20).
+- Per the owner, no emulator run for this image-only change; checked by build only.
