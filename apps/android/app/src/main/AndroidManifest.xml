@@ -78,6 +78,17 @@
             android:launchMode="singleTask"
             android:taskAffinity="app.lockdin.block" />
 
+        <!-- Music control (B2, R47): notification access lets Lockd In control the music app's
+             player. It overrides no notification callbacks, so it never reads notifications. -->
+        <service
+            android:name=".audio.MediaAccessService"
+            android:exported="true"
+            android:label="Lockd In music control"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
         <service
             android:name=".enforce.FocusService"
             android:exported="false"

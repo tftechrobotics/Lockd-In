@@ -80,4 +80,24 @@ class AudioTest {
         val d = StateCodec.decode(raw).profiles.first { it.id == "study" }.audio
         assertNull(d.musicLink); assertEquals(Ambient.NONE, d.ambient)
     }
+
+    @Test fun playUrisAndOpenLinks() {
+        assertEquals("spotify:playlist:37i9dQZF1DX8NTLI2TtZa6", Music.playUri("https://open.spotify.com/playlist/37i9dQZF1DX8NTLI2TtZa6?si=abc"))
+        assertEquals("spotify:album:4aawyAB9vmqN3uQ7FjRGTy", Music.playUri("https://open.spotify.com/intl-de/album/4aawyAB9vmqN3uQ7FjRGTy"))
+        assertEquals("https://music.youtube.com/playlist?list=PL1", Music.playUri("https://music.youtube.com/playlist?list=PL1"))
+        assertEquals("https://music.youtube.com/watch?list=PL1", Music.openUri("https://music.youtube.com/playlist?list=PL1&si=x"))
+        assertEquals("https://soundcloud.com/a/sets/b", Music.openUri("https://soundcloud.com/a/sets/b"))
+        assertEquals("Spotify playlist", Music.defaultName("https://open.spotify.com/playlist/x"))
+    }
+
+    // CI only (needs org.json): saved playlists round-trip, and an older profile link is kept as a saved playlist.
+    @Test fun savedPlaylistsRoundTripAndMigrate() {
+        val s = AppState(playlists = listOf(app.lockdin.state.SavedPlaylist("Deep work", "https://open.spotify.com/playlist/A")))
+        assertEquals(s.playlists, StateCodec.decode(StateCodec.encode(s)).playlists)
+        val old = AppState(profiles = AppState().profiles.map { if (it.id == "study") it.copy(audio = ProfileAudio(musicLink = "https://music.youtube.com/playlist?list=PL9")) else it })
+        val raw = StateCodec.encode(old).replace("\"playlists\":[]", "\"playlists\":null")
+        val d = StateCodec.decode(raw).playlists
+        assertEquals(listOf("https://music.youtube.com/playlist?list=PL9"), d.map { it.link })
+        assertEquals("YouTube Music playlist", d.single().name)
+    }
 }

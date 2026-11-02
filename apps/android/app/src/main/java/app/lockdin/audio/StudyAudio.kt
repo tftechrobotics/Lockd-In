@@ -4,9 +4,9 @@
 // service so it keeps going with the screen off. It follows the session: on in focus, paused
 // for breaks unless the profile keeps it, stopped at the end and on emergency recovery.
 //
-// Music: NOT played by Lockd In. The playlist opens in the person's own music app (for a start
-// made in the app), and the controls send Android's standard media keys and change media
-// volume — no extra permission, no browsing.
+// Music: NOT played by Lockd In. Lockd In asks the person's own music app to play the playlist
+// in the background (see MediaAccess and Music), never bringing that app onto the screen unless
+// the person taps "Open in …". Controls send Android's standard media keys and media volume.
 package app.lockdin.audio
 
 import android.content.Context
@@ -101,29 +101,73 @@ object StudyAudio {
 
     // ---------------- Music (external app) ----------------
 
+    /** A short line under the music controls about the last play request (null = nothing to say). */
+    var musicNote by mutableStateOf<String?>(null)
+        private set
+
     /**
-     * For a start made in the app: opens the playlist in its app, then brings Lockd In back.
-     * Never used for scheduled starts (they must not bring apps onto the screen).
+     * For a start made in the app: plays the session's playlist without leaving Lockd In, so the
+     * start sequence stays on screen. Never used for scheduled starts.
      */
-    fun openPlaylist(ctx: Context, session: ActiveSession) {
-        val link = session.audio.musicLink ?: return
+    fun startMusic(ctx: Context, session: ActiveSession) {
         if (!session.audio.autoPlay) return
-        val provider = session.audio.musicProvider
-        val view = Intent(Intent.ACTION_VIEW, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        session.audio.musicLink?.let { playPlaylist(ctx, it) }
+    }
+
+    /**
+     * Asks the playlist's app to play it, in the background. With notification access this goes
+     * to the app's player (playFromUri; the app is woken with a media key first if it has no
+     * player yet). Without it, the app can only be resumed, which plays whatever it played last.
+     */
+    fun playPlaylist(ctx: Context, link: String) {
+        val provider = Music.providerOf(link) ?: return
+        val app = ctx.applicationContext
+        if (!installed(app, provider.pkg)) { musicNote = "${provider.name} isn’t installed on this phone."; return }
+        if (!MediaAccess.granted(app)) {
+            sendKey(app, provider.pkg, KeyEvent.KEYCODE_MEDIA_PLAY)
+            musicNote = "Resumed ${provider.name}. To start this exact playlist, allow music control or open it in ${provider.name}."
+            Log.i(TAG, "music_resume provider=${provider.name}")
+            return
+        }
+        musicNote = "Starting in ${provider.name}…"
+        val uri = Uri.parse(Music.playUri(link))
+        fun attempt(n: Int) {
+            val mc = MediaAccess.controller(app, provider.pkg)
+            if (mc != null) {
+                runCatching { mc.transportControls.playFromUri(uri, android.os.Bundle()) }
+                Log.i(TAG, "music_play_from_uri provider=${provider.name} try=$n")
+                main.postDelayed({
+                    val st = MediaAccess.controller(app, provider.pkg)?.playbackState?.state
+                    val ok = st == android.media.session.PlaybackState.STATE_PLAYING || st == android.media.session.PlaybackState.STATE_BUFFERING ||
+                        st == android.media.session.PlaybackState.STATE_CONNECTING
+                    musicNote = if (ok) null else "${provider.name} didn’t start playing. Open the playlist to play it there."
+                    Log.i(TAG, "music_state provider=${provider.name} state=$st")
+                }, 3_000)
+                return
+            }
+            if (n == 0) sendKey(app, provider.pkg, KeyEvent.KEYCODE_MEDIA_PLAY) // wakes the app's player
+            if (n < 4) main.postDelayed({ attempt(n + 1) }, 1_500)
+            else musicNote = "${provider.name} didn’t respond. Open the playlist to play it there."
+        }
+        attempt(0)
+    }
+
+    /** Opens the playlist in its app (the person tapped "Open in …"). YouTube Music starts playing it. */
+    fun openInApp(ctx: Context, link: String) {
+        val provider = Music.providerOf(link)
+        val view = Intent(Intent.ACTION_VIEW, Uri.parse(Music.openUri(link))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         provider?.let { p -> if (installed(ctx, p.pkg)) view.setPackage(p.pkg) }
-        try {
-            ctx.startActivity(view)
-            Log.i(TAG, "playlist_opened provider=${provider?.name}")
-            main.postDelayed({
-                runCatching {
-                    ctx.startActivity(Intent(ctx, app.lockdin.MainActivity::class.java)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
-                }
-            }, 2_500)
-        } catch (e: Exception) {
-            Log.w(TAG, "playlist_open_failed: ${e.javaClass.simpleName}")
+        runCatching { ctx.startActivity(view); musicNote = null }.onFailure { musicNote = "Couldn’t open ${provider?.name ?: "the playlist"}." }
+    }
+
+    /** A media key sent only to that app (its media button receiver), so nothing else starts playing. */
+    private fun sendKey(ctx: Context, pkg: String, code: Int) {
+        for (action in listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP)) runCatching {
+            ctx.sendBroadcast(Intent(Intent.ACTION_MEDIA_BUTTON).setPackage(pkg).putExtra(Intent.EXTRA_KEY_EVENT, KeyEvent(action, code)))
         }
     }
+
+    fun clearMusicNote() { musicNote = null }
 
     fun installed(ctx: Context, pkg: String): Boolean =
         runCatching { ctx.packageManager.getLaunchIntentForPackage(pkg) != null }.getOrDefault(false)

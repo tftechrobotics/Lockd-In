@@ -1,6 +1,7 @@
-// Study audio (roadmap step 3, B2): a playlist in the person's own music app. Lockd In does not
-// play this music itself; it opens the playlist in that app and sends standard media keys
-// (play/pause, next) and media volume, which every music app on Android accepts.
+// Study audio (roadmap step 3, B2): playlists in the person's own music app. Lockd In does not
+// play this music itself. With notification access it asks the music app's player to play the
+// playlist (MediaController.playFromUri); otherwise it resumes the app with a media key, and the
+// person can open the playlist in its app. Controls are Android's standard media keys and volume.
 package app.lockdin.audio
 
 data class MusicProvider(val name: String, val pkg: String)
@@ -35,5 +36,29 @@ object Music {
         val l = link?.trim() ?: return null
         if (providerOf(l) == null) return null
         return if (l.startsWith("http://", ignoreCase = true)) "https://" + l.substring(7) else l
+    }
+
+    /** A name for a link the person didn't name. */
+    fun defaultName(link: String): String = providerOf(link)?.let { "${it.name} playlist" } ?: "Playlist"
+
+    private val SPOTIFY_PATH = Regex("^https?://open\\.spotify\\.com/(?:intl-[a-z-]+/)?(playlist|album|track|artist|show|episode)/([A-Za-z0-9]+)", RegexOption.IGNORE_CASE)
+    private val YTM_LIST = Regex("[?&]list=([A-Za-z0-9_-]+)")
+
+    /**
+     * The URI handed to the music app's player: spotify:playlist:ID for Spotify share links
+     * (the form Spotify's player accepts), the link itself for the others.
+     */
+    fun playUri(link: String): String {
+        SPOTIFY_PATH.find(link)?.let { m -> return "spotify:${m.groupValues[1].lowercase()}:${m.groupValues[2]}" }
+        return link
+    }
+
+    /**
+     * The link used to open the playlist in its app. For YouTube Music this is the "watch" form,
+     * which starts playing the list on its own; the others open the playlist page.
+     */
+    fun openUri(link: String): String {
+        if (providerOf(link) == YOUTUBE_MUSIC) YTM_LIST.find(link)?.let { return "https://music.youtube.com/watch?list=${it.groupValues[1]}" }
+        return link
     }
 }

@@ -216,7 +216,7 @@ fun startPreset(store: Store, p: app.lockdin.state.Preset, now: Long, ctx: andro
         LastChoice(p.focusMinutes, if (p.breakMinutes > 0) p.breakMinutes else store.state.last.breakMinutes, p.rounds, profile),
         presetId = p.id,
     )
-    store.state.active?.let { StartIntro.request(it.id); if (ctx != null) app.lockdin.audio.StudyAudio.openPlaylist(ctx, it) }
+    store.state.active?.let { StartIntro.request(it.id); if (ctx != null) app.lockdin.audio.StudyAudio.startMusic(ctx, it) }
 }
 
 /** Scrolling content with the action area pinned below it (above the bottom navigation). */
@@ -380,7 +380,7 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
                         presetId = presetId,
                     )
                     // The start sequence plays once, for this manual start only.
-                    store.state.active?.let { StartIntro.request(it.id); app.lockdin.audio.StudyAudio.openPlaylist(ctx, it) }
+                    store.state.active?.let { StartIntro.request(it.id); app.lockdin.audio.StudyAudio.startMusic(ctx, it) }
                 }
             })
         },
@@ -638,7 +638,7 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
         }
         if (session.audio.hasSound) {
             Spacer(Modifier.height(Dim.s3))
-            SoundControls(session)
+            SoundControls(store, session)
         }
         Spacer(Modifier.height(Dim.s3))
         QuestionTimer(store, session, now)
@@ -662,7 +662,7 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
  * a playlist, play/pause, skip and media volume sent to the music app. No browsing.
  */
 @Composable
-private fun SoundControls(session: ActiveSession) {
+private fun SoundControls(store: Store, session: ActiveSession) {
     val c = LocalColors.current
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val a = session.audio
@@ -701,11 +701,50 @@ private fun SoundControls(session: ActiveSession) {
                         modifier = Modifier.weight(1f).semantics { contentDescription = "Media volume" },
                     )
                 }
-                Text("Plays in ${provider.name}. Lockd In only sends play, pause, skip and volume.", style = UiType.caption, color = c.inkMuted,
-                    modifier = Modifier.padding(start = Dim.s2, bottom = Dim.s1))
+                val link = a.musicLink!!
+                val saved = store.state.playlists
+                val current = saved.firstOrNull { it.link == link }?.name ?: app.lockdin.audio.Music.defaultName(link)
+                var choosing by remember { mutableStateOf(false) }
+                Row(Modifier.padding(start = Dim.s2), verticalAlignment = Alignment.CenterVertically) {
+                    Text(current, style = UiType.caption.copy(fontWeight = FontWeight.SemiBold), color = c.ink, maxLines = 1, modifier = Modifier.weight(1f))
+                    if (saved.size > 1) Box {
+                        TextAction("Change", { choosing = true })
+                        androidx.compose.material3.DropdownMenu(choosing, { choosing = false }, containerColor = c.surface) {
+                            saved.forEach { p ->
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(p.name + (p.provider?.let { " · ${it.name}" } ?: ""), style = UiType.body, color = c.ink) },
+                                    onClick = {
+                                        choosing = false
+                                        store.update { s -> s.copy(active = s.active?.takeIf { it.id == session.id }?.let { it.copy(audio = it.audio.copy(musicLink = p.link)) } ?: s.active) }
+                                        app.lockdin.audio.StudyAudio.playPlaylist(ctx, p.link)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+                FlowRowCompat {
+                    TextAction("Play this playlist", { app.lockdin.audio.StudyAudio.playPlaylist(ctx, link) })
+                    // Opening the app is offered only when this session doesn't cover it.
+                    if (!app.lockdin.enforce.BlockPolicy.isRestricted(provider.pkg, session.rules, emptySet())) TextAction("Open in ${provider.name}", { app.lockdin.audio.StudyAudio.openInApp(ctx, link) })
+                }
+                Text(
+                    app.lockdin.audio.StudyAudio.musicNote ?: "Plays in ${provider.name}, in the background.",
+                    style = UiType.caption, color = if (app.lockdin.audio.StudyAudio.musicNote != null) c.ink else c.inkMuted,
+                    modifier = Modifier.padding(start = Dim.s2, bottom = Dim.s1).semantics { liveRegion = LiveRegionMode.Polite },
+                )
+                if (!app.lockdin.audio.MediaAccess.granted(ctx)) MusicControlAccessShort()
             }
         }
     }
+}
+
+@Composable
+private fun MusicControlAccessShort() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    TextAction("Allow music control to start the exact playlist", {
+        runCatching { ctx.startActivity(app.lockdin.audio.MediaAccess.settingsIntent(ctx)) }
+    })
 }
 
 /**
@@ -1009,7 +1048,7 @@ private fun Recap(
             if (onClose != null) SecondaryButton("Back", onClose, modifier = Modifier.fillMaxWidth())
             else SecondaryButton("Same again", {
                 store.startSession(clock.now(), session.segments, session.intention, session.profileId, store.state.last)
-                store.state.active?.let { StartIntro.request(it.id); app.lockdin.audio.StudyAudio.openPlaylist(ctx, it) }
+                store.state.active?.let { StartIntro.request(it.id); app.lockdin.audio.StudyAudio.startMusic(ctx, it) }
             }, modifier = Modifier.fillMaxWidth())
         },
     )

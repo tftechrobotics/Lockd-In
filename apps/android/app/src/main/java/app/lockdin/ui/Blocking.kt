@@ -265,7 +265,7 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
 
     fun save() {
         val link = linkText.trim()
-        if (link.isNotEmpty() && app.lockdin.audio.Music.clean(link) == null) { tab = 2; linkError = "Paste a playlist link from Spotify, YouTube Music, Apple Music or SoundCloud"; return }
+        if (link.isNotEmpty() && app.lockdin.audio.Music.clean(link) == null) { tab = 2; linkError = "Choose a saved playlist"; return }
         val a = audio.copy(musicLink = app.lockdin.audio.Music.clean(link))
         app.lockdin.audio.StudyAudio.stopPreview()
         store.update { s -> s.copy(profiles = s.profiles.map { if (it.id == profile.id) it.copy(rules = AppRules(mode, chosen, sites, siteMode), audio = a) else it }) }
@@ -284,7 +284,7 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
             if (running) Text("A session with this profile is running. Changes apply from the next session.", style = UiType.caption, color = c.ink)
         }
         if (tab == 2) {
-            SoundTab(audio, { audio = it }, linkText, { linkText = it.take(500); linkError = null }, linkError)
+            SoundTab(store, audio, { audio = it }, linkText, { linkText = it; linkError = null }, linkError)
         } else if (tab == 1) {
             Column(Modifier.padding(horizontal = Dim.gutter, vertical = Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
                 SegmentedChoice(
@@ -420,6 +420,7 @@ fun AppIcon(pkg: String, size: androidx.compose.ui.unit.Dp = 36.dp) {
 /** Study sound for a profile (B2): generated ambient sound, and/or a playlist in the person's own music app. */
 @Composable
 private fun SoundTab(
+    store: Store,
     audio: app.lockdin.state.ProfileAudio, onAudio: (app.lockdin.state.ProfileAudio) -> Unit,
     link: String, onLink: (String) -> Unit, linkError: String?,
 ) {
@@ -435,12 +436,7 @@ private fun SoundTab(
             Text("Made on your phone and played by Lockd In. Works offline.", style = UiType.caption, color = c.inkMuted)
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Dim.s2), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
                 app.lockdin.audio.Ambient.values().forEach { k ->
-                    val on = audio.ambient == k
-                    androidx.compose.material3.Surface(
-                        shape = androidx.compose.foundation.shape.CircleShape, color = if (on) c.ink else androidx.compose.ui.graphics.Color.Transparent,
-                        contentColor = if (on) c.onInk else c.ink, border = if (on) null else androidx.compose.foundation.BorderStroke(1.dp, c.line),
-                        modifier = Modifier.heightIn(min = Dim.control).androidx_selectable(on) { onAudio(audio.copy(ambient = k)); app.lockdin.audio.StudyAudio.stopPreview() },
-                    ) { Box(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), contentAlignment = Alignment.Center) { Text(k.label, style = UiType.label) } }
+                    Chip(k.label, audio.ambient == k) { onAudio(audio.copy(ambient = k)); app.lockdin.audio.StudyAudio.stopPreview() }
                 }
             }
             if (audio.ambient != app.lockdin.audio.Ambient.NONE) {
@@ -457,33 +453,118 @@ private fun SoundTab(
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
-            SectionLabel("Music playlist")
+            SectionLabel("Music")
             Text(
-                "Paste a playlist link from Spotify, YouTube Music, Apple Music or SoundCloud. Lockd In opens it in that app when you start focus, and gives you play/pause, skip and volume. The music plays in that app, not in Lockd In.",
+                "Pick the playlist this profile starts with. You can switch to any saved playlist during a session. The music plays in its own app (Spotify, YouTube Music, Apple Music or SoundCloud), in the background.",
                 style = UiType.caption, color = c.inkMuted,
             )
-            OutlinedTextField(
-                link, onLink, singleLine = true, placeholder = { Text("https://open.spotify.com/playlist/…") }, isError = linkError != null,
-                shape = RoundedCornerShape(Dim.radius), colors = fieldColors(),
-                modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Playlist link" },
-            )
-            when {
-                linkError != null -> Text(linkError, style = UiType.caption, color = c.danger)
-                provider != null -> Text(
-                    "Controls your ${provider.name} app. ${provider.name} stays available during this profile’s focus so it can play." +
-                        if (!app.lockdin.audio.StudyAudio.installed(ctx, provider.pkg)) " ${provider.name} isn’t installed on this phone; the link will open in your browser." else "",
+            val saved = store.state.playlists
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Dim.s2), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+                Chip("No music", link.isBlank()) { onLink("") }
+                saved.forEach { p -> Chip(p.name, p.link == link) { onLink(p.link) } }
+            }
+            linkError?.let { Text(it, style = UiType.caption, color = c.danger) }
+            if (provider != null) {
+                Text(
+                    "${provider.name} stays available during this profile’s focus so it can play." +
+                        if (!app.lockdin.audio.StudyAudio.installed(ctx, provider.pkg)) " ${provider.name} isn’t installed on this phone." else "",
                     style = UiType.caption, color = c.ink,
                 )
-                link.isNotBlank() -> Text("Not a link Lockd In recognises yet.", style = UiType.caption, color = c.inkMuted)
+                saved.firstOrNull { it.link == link }?.let { p ->
+                    TextAction("Remove “${p.name}” from saved playlists", {
+                        store.update { s ->
+                            s.copy(playlists = s.playlists.filter { it.link != p.link },
+                                profiles = s.profiles.map { if (it.audio.musicLink == p.link) it.copy(audio = it.audio.copy(musicLink = null)) else it })
+                        }
+                        onLink("")
+                    }, danger = true)
+                }
             }
+            AddPlaylist(store) { onLink(it) }
+            MusicControlAccess()
         }
         SettingsGroup {
             SwitchRow("Start sound when focus starts",
-                "Ambient sound starts by itself. The playlist opens for sessions you start in the app; planned automatic starts never open other apps.",
+                "Ambient sound starts by itself. Music starts in the background for sessions you start in the app; Lockd In stays on screen.",
                 audio.autoPlay) { onAudio(audio.copy(autoPlay = it)) }
             GroupDivider()
             SwitchRow("Keep ambient sound during breaks", "Off: it pauses for breaks and returns with focus", audio.duringBreaks) { onAudio(audio.copy(duringBreaks = it)) }
         }
+    }
+}
+
+@Composable
+private fun Chip(label: String, on: Boolean, onClick: () -> Unit) {
+    val c = LocalColors.current
+    androidx.compose.material3.Surface(
+        shape = androidx.compose.foundation.shape.CircleShape, color = if (on) c.ink else androidx.compose.ui.graphics.Color.Transparent,
+        contentColor = if (on) c.onInk else c.ink, border = if (on) null else androidx.compose.foundation.BorderStroke(1.dp, c.line),
+        modifier = Modifier.heightIn(min = Dim.control).androidx_selectable(on, onClick),
+    ) { Box(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), contentAlignment = Alignment.Center) { Text(label, style = UiType.label, maxLines = 1) } }
+}
+
+/** Name + link, saved to the playlist list (and chosen). */
+@Composable
+private fun AddPlaylist(store: Store, onAdded: (String) -> Unit) {
+    val c = LocalColors.current
+    var open by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf("") }
+    var link by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    if (!open) { SecondaryButton("Add a playlist", { open = true }); return }
+    androidx.compose.material3.Surface(shape = RoundedCornerShape(Dim.radius), color = c.surface, border = androidx.compose.foundation.BorderStroke(1.dp, c.line), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+            Text("In your music app, open the playlist, tap Share, then Copy link, and paste it here.", style = UiType.caption, color = c.inkMuted)
+            OutlinedTextField(
+                link, { link = it.take(500); error = null }, singleLine = true, placeholder = { Text("Playlist link") }, isError = error != null,
+                shape = RoundedCornerShape(Dim.radius), colors = fieldColors(),
+                modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Playlist link" },
+            )
+            OutlinedTextField(
+                name, { name = it.take(40) }, singleLine = true, placeholder = { Text("Name, e.g. Deep work") },
+                shape = RoundedCornerShape(Dim.radius), colors = fieldColors(),
+                modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Playlist name" },
+            )
+            error?.let { Text(it, style = UiType.caption, color = c.danger) }
+            Row(horizontalArrangement = Arrangement.spacedBy(Dim.s2)) {
+                SecondaryButton("Cancel", { open = false; name = ""; link = ""; error = null })
+                SecondaryButton("Save playlist", {
+                    val clean = app.lockdin.audio.Music.clean(link)
+                    when {
+                        clean == null -> error = "Paste a playlist link from Spotify, YouTube Music, Apple Music or SoundCloud"
+                        store.state.playlists.size >= app.lockdin.state.StateCodec.MAX_PLAYLISTS && store.state.playlists.none { it.link == clean } ->
+                            error = "You can save up to ${app.lockdin.state.StateCodec.MAX_PLAYLISTS} playlists. Remove one first."
+                        else -> {
+                            val p = app.lockdin.state.SavedPlaylist(name.trim().ifEmpty { app.lockdin.audio.Music.defaultName(clean) }, clean)
+                            store.update { s -> s.copy(playlists = s.playlists.filter { it.link != clean } + p) }
+                            onAdded(clean); open = false; name = ""; link = ""
+                        }
+                    }
+                })
+            }
+        }
+    }
+}
+
+/** Notification access, explained plainly, with its own switch in Android settings. */
+@Composable
+fun MusicControlAccess() {
+    val c = LocalColors.current
+    val ctx = LocalContext.current
+    val granted = remember(Resumes.tick) { app.lockdin.audio.MediaAccess.granted(ctx) }
+    Column(verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
+        Text(
+            if (granted) "Music control is on: Lockd In can start the exact playlist in its app."
+            else "To start the exact playlist, allow music control. Without it, Lockd In can only resume your music app, which plays whatever it played last.",
+            style = UiType.caption, color = if (granted) c.inkMuted else c.ink,
+        )
+        Text(
+            "Android grants this as “notification access”. Lockd In uses it only to see and control the music player; it never reads or keeps your notifications. You can turn it off in Android settings at any time.",
+            style = UiType.caption, color = c.inkMuted,
+        )
+        TextAction(if (granted) "Manage music control" else "Allow music control", {
+            runCatching { ctx.startActivity(app.lockdin.audio.MediaAccess.settingsIntent(ctx)) }
+        })
     }
 }
 

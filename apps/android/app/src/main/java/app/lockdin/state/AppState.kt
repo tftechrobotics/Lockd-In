@@ -96,6 +96,11 @@ data class ActiveSession(
     val checkIn: CheckInState = CheckInState(),
 )
 
+/** A playlist the person saved (B2): a name they chose and a link in their own music app. */
+data class SavedPlaylist(val name: String, val link: String) {
+    val provider: app.lockdin.audio.MusicProvider? get() = app.lockdin.audio.Music.providerOf(link)
+}
+
 data class AppState(
     val theme: ThemeChoice = ThemeChoice.SYSTEM,
     val tone: Tone = Tone.CALM,
@@ -107,6 +112,8 @@ data class AppState(
     /** Default commitment for new sessions. */
     val commitment: Commitment = Commitment.DELAYED,
     val presets: List<Preset> = emptyList(),
+    /** Saved playlists (B2). A profile's `musicLink` is one of these; any session can switch between them. */
+    val playlists: List<SavedPlaylist> = emptyList(),
     /** First-run introduction seen (new installs start with false; see Store.get). */
     val onboarded: Boolean = true,
     /** Location routines (E): places, and a switch that pauses all of them. */
@@ -170,6 +177,7 @@ object StateCodec {
                 .put("rounds", p.rounds).put("profileId", p.profileId).put("task", p.task ?: JSONObject.NULL)
                 .put("due", p.due?.toString() ?: JSONObject.NULL).put("steps", JSONArray(p.steps))
         }))
+        put("playlists", JSONArray(s.playlists.map { JSONObject().put("name", it.name).put("link", it.link) }))
         put("historyDays", s.historyDays)
         put("onboarded", s.onboarded)
         put("places", JSONArray(s.places.map { p ->
@@ -241,6 +249,7 @@ object StateCodec {
                 }?.take(8) ?: emptyList(),
                 commitment = enumOr(o.optString("commitment"), Commitment.DELAYED),
                 presets = o.optJSONArray("presets")?.objects()?.mapNotNull(::presetOf)?.take(MAX_PRESETS) ?: emptyList(),
+                playlists = playlistsOf(o),
                 historyDays = o.optInt("historyDays", 365).let { if (it in app.lockdin.engine.History.RETENTION_CHOICES) it else 365 },
                 onboarded = o.optBoolean("onboarded", true),
                 places = o.optJSONArray("places")?.objects()?.mapNotNull(::placeOf)?.take(20) ?: emptyList(),
@@ -284,6 +293,19 @@ object StateCodec {
         ).takeIf { (it.date != null || it.days.isNotEmpty()) && it.focusMinutes in 1..240 && it.rounds in 1..12 && it.breakMinutes in 0..120 }
     } catch (e: Exception) {
         null // DateTimeException, JSONException, bad day numbers: drop the item
+    }
+
+    /** Saved playlists; links a profile used before the list existed are added so nothing is lost. */
+    private fun playlistsOf(o: JSONObject): List<SavedPlaylist> {
+        val saved = o.optJSONArray("playlists")?.objects()?.mapNotNull { j ->
+            val link = app.lockdin.audio.Music.clean(j.optString("link")) ?: return@mapNotNull null
+            SavedPlaylist(j.optString("name").trim().take(40).ifEmpty { app.lockdin.audio.Music.defaultName(link) }, link)
+        } ?: emptyList()
+        val fromProfiles = o.optJSONArray("profiles")?.objects()?.mapNotNull { p ->
+            p.optJSONObject("audio")?.let { a -> if (a.isNull("musicLink") || !a.has("musicLink")) null else app.lockdin.audio.Music.clean(a.optString("musicLink")) }
+        } ?: emptyList()
+        val all = saved + fromProfiles.filter { l -> saved.none { it.link == l } }.distinct().map { SavedPlaylist(app.lockdin.audio.Music.defaultName(it), it) }
+        return all.distinctBy { it.link }.take(MAX_PLAYLISTS)
     }
 
     private fun presetOf(p: JSONObject): Preset? = try {
@@ -354,6 +376,7 @@ object StateCodec {
     private const val MAX_LOG = 300
     private const val MAX_STARTS = 40
     private const val MAX_PRESETS = 30
+    const val MAX_PLAYLISTS = 20
     // Earlier pattern backgrounds (PAPER, LINEN, CONTOURS, HILLS) were replaced by scenes; they read as NONE.
     private val BACKDROPS = setOf("NONE", "LIBRARY", "MOUNTAINS", "WORDS", "BLUEPRINT", "PHOTO")
 
