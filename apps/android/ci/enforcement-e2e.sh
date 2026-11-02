@@ -406,6 +406,18 @@ adb logcat -d -s LockdInAudio:I | grep -q "ambient_on kind=RAIN" && record B2-am
 ctl --es cmd emergency; sleep 4
 adb logcat -d -s LockdInAudio:I | grep -q "ambient_off" && record B2-ambient-off pass "stopped on emergency recovery" || record B2-ambient-off FAIL "ambient kept playing after emergency recovery"
 plan_phase
+# Calendar (C): a local calendar with one event; Lockd In reads it through Android's provider.
+adb shell pm grant $A android.permission.READ_CALENDAR || true
+adb shell content insert --uri 'content://com.android.calendar/calendars?caller_is_syncadapter=true&account_name=ci&account_type=LOCAL' \
+  --bind account_name:s:ci --bind account_type:s:LOCAL --bind name:s:CI --bind calendar_displayName:s:CI \
+  --bind calendar_access_level:i:700 --bind ownerAccount:s:ci --bind visible:i:1 --bind sync_events:i:1 --bind calendar_timezone:s:UTC >/dev/null 2>&1
+cal=$(adb shell content query --uri content://com.android.calendar/calendars --projection _id --where "account_name='ci'" | grep -oE '_id=[0-9]+' | head -1 | cut -d= -f2)
+s0=$(( ($(date +%s) + 7200) * 1000 )); e0=$(( s0 + 3600000 ))
+adb shell content insert --uri content://com.android.calendar/events --bind calendar_id:i:${cal:-1} --bind title:s:CIExam \
+  --bind dtstart:l:$s0 --bind dtend:l:$e0 --bind eventTimezone:s:UTC >/dev/null 2>&1
+adb logcat -c; ctl --es cmd calendar; sleep 2
+line=$(adb logcat -d -s LockdInTest:I | grep "calendar permitted" | tail -1)
+echo "$line" | grep -q "titles=.*CIExam" && record C-calendar-read pass "device calendar read: ${line#*permitted=}" || record C-calendar-read FAIL "event not read: ${line:-no log}"
 # History (roadmap step 2): sessions left above are saved and survive the process being killed.
 adb shell am force-stop $A; sleep 2
 n=$(adb shell run-as $A cat no_backup/history.v1.json 2>/dev/null | grep -o '"outcome"' | wc -l | tr -d ' ')

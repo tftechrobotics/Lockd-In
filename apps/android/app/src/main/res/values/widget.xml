@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_bg">#F7F3EC</color>
+    <color name="widget_ink">#2B251F</color>
+    <color name="widget_muted">#6F655B</color>
+    <color name="widget_line">#E3DBCF</color>
+    <string name="widget_description">Your next focus session, or the one running now with its countdown.</string>
+</resources>

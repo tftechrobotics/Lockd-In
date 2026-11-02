@@ -121,6 +121,7 @@ fun ScheduleScreen(store: Store, now: Long, zone: ZoneId, onEdit: (ScheduledSess
             ScreenTitle("Schedule", Modifier.weight(1f))
             if (all.isNotEmpty()) SecondaryButton("Add session", add)
         }
+        CalendarSuggestions(store, now, zone, onPlan = onEdit)
         if (all.isEmpty()) {
             Surface(shape = RoundedCornerShape(Dim.radius), color = c.surface, border = BorderStroke(1.dp, c.line), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(Dim.s5), verticalArrangement = Arrangement.spacedBy(Dim.s3), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -328,6 +329,7 @@ fun ScheduleEditor(store: Store, initial: ScheduledSession, zone: ZoneId, now: L
             }
         }
         ActionBar {
+            CalendarClash(store, s, now, zone)
             MainButton(if (isNew) "Save session" else "Save changes", onClick = {
                 val candidate = s.copy(id = s.id.ifEmpty { Store.newId() }, title = s.title.trim().ifEmpty { "Focus session" },
                     breakMinutes = if (s.rounds > 1) s.breakMinutes.coerceAtLeast(5) else s.breakMinutes)
@@ -432,4 +434,20 @@ private fun AutoStartRow(on: Boolean, onChange: (Boolean) -> Unit) {
             colors = SwitchDefaults.colors(checkedTrackColor = c.ink, checkedThumbColor = c.onInk, uncheckedTrackColor = c.taupeSoft, uncheckedBorderColor = c.controlLine, uncheckedThumbColor = c.controlLine),
         )
     }
+}
+
+
+/** Warns (never blocks) when the next occurrence overlaps a busy calendar event. */
+@Composable
+private fun CalendarClash(store: Store, s: ScheduledSession, now: Long, zone: ZoneId) {
+    if (!store.state.calendarOn) return
+    val c = LocalColors.current
+    val probe = s.copy(id = s.id.ifEmpty { "probe" }, enabled = true)
+    val next = remember(probe, now / 60_000) { app.lockdin.engine.Planner.occurrences(listOf(probe), now, now + 8 * 86_400_000L, zone).firstOrNull() } ?: return
+    val events = rememberCalendarEvents(store, next.start - 3_600_000, next.end + 3_600_000) ?: return
+    val clash = app.lockdin.engine.CalendarPlan.overlaps(events, next.start, next.end).firstOrNull() ?: return
+    Text(
+        "Overlaps “${clash.title}” (${Fmt.clock(clash.start, zone)}–${Fmt.clock(clash.end, zone)}) in your calendar on ${Fmt.dayLabel(next.start, now, zone).lowercase().replaceFirstChar { it.uppercase() }}. You can still save it.",
+        style = UiType.caption, color = c.ink,
+    )
 }

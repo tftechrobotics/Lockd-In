@@ -57,6 +57,7 @@ object Scheduler {
         val stale = events.filter { it.at <= now && it.id !in handled && it !in due }.map { it.id }
         if (stale.isNotEmpty()) store.logPlan(stale)
         schedule(ctx, Planner.nextWake(events, now, Store.get(ctx).state.planLog.toSet()))
+        app.lockdin.widget.LockdInWidget.update(ctx)
     }
 
     private fun schedule(ctx: Context, at: Long?) {

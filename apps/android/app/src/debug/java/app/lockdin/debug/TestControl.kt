@@ -70,6 +70,16 @@ class TestControl : BroadcastReceiver() {
                     )
                 }
             }
+            // Turns calendar suggestions on and logs what the device calendar returns (C).
+            "calendar" -> {
+                store.update { it.copy(calendarOn = true) }
+                val now = System.currentTimeMillis()
+                val ev = app.lockdin.cal.DeviceCalendar.events(context, now, now + 2 * 86_400_000L, emptySet())
+                val zone = java.time.ZoneId.systemDefault()
+                val today = java.time.LocalDate.now(zone)
+                val windows = app.lockdin.engine.CalendarPlan.freeWindows(ev, today, zone, now) + app.lockdin.engine.CalendarPlan.freeWindows(ev, today.plusDays(1), zone, now)
+                Log.i("LockdInTest", "calendar permitted=${app.lockdin.cal.DeviceCalendar.permitted(context)} calendars=${app.lockdin.cal.DeviceCalendar.calendars(context).size} events=${ev.size} titles=${ev.joinToString("|") { it.title }} windows=${windows.size}")
+            }
             "emergency" -> store.state.active?.let { a ->
                 store.setControls(a.id) { it.copy(emergencyRecoveryAt = System.currentTimeMillis()) }
             }

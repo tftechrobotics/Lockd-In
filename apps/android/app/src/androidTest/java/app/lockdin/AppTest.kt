@@ -433,6 +433,15 @@ class AppTest {
         rule.onNodeWithText("Plays in YouTube Music", substring = true).performScrollTo().assertIsDisplayed()
     }
 
+    @Test fun scheduleOffersCalendarSuggestionsOnlyWhenAsked() {
+        launch(home = true)
+        rule.onNodeWithTag("tab-schedule").performClick()
+        rule.onNodeWithText("Find free time in your calendar").assertIsDisplayed()
+        rule.onNodeWithText("never changes your calendar", substring = true).assertIsDisplayed()
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.onNodeWithText("Suggest times from my calendar").performScrollTo().assertIsDisplayed()
+    }
+
     @Test fun invalidCustomLengthExplained() {
         launch()
         rule.onNodeWithContentDescription("Custom minutes").performClick()
@@ -635,6 +644,31 @@ class AppTest {
                 val bmp = rule.onNodeWithTag("seq").captureToImage().asAndroidBitmap()
                 File(dir, "${theme}_%03d.png".format(i)).outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
             }
+        }
+    }
+
+    @Test fun widgetShowsNextOrRunningSession() {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        val now = clock.now()
+        val idle = app.lockdin.widget.LockdInWidget.content(AppState(), now, zone)
+        org.junit.Assert.assertEquals("Nothing planned", idle.title)
+        val store = Store(AppState()) {}
+        store.startSession(now, app.lockdin.engine.Session.roundsPlan(1, 40, 5), "Physics", "study", store.state.last)
+        val running = app.lockdin.widget.LockdInWidget.content(store.state, now + 60_000, zone)
+        org.junit.Assert.assertEquals("Focusing", running.label)
+        org.junit.Assert.assertEquals(now + 40 * 60_000, running.countdownTo)
+        // Render the real layout for the design review (light theme of the test device).
+        val dir = File(ctx.filesDir, "screens").apply { mkdirs() }
+        listOf("20-widget-idle" to idle, "21-widget-running" to running).forEach { (name, c) ->
+            val parent = android.widget.FrameLayout(ctx)
+            val view = app.lockdin.widget.LockdInWidget.views(ctx, c, now).apply(ctx, parent)
+            val w = (300 * ctx.resources.displayMetrics.density).toInt(); val h = (170 * ctx.resources.displayMetrics.density).toInt()
+            view.measure(android.view.View.MeasureSpec.makeMeasureSpec(w, android.view.View.MeasureSpec.EXACTLY), android.view.View.MeasureSpec.makeMeasureSpec(h, android.view.View.MeasureSpec.EXACTLY))
+            view.layout(0, 0, w, h)
+            val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+            bmp.eraseColor(android.graphics.Color.rgb(200, 205, 215))
+            view.draw(android.graphics.Canvas(bmp))
+            File(dir, "$name.png").outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
         }
     }
 

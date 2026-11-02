@@ -196,6 +196,7 @@ fun SettingsScreen(store: Store, history: app.lockdin.state.HistoryStore, zone: 
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
         }
         RemindersSettings(store)
+        CalendarSettings(store)
         Column {
             SectionLabel("Starting a session")
             SettingsGroup {

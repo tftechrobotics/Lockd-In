@@ -158,6 +158,7 @@ class FocusService : Service() {
                 else "Focus is back on" to "${session.intention ?: "Your session"} until $at."
             }
         }
+        app.lockdin.widget.LockdInWidget.update(this)
         // Study audio (B2) follows the session: on in focus, paused for breaks unless kept.
         app.lockdin.audio.StudyAudio.follow(
             this, session, inFocus = snap.phase?.kind == PhaseKind.FOCUS, inBreak = snap.phase?.kind == PhaseKind.BREAK,
@@ -296,6 +297,7 @@ class FocusService : Service() {
     private fun stop(reason: String) {
         Log.i(TAG, "released: $reason")
         app.lockdin.audio.StudyAudio.follow(this, null, inFocus = false, inBreak = false)
+        app.lockdin.widget.LockdInWidget.update(this)
         handler.removeCallbacks(tick)
         scheduleWake(null)
         EnforcerStatus.publish(EnforcerStatus.Report(null, Protection.IDLE, emptySet()))

@@ -95,6 +95,9 @@ data class AppState(
     /** Default commitment for new sessions. */
     val commitment: Commitment = Commitment.DELAYED,
     val presets: List<Preset> = emptyList(),
+    /** Calendar suggestions (C): off until the person turns them on; calendars they excluded. */
+    val calendarOn: Boolean = false,
+    val calendarHidden: Set<Long> = emptySet(),
     /** History kept for this many days; 0 = keep everything. */
     val historyDays: Int = 365,
     /** Manual-start animation feedback: haptic clicks (on) and a quiet click sound (off). */
@@ -139,6 +142,8 @@ object StateCodec {
                 .put("due", p.due?.toString() ?: JSONObject.NULL).put("steps", JSONArray(p.steps))
         }))
         put("historyDays", s.historyDays)
+        put("calendarOn", s.calendarOn)
+        put("calendarHidden", JSONArray(s.calendarHidden.sorted()))
         put("startHaptics", s.startHaptics)
         put("startSound", s.startSound)
         put("schedule", JSONArray(s.schedule.map {
@@ -193,6 +198,8 @@ object StateCodec {
                 commitment = enumOr(o.optString("commitment"), Commitment.DELAYED),
                 presets = o.optJSONArray("presets")?.objects()?.mapNotNull(::presetOf)?.take(MAX_PRESETS) ?: emptyList(),
                 historyDays = o.optInt("historyDays", 365).let { if (it in app.lockdin.engine.History.RETENTION_CHOICES) it else 365 },
+                calendarOn = o.optBoolean("calendarOn", false),
+                calendarHidden = longs(o.optJSONArray("calendarHidden")).take(200).toSet(),
                 startHaptics = o.optBoolean("startHaptics", true),
                 startSound = o.optBoolean("startSound", false),
                 reminders = o.optJSONObject("reminders")?.let(::remindersOf) ?: ReminderSettings(),

@@ -14,6 +14,7 @@ class LockdInApplication : Application() {
         var lastPlanInputs: Any? = null
         Store.get(this).onChange = { st ->
             FocusService.sync(this)
+            app.lockdin.widget.LockdInWidget.update(this)
             // Schedule or reminder settings changed: re-plan alarms.
             val inputs = st.schedule to st.reminders
             if (inputs != lastPlanInputs) {
