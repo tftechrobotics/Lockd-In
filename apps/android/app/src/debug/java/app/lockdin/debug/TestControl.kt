@@ -60,7 +60,7 @@ class TestControl : BroadcastReceiver() {
                 val pkgs = intent.getStringExtra("block")?.split(',')?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
                 store.update { s ->
                     s.copy(
-                        profiles = s.profiles.map { if (it.id == "study") it.copy(rules = AppRules(RuleMode.BLOCK_LIST, pkgs)) else it },
+                        profiles = s.profiles.map { if (it.id == "study") it.copy(rules = AppRules(RuleMode.BLOCK_LIST, pkgs), audio = app.lockdin.state.ProfileAudio()) else it },
                         schedule = s.schedule + app.lockdin.engine.ScheduledSession(
                             Store.newId(), intent.getStringExtra("title") ?: "E2E plan", emptySet(), at,
                             intent.getIntExtra("focus", 2), 1, 1, "study",
