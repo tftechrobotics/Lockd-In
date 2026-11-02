@@ -22,6 +22,8 @@
   Known: emulator Chrome sometimes shows its own full-screen screen with no address bar late in the long run,
   so `a11y-site-block` can fail there (diagnostics: `ONLY=site`, screen texts on failure).
   Phone check pending for: start sequence feel/haptics, Chrome blocking, Wallet + home screen.
+  Fixed 63c1d63 (owner report: dial turned only the first time): MainActivity is singleTask (Return to work had
+  created a second instance whose hidden composition consumed StartIntro); only a STARTED screen may consume.
 - **Sculpted dial + start sequence (R42, first commit e72eb6d):** `ui/ClockLock.kt` (`StartIntro` one-shot, `animationsOff`),
   settings `startHaptics`/`startSound`. Emulator E2E `intro_phase` records `ci-screenshots/start-sequence/*.mp4`.
 - **Profiles pass (R41, commit 26e40d3):** allow-only websites (`AppRules.siteMode`, `BlockPolicy.isSiteRestricted`;
