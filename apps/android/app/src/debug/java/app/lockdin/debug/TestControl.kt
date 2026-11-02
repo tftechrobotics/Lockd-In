@@ -90,6 +90,8 @@ class TestControl : BroadcastReceiver() {
                 store.update { it.copy(places = listOf(p), placesPaused = false) }
                 app.lockdin.loc.Geofences.sync(context)
             }
+            // Marks the first-run introduction as seen (the E2E drives the main screens).
+            "onboarded" -> store.update { it.copy(onboarded = true) }
             "emergency" -> store.state.active?.let { a ->
                 store.setControls(a.id) { it.copy(emergencyRecoveryAt = System.currentTimeMillis()) }
             }
