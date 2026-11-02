@@ -111,7 +111,33 @@ object StudyAudio {
      */
     fun startMusic(ctx: Context, session: ActiveSession) {
         if (!session.audio.autoPlay) return
-        session.audio.musicLink?.let { playPlaylist(ctx, it) }
+        val link = session.audio.musicLink ?: return
+        // After the start sequence has played, so nothing can cover it.
+        main.postDelayed({ playPlaylist(ctx, link) }, START_DELAY_MS)
+    }
+
+    private const val START_DELAY_MS = 2_000L
+    private const val HOLD_FRONT_MS = 8_000L
+    /** Until then, if Lockd In leaves the screen it was the music app jumping in front: come back. */
+    private var holdFrontUntil = 0L
+    private var holdFrontPkg: String? = null
+
+    /** From MainActivity.onStop. */
+    fun onLockdInHidden(ctx: Context) {
+        if (SystemClock.elapsedRealtime() >= holdFrontUntil) return
+        holdFrontUntil = 0L
+        val app = ctx.applicationContext
+        main.postDelayed({
+            // With Accessibility on, act only if the music app is what came up (not Home or
+            // another app the person chose). Without it, Lockd In can't tell, so it comes back.
+            val a11y = app.lockdin.enforce.FocusAccessibilityService
+            if (a11y.connected && a11y.lastWindowPkg != holdFrontPkg) return@postDelayed
+            runCatching {
+                app.startActivity(Intent(app, app.lockdin.MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+            }
+            Log.i(TAG, "music_app_sent_back")
+        }, 400)
     }
 
     /**
@@ -122,6 +148,8 @@ object StudyAudio {
     fun playPlaylist(ctx: Context, link: String) {
         val provider = Music.providerOf(link) ?: return
         val app = ctx.applicationContext
+        holdFrontUntil = SystemClock.elapsedRealtime() + HOLD_FRONT_MS
+        holdFrontPkg = provider.pkg
         if (!installed(app, provider.pkg)) { musicNote = "${provider.name} isn’t installed on this phone."; return }
         if (!MediaAccess.granted(app)) {
             sendKey(app, provider.pkg, KeyEvent.KEYCODE_MEDIA_PLAY)
@@ -154,6 +182,7 @@ object StudyAudio {
 
     /** Opens the playlist in its app (the person tapped "Open in …"). YouTube Music starts playing it. */
     fun openInApp(ctx: Context, link: String) {
+        holdFrontUntil = 0L
         val provider = Music.providerOf(link)
         val view = Intent(Intent.ACTION_VIEW, Uri.parse(Music.openUri(link))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         provider?.let { p -> if (installed(ctx, p.pkg)) view.setPackage(p.pkg) }

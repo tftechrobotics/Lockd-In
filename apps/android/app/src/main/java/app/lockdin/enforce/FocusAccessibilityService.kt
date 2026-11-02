@@ -103,6 +103,7 @@ class FocusAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val e = event ?: return
         val pkg = e.packageName?.toString() ?: return
+        if (e.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) lastWindowPkg = pkg
         if (pkg == packageName) return
         val session = Store.get(this).state.active ?: return
         val now = System.currentTimeMillis()
@@ -232,6 +233,10 @@ class FocusAccessibilityService : AccessibilityService() {
 
         /** The service is bound by Android right now (process-local; reset by process death). */
         @Volatile var connected = false
+            private set
+
+        /** Package of the last window that came up (read-only use: sending a music app back, R47). */
+        @Volatile var lastWindowPkg: String? = null
             private set
 
         /** Address-bar view IDs of supported browsers. Others are blocked as whole apps only. */
