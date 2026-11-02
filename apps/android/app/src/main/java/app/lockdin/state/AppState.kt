@@ -107,6 +107,8 @@ data class AppState(
     /** Default commitment for new sessions. */
     val commitment: Commitment = Commitment.DELAYED,
     val presets: List<Preset> = emptyList(),
+    /** First-run introduction seen (new installs start with false; see Store.get). */
+    val onboarded: Boolean = true,
     /** Location routines (E): places, and a switch that pauses all of them. */
     val places: List<app.lockdin.engine.Place> = emptyList(),
     val placesPaused: Boolean = false,
@@ -167,6 +169,7 @@ object StateCodec {
                 .put("due", p.due?.toString() ?: JSONObject.NULL).put("steps", JSONArray(p.steps))
         }))
         put("historyDays", s.historyDays)
+        put("onboarded", s.onboarded)
         put("places", JSONArray(s.places.map { p ->
             JSONObject().put("id", p.id).put("name", p.name).put("lat", p.lat).put("lon", p.lon).put("radiusM", p.radiusM)
                 .put("profileId", p.profileId).put("days", JSONArray(p.days.map { it.value }.sorted()))
@@ -236,6 +239,7 @@ object StateCodec {
                 commitment = enumOr(o.optString("commitment"), Commitment.DELAYED),
                 presets = o.optJSONArray("presets")?.objects()?.mapNotNull(::presetOf)?.take(MAX_PRESETS) ?: emptyList(),
                 historyDays = o.optInt("historyDays", 365).let { if (it in app.lockdin.engine.History.RETENTION_CHOICES) it else 365 },
+                onboarded = o.optBoolean("onboarded", true),
                 places = o.optJSONArray("places")?.objects()?.mapNotNull(::placeOf)?.take(20) ?: emptyList(),
                 placesPaused = o.optBoolean("placesPaused", false),
                 customMessages = o.optJSONArray("customMessages")?.let { a -> (0 until a.length()).mapNotNull { a.optString(it).trim().take(140).ifEmpty { null } } }?.take(10) ?: emptyList(),

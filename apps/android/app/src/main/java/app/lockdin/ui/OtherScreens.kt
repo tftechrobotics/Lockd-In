@@ -203,6 +203,7 @@ fun SettingsScreen(
             if (store.state.tone != Tone.QUIET) { Spacer(Modifier.height(Dim.s3)); AppMessagesEditor(store) }
         }
         CoachingSettings(store)
+        DefaultsSettings(store)
         LookSettings(store)
         RemindersSettings(store)
         CalendarSettings(store)
@@ -254,6 +255,7 @@ fun SettingsScreen(
             }
             exportError?.let { Text(it, style = UiType.caption, color = c.danger) }
         }
+        PrivacySettings()
         Column {
             SectionLabel("Data")
             SettingsGroup {
@@ -544,6 +546,61 @@ private fun CoachingSettings(store: Store) {
         Spacer(Modifier.height(Dim.s2))
         Text(
             "During focus, if the phone hasn’t been used for that long, a silent notification asks if you’re still working. Working on paper counts. It only looks at when the screen was last used, never what’s on it, and isn’t sent in a session’s first 10 minutes.",
+            style = UiType.caption, color = c.inkMuted,
+        )
+    }
+}
+
+
+/** Settings › New session defaults: what setup starts with (release readiness). */
+@Composable
+private fun DefaultsSettings(store: Store) {
+    val l = store.state.last
+    fun set(f: (app.lockdin.state.LastChoice) -> app.lockdin.state.LastChoice) = store.update { it.copy(last = f(it.last)) }
+    Column {
+        SectionLabel("New session defaults")
+        SettingsGroup {
+            SettingMenuRow("Focus length", (listOf(15, 20, 25, 30, 40, 45, 50, 60, 90) + l.focusMinutes).distinct().sorted().map { it to "$it min" }, l.focusMinutes, { v -> set { it.copy(focusMinutes = v) } }, icon = LIcon.Clock)
+            GroupDivider()
+            SettingMenuRow("Rounds", (1..6).map { it to if (it == 1) "1 round" else "$it rounds" }, l.rounds, { v -> set { it.copy(rounds = v) } }, icon = LIcon.Repeat)
+            GroupDivider()
+            SettingMenuRow("Breaks", listOf(5, 10, 15, 20).map { it to "$it min" }, l.breakMinutes.coerceIn(5, 20), { v -> set { it.copy(breakMinutes = v) } }, icon = LIcon.Coffee)
+            GroupDivider()
+            SettingMenuRow("Profile", store.state.profiles.map { it.id to it.name }, l.profileId, { v -> set { it.copy(profileId = v) } }, icon = LIcon.Book)
+        }
+    }
+}
+
+/** Settings › Privacy: every permission Lockd In can use, whether it's on, and what it's for. */
+@Composable
+private fun PrivacySettings() {
+    val c = LocalColors.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val tick = Resumes.tick
+    fun granted(p: String) = ctx.checkSelfPermission(p) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    val rows = remember(tick) {
+        listOf(
+            Triple("Accessibility", app.lockdin.enforce.Capabilities.accessibility(ctx), "Sees which app is in front and, in supported browsers, the web address, during focus only"),
+            Triple("Usage access", app.lockdin.enforce.Capabilities.usageAccess(ctx), "Which app is in front, as a fallback to Accessibility"),
+            Triple("Display over other apps", android.provider.Settings.canDrawOverlays(ctx), "Lets the block screen appear over a blocked app"),
+            Triple("Notifications", app.lockdin.sched.Notifier.allowed(ctx), "Reminders, session notices and blocking problems"),
+            Triple("Calendar", granted(android.Manifest.permission.READ_CALENDAR), "Read-only, for free-time suggestions"),
+            Triple("Location", granted(android.Manifest.permission.ACCESS_FINE_LOCATION), "Only for places you save; no history"),
+        )
+    }
+    Column {
+        SectionLabel("Privacy")
+        SettingsGroup {
+            rows.forEachIndexed { i, (name, on, what) ->
+                if (i > 0) GroupDivider()
+                SettingRow(name, if (on) "On" else "Off", supporting = what, onClick = {
+                    ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.fromParts("package", ctx.packageName, null)))
+                })
+            }
+        }
+        Spacer(Modifier.height(Dim.s2))
+        Text(
+            "Everything Lockd In knows stays on this phone and is excluded from backups: your settings, schedule, profiles, presets, history and saved places. It has no account and sends nothing anywhere. Tap a permission to change it in Android.",
             style = UiType.caption, color = c.inkMuted,
         )
     }

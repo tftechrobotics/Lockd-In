@@ -518,6 +518,28 @@ class AppTest {
         org.junit.Assert.assertEquals(1, store.state.places.size)
     }
 
+    @Test fun firstRunIntroIsShortAndSkippable() {
+        val store = launch(AppState(onboarded = false), home = true)
+        rule.onNodeWithText("Start focus. Keep distractions closed.").assertIsDisplayed()
+        rule.onNodeWithText("never closes your apps", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Continue").performClick()
+        rule.onNodeWithText("Blocking needs one permission").assertIsDisplayed()
+        rule.onNodeWithText("Skip").performClick()
+        org.junit.Assert.assertTrue(store.state.onboarded)
+        rule.onNodeWithText("New session").assertIsDisplayed()
+    }
+
+    @Test fun privacyListsPermissionsAndDefaultsAreEditable() {
+        val store = launch(home = true)
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.onNodeWithText("Privacy").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("sends nothing anywhere", substring = true).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Read-only, for free-time suggestions").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Focus length").performScrollTo().performClick()
+        rule.onNodeWithText("25 min").performClick()
+        org.junit.Assert.assertEquals(25, store.state.last.focusMinutes)
+    }
+
     @Test fun invalidCustomLengthExplained() {
         launch()
         rule.onNodeWithContentDescription("Custom minutes").performClick()

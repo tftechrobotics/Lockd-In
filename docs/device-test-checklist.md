@@ -51,3 +51,13 @@ Run these on the Galaxy S24+ with the latest test APK. Answer each with pass or 
 15. Settings › Notifications: "Allow notifications" off hides the switches and stops reminders. Turning it on brings them back.
 16. The new padlock-with-clock icon is on the home screen and in the app drawer. With themed icons on, it turns one colour.
 17. The Profiles list is readable, and app logos show in the editor.
+
+## Battery measurement (release readiness; repeat after study audio)
+
+These need no computer. Charge the phone above 80% and close other heavy apps first.
+
+1. **Baseline:** start a 60-minute session with blocking (Accessibility on) and no sound. Use the phone normally for a few minutes, then leave it locked for the rest. Afterwards, open Android Settings › Battery › Battery usage, choose "Since last full charge" or "Past 24 hours", find Lockd In and note its percentage. Note the phone's total battery drop too.
+2. **With ambient sound:** same session, but with a profile that plays Rain at the default level, screen locked. Note both numbers again.
+3. **With a playlist:** same, with a Spotify/YouTube Music playlist profile. Lockd In's share should match the baseline; the music app's share is that app's own.
+
+Report the three Lockd In percentages and total drops. Targets: blocking alone ≤ 2% per hour; ambient sound adds ≤ 3% per hour on the S24+.

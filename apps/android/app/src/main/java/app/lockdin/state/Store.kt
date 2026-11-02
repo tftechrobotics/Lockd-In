@@ -141,7 +141,9 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
             shared ?: run {
                 val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 val raw = prefs.getString(KEY_V2, null) ?: prefs.getString(KEY_V1, null)
-                Store(StateCodec.decode(raw)) { prefs.edit().putString(KEY_V2, it).commit() }.also { shared = it }
+                // A new install (nothing saved yet) starts with the short introduction.
+                val initial = if (raw == null) AppState(onboarded = false) else StateCodec.decode(raw)
+                Store(initial) { prefs.edit().putString(KEY_V2, it).commit() }.also { shared = it }
             }
         }
 

@@ -91,7 +91,15 @@ fun LockdInApp(
             }
         }
 
-        // Schedule create/edit is its own full screen: no tabs, its own close and save.
+        // First run: a short introduction (skippable).
+        if (!store.state.onboarded) {
+            Box(
+                Modifier.fillMaxSize().background(c.ground)
+                    .windowInsetsPadding(WindowInsets.safeDrawing).semantics { contentDescription = "Welcome" },
+            ) { Onboarding(store) }
+            return@LockdInTheme
+        }
+                // Schedule create/edit is its own full screen: no tabs, its own close and save.
         editing?.let { e ->
             Box(
                 Modifier.fillMaxSize().background(c.ground)
