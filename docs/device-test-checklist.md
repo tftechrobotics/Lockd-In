@@ -61,3 +61,22 @@ These need no computer. Charge the phone above 80% and close other heavy apps fi
 3. **With a playlist:** same, with a Spotify/YouTube Music playlist profile. Lockd In's share should match the baseline; the music app's share is that app's own.
 
 Report the three Lockd In percentages and total drops. Targets: blocking alone ≤ 2% per hour; ambient sound adds ≤ 3% per hour on the S24+.
+
+
+## New in the 2026-11-02 build (roadmap steps 2–7)
+
+18. **History:** finish a session and check it on the History tab and in the week card. Delete one entry. Export a CSV from Settings › History.
+19. **Presets:** in New session, set up a session and tap "Save as preset". Start it from Home in one tap. Add steps in Profiles › Presets, then check they show under Details.
+20. **Sound:** in Profiles › a profile › Sound, try Rain with Preview. Then:
+    - Start focus and check that the sound plays with the screen locked, pauses at the break and stops at the end.
+    - Paste a Spotify or YouTube Music playlist link and start focus. The app opens, then Lockd In comes back. Play/pause and skip control it.
+21. **Calendar:** on Schedule, tap "Use my calendar". The free times should match your Google Calendar. Tap one and check the editor is filled in.
+22. **Widget:** add the Lockd In widget to the home screen. It should show the next session, or a live countdown during focus.
+23. **Look:** in Settings › Look, choose a background and turn on quotes. The lock and text stay clear. Try your own photo.
+24. **Coaching:**
+    - Set "My own words" and add a line.
+    - Add a message for one app and open that app during focus.
+    - Time a few questions.
+    - Set check-ins to 10 min and leave the phone untouched during focus. One silent "Still working?" should appear.
+25. **Places:** add a place where you are, set it to remind, and allow location "All the time". Leave and come back during its hours. A reminder should come once.
+26. **Battery:** follow the battery protocol above.

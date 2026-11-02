@@ -118,7 +118,11 @@ The checklist is in `docs/device-test-checklist.md` under "Pending phone checks 
 
 ## Known limitations (2026-11-02)
 
-- **Phone checks:** none of B–E has been checked on a physical phone yet. Only the emulator and unit tests ran.
+- **Phone checks:** none of B–E has been checked on a physical phone yet. Emulator evidence (2026-11-02):
+  - Screen tests: 64/64 passed (e3a31d8).
+  - Blocking end-to-end: all pass, including B history persisting after force-stop, B2 ambient on/off and the start sequence. The exception is the intermittent emulator-Chrome site check, which passed in the previous run with the same app code.
+  - C reads a real provider calendar event (6643f6e).
+  - E: a geofence arrival, fed through Play services mock location, posted the reminder; a second arrival the same day was skipped (6643f6e).
 - **Music:** external control uses Android media keys and media volume. It can't show what's playing, and play/pause goes to whichever app last played audio.
   - Opening a playlist brings that app to the front for about 2.5 s, then Lockd In returns. That return can be blocked on Android without "display over other apps"; the person then switches back themselves.
   - Scheduled and place-based starts never open playlists.
