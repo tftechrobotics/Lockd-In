@@ -284,6 +284,22 @@ class AppTest {
         rule.onNodeWithText("Focusing", substring = true).assertExists()
     }
 
+    @Test fun startSequencePlaysOnEveryManualStart() {
+        // Owner report: the dial turned only for the first session. Start, finish, start again
+        // (Done → New session) and once more with "Same again".
+        val store = launch(AppState(last = app.lockdin.state.LastChoice(25, 5, 1, "study")))
+        val p0 = app.lockdin.ui.StartIntro.plays; val d0 = app.lockdin.ui.StartIntro.drawn
+        rule.onNodeWithText("Start timer").performClick(); rule.waitForIdle()
+        clock.advanceMinutes(26); tick(store)
+        rule.onNodeWithText("Done").performClick()
+        rule.onNodeWithText("New session").performClick()
+        rule.onNodeWithText("Start timer").performClick(); rule.waitForIdle()
+        clock.advanceMinutes(26); tick(store)
+        rule.onNodeWithText("Same again").performScrollTo().performClick(); rule.waitForIdle()
+        org.junit.Assert.assertEquals("requests consumed", p0 + 3, app.lockdin.ui.StartIntro.plays)
+        org.junit.Assert.assertEquals("sequences drawn", d0 + 3, app.lockdin.ui.StartIntro.drawn)
+    }
+
     @Test fun sessionStartedOutsideTheAppDoesNotPlayTheSequence() {
         // As after a scheduled start: the session already exists when the app is opened.
         val store = Store(AppState()) {}

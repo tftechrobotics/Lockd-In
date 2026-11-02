@@ -116,6 +116,10 @@ object StartIntro {
     @Volatile var plays = 0
         private set
 
+    /** Sequences that actually began drawing (tests). */
+    @Volatile var drawn = 0
+        internal set
+
     fun request(sessionId: String) { pending = sessionId }
 
     fun consume(sessionId: String): Boolean {
@@ -190,6 +194,7 @@ fun ClockLock(
     LaunchedEffect(introFor) {
         if (introFor == null) return@LaunchedEffect
         android.util.Log.i("LockdInIntro", "played session=$introFor reduced=$reduced")
+        StartIntro.drawn++
         if (reduced) {
             turning = false
             face.animateTo(1f, tween(220))
