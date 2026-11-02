@@ -7,6 +7,8 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -246,6 +248,9 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
     var chosen by remember { mutableStateOf(profile.rules.packages) }
     var sites by remember { mutableStateOf(profile.rules.sites) }
     var siteMode by remember { mutableStateOf(profile.rules.siteMode) }
+    var audio by remember { mutableStateOf(profile.audio) }
+    var linkText by remember { mutableStateOf(profile.audio.musicLink ?: "") }
+    var linkError by remember { mutableStateOf<String?>(null) }
     var tab by remember { mutableStateOf(0) }
     var siteText by remember { mutableStateOf("") }
     var siteError by remember { mutableStateOf<String?>(null) }
@@ -259,7 +264,11 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
     val allowSites = siteMode == RuleMode.APPROVED_ONLY
 
     fun save() {
-        store.update { s -> s.copy(profiles = s.profiles.map { if (it.id == profile.id) it.copy(rules = AppRules(mode, chosen, sites, siteMode)) else it }) }
+        val link = linkText.trim()
+        if (link.isNotEmpty() && app.lockdin.audio.Music.clean(link) == null) { tab = 2; linkError = "Paste a playlist link from Spotify, YouTube Music, Apple Music or SoundCloud"; return }
+        val a = audio.copy(musicLink = app.lockdin.audio.Music.clean(link))
+        app.lockdin.audio.StudyAudio.stopPreview()
+        store.update { s -> s.copy(profiles = s.profiles.map { if (it.id == profile.id) it.copy(rules = AppRules(mode, chosen, sites, siteMode), audio = a) else it }) }
         onClose()
     }
 
@@ -271,10 +280,12 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
             TextAction("Save", ::save)
         }
         Column(Modifier.padding(horizontal = Dim.gutter), verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
-            SegmentedChoice(listOf(0 to "Apps", 1 to "Websites"), tab, { tab = it }, label = "Edit apps or websites")
+            SegmentedChoice(listOf(0 to "Apps", 1 to "Websites", 2 to "Sound"), tab, { tab = it }, label = "Edit apps, websites or sound")
             if (running) Text("A session with this profile is running. Changes apply from the next session.", style = UiType.caption, color = c.ink)
         }
-        if (tab == 1) {
+        if (tab == 2) {
+            SoundTab(audio, { audio = it }, linkText, { linkText = it.take(500); linkError = null }, linkError)
+        } else if (tab == 1) {
             Column(Modifier.padding(horizontal = Dim.gutter, vertical = Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
                 SegmentedChoice(
                     listOf(RuleMode.BLOCK_LIST to "Block these", RuleMode.APPROVED_ONLY to "Allow only these"),
@@ -404,3 +415,77 @@ fun AppIcon(pkg: String, size: androidx.compose.ui.unit.Dp = 36.dp) {
         bmp?.let { androidx.compose.foundation.Image(it.asImageBitmap(), contentDescription = null, modifier = Modifier.size(size)) }
     }
 }
+
+
+/** Study sound for a profile (B2): generated ambient sound, and/or a playlist in the person's own music app. */
+@Composable
+private fun SoundTab(
+    audio: app.lockdin.state.ProfileAudio, onAudio: (app.lockdin.state.ProfileAudio) -> Unit,
+    link: String, onLink: (String) -> Unit, linkError: String?,
+) {
+    val c = LocalColors.current
+    val ctx = LocalContext.current
+    val provider = app.lockdin.audio.Music.providerOf(link)
+    Column(
+        Modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(horizontal = Dim.gutter, vertical = Dim.s3),
+        verticalArrangement = Arrangement.spacedBy(Dim.s4),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+            SectionLabel("Ambient sound")
+            Text("Made on your phone and played by Lockd In. Works offline.", style = UiType.caption, color = c.inkMuted)
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Dim.s2), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+                app.lockdin.audio.Ambient.values().forEach { k ->
+                    val on = audio.ambient == k
+                    androidx.compose.material3.Surface(
+                        shape = androidx.compose.foundation.shape.CircleShape, color = if (on) c.ink else androidx.compose.ui.graphics.Color.Transparent,
+                        contentColor = if (on) c.onInk else c.ink, border = if (on) null else androidx.compose.foundation.BorderStroke(1.dp, c.line),
+                        modifier = Modifier.heightIn(min = Dim.control).androidx_selectable(on) { onAudio(audio.copy(ambient = k)); app.lockdin.audio.StudyAudio.stopPreview() },
+                    ) { Box(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), contentAlignment = Alignment.Center) { Text(k.label, style = UiType.label) } }
+                }
+            }
+            if (audio.ambient != app.lockdin.audio.Ambient.NONE) {
+                Text("Level", style = UiType.caption, color = c.inkMuted)
+                androidx.compose.material3.Slider(
+                    audio.level, { onAudio(audio.copy(level = it)) }, valueRange = 0f..1f,
+                    colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = c.ink, activeTrackColor = c.ink, inactiveTrackColor = c.line),
+                    modifier = Modifier.semantics { contentDescription = "Ambient level" },
+                )
+                val previewing = app.lockdin.audio.StudyAudio.playing
+                SecondaryButton(if (previewing) "Stop preview" else "Preview 10 seconds", {
+                    if (previewing) app.lockdin.audio.StudyAudio.stopPreview() else app.lockdin.audio.StudyAudio.preview(ctx, audio.ambient, audio.level)
+                })
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+            SectionLabel("Music playlist")
+            Text(
+                "Paste a playlist link from Spotify, YouTube Music, Apple Music or SoundCloud. Lockd In opens it in that app when you start focus, and gives you play/pause, skip and volume. The music plays in that app, not in Lockd In.",
+                style = UiType.caption, color = c.inkMuted,
+            )
+            OutlinedTextField(
+                link, onLink, singleLine = true, placeholder = { Text("https://open.spotify.com/playlist/…") }, isError = linkError != null,
+                shape = RoundedCornerShape(Dim.radius), colors = fieldColors(),
+                modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Playlist link" },
+            )
+            when {
+                linkError != null -> Text(linkError, style = UiType.caption, color = c.danger)
+                provider != null -> Text(
+                    "Controls your ${provider.name} app. ${provider.name} stays available during this profile’s focus so it can play." +
+                        if (!app.lockdin.audio.StudyAudio.installed(ctx, provider.pkg)) " ${provider.name} isn’t installed on this phone; the link will open in your browser." else "",
+                    style = UiType.caption, color = c.ink,
+                )
+                link.isNotBlank() -> Text("Not a link Lockd In recognises yet.", style = UiType.caption, color = c.inkMuted)
+            }
+        }
+        SettingsGroup {
+            SwitchRow("Start sound when focus starts",
+                "Ambient sound starts by itself. The playlist opens for sessions you start in the app; planned automatic starts never open other apps.",
+                audio.autoPlay) { onAudio(audio.copy(autoPlay = it)) }
+            GroupDivider()
+            SwitchRow("Keep ambient sound during breaks", "Off: it pauses for breaks and returns with focus", audio.duringBreaks) { onAudio(audio.copy(duringBreaks = it)) }
+        }
+    }
+}
+
+private fun Modifier.androidx_selectable(on: Boolean, onClick: () -> Unit): Modifier =
+    this.then(Modifier.clickable(role = Role.RadioButton, onClick = onClick).semantics { stateDescription = if (on) "Selected" else "Not selected" })

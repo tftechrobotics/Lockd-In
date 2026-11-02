@@ -160,6 +160,7 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
                     }
                 }
                 // Presets: one tap starts the session (a manual start, so the start sequence plays).
+                val homeCtx = androidx.compose.ui.platform.LocalContext.current
                 if (store.state.presets.isNotEmpty()) {
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
                         Text("Start a preset", style = UiType.section, color = c.inkMuted, modifier = Modifier.semantics { heading() })
@@ -169,7 +170,7 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
                                 Surface(
                                     shape = CircleShape, color = Color.Transparent, contentColor = c.ink, border = BorderStroke(1.dp, c.line),
                                     modifier = Modifier.heightIn(min = Dim.control).clickable(role = Role.Button, onClickLabel = "Start ${p.name}") {
-                                        startPreset(store, p, clock.now())
+                                        startPreset(store, p, clock.now(), homeCtx)
                                     },
                                 ) {
                                     Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
@@ -207,15 +208,15 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
     )
 }
 
-/** Starts a preset now as a manual start (the start sequence plays). */
-fun startPreset(store: Store, p: app.lockdin.state.Preset, now: Long) {
+/** Starts a preset now as a manual start (the start sequence plays; the playlist opens). */
+fun startPreset(store: Store, p: app.lockdin.state.Preset, now: Long, ctx: android.content.Context? = null) {
     val profile = if (store.state.profiles.any { it.id == p.profileId }) p.profileId else store.state.last.profileId
     store.startSession(
         now, Session.roundsPlan(p.rounds, p.focusMinutes, if (p.rounds > 1) p.breakMinutes else 0), p.task, profile,
         LastChoice(p.focusMinutes, if (p.breakMinutes > 0) p.breakMinutes else store.state.last.breakMinutes, p.rounds, profile),
         presetId = p.id,
     )
-    store.state.active?.let { StartIntro.request(it.id) }
+    store.state.active?.let { StartIntro.request(it.id); if (ctx != null) app.lockdin.audio.StudyAudio.openPlaylist(ctx, it) }
 }
 
 /** Scrolling content with the action area pinned below it (above the bottom navigation). */
@@ -379,7 +380,7 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
                         presetId = presetId,
                     )
                     // The start sequence plays once, for this manual start only.
-                    store.state.active?.let { StartIntro.request(it.id) }
+                    store.state.active?.let { StartIntro.request(it.id); app.lockdin.audio.StudyAudio.openPlaylist(ctx, it) }
                 }
             })
         },
@@ -629,6 +630,10 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
                 style = UiType.body.copy(fontFeatureSettings = "tnum"), color = c.inkMuted,
             )
         }
+        if (session.audio.hasSound) {
+            Spacer(Modifier.height(Dim.s3))
+            SoundControls(session)
+        }
         Spacer(Modifier.height(Dim.s3))
         MoreToggle("Details and options", more || pending) { more = !more }
         if (more || pending) {
@@ -639,6 +644,57 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
                 nudge?.let { Text(it, style = UiType.body, color = c.inkMuted) }
                 note()
                 OutPanel(store, session, snap, now, clock)
+            }
+        }
+    }
+}
+
+/**
+ * Study sound during a session (B2): ambient play/pause and level (played by Lockd In), and for
+ * a playlist, play/pause, skip and media volume sent to the music app. No browsing.
+ */
+@Composable
+private fun SoundControls(session: ActiveSession) {
+    val c = LocalColors.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val a = session.audio
+    val provider = a.musicProvider
+    Surface(shape = RoundedCornerShape(Dim.radius), color = c.surface, border = BorderStroke(1.dp, c.line), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = Dim.s3, vertical = Dim.s2)) {
+            if (a.ambient != app.lockdin.audio.Ambient.NONE) {
+                val playing = app.lockdin.audio.StudyAudio.playing
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.IconButton(onClick = { app.lockdin.audio.StudyAudio.toggle(ctx, session) }) {
+                        LockdIcon(if (playing) LIcon.Pause else LIcon.Play, tint = c.ink,
+                            description = if (playing) "Pause ${a.ambient.label.lowercase()}" else "Play ${a.ambient.label.lowercase()}")
+                    }
+                    Text(a.ambient.label, style = UiType.label, color = c.ink, modifier = Modifier.width(96.dp))
+                    val lv = app.lockdin.audio.StudyAudio.level.let { if (it >= 0f) it else a.level }
+                    androidx.compose.material3.Slider(
+                        lv, { app.lockdin.audio.StudyAudio.setSessionLevel(it) }, valueRange = 0f..1f,
+                        colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = c.ink, activeTrackColor = c.ink, inactiveTrackColor = c.line),
+                        modifier = Modifier.weight(1f).semantics { contentDescription = "${a.ambient.label} level" },
+                    )
+                }
+            }
+            if (provider != null) {
+                var vol by remember { mutableStateOf(app.lockdin.audio.StudyAudio.mediaVolume(ctx)) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.IconButton(onClick = { app.lockdin.audio.StudyAudio.mediaKey(ctx, android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) }) {
+                        LockdIcon(LIcon.Play, tint = c.ink, description = "Play or pause ${provider.name}")
+                    }
+                    androidx.compose.material3.IconButton(onClick = { app.lockdin.audio.StudyAudio.mediaKey(ctx, android.view.KeyEvent.KEYCODE_MEDIA_NEXT) }) {
+                        LockdIcon(LIcon.Next, tint = c.ink, description = "Next track in ${provider.name}")
+                    }
+                    Text(provider.name, style = UiType.label, color = c.ink, modifier = Modifier.width(52.dp + Dim.s1), maxLines = 1)
+                    androidx.compose.material3.Slider(
+                        vol, { vol = it; app.lockdin.audio.StudyAudio.setMediaVolume(ctx, it) }, valueRange = 0f..1f,
+                        colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = c.ink, activeTrackColor = c.ink, inactiveTrackColor = c.line),
+                        modifier = Modifier.weight(1f).semantics { contentDescription = "Media volume" },
+                    )
+                }
+                Text("Plays in ${provider.name}. Lockd In only sends play, pause, skip and volume.", style = UiType.caption, color = c.inkMuted,
+                    modifier = Modifier.padding(start = Dim.s2, bottom = Dim.s1))
             }
         }
     }
@@ -879,7 +935,7 @@ private fun Recap(
             if (onClose != null) SecondaryButton("Back", onClose, modifier = Modifier.fillMaxWidth())
             else SecondaryButton("Same again", {
                 store.startSession(clock.now(), session.segments, session.intention, session.profileId, store.state.last)
-                store.state.active?.let { StartIntro.request(it.id) }
+                store.state.active?.let { StartIntro.request(it.id); app.lockdin.audio.StudyAudio.openPlaylist(ctx, it) }
             }, modifier = Modifier.fillMaxWidth())
         },
     )

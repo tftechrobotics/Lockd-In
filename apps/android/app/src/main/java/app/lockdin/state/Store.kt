@@ -56,7 +56,8 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
             last = last,
             active = ActiveSession(
                 newId(), now, segments, text, profileId, SessionControls(),
-                rules = s.profiles.firstOrNull { it.id == profileId }?.rules ?: app.lockdin.enforce.AppRules(),
+                rules = sessionRules(s.profiles.firstOrNull { it.id == profileId }),
+                audio = s.profiles.firstOrNull { it.id == profileId }?.audio ?: ProfileAudio(),
                 commitment = s.commitment,
                 occurrenceKey = occurrenceKey,
                 presetId = presetId,
@@ -93,6 +94,19 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
     }
 
     fun clearAll() = update { AppState() }
+
+    /**
+     * The rules a session runs with: the profile's, except that its own music app (if it has a
+     * playlist) is never blocked during the session, so the music can be opened and controlled.
+     */
+    private fun sessionRules(p: Profile?): app.lockdin.enforce.AppRules {
+        val r = p?.rules ?: return app.lockdin.enforce.AppRules()
+        val pkg = p.audio.musicProvider?.pkg ?: return r
+        return when (r.mode) {
+            app.lockdin.enforce.RuleMode.BLOCK_LIST -> r.copy(packages = r.packages - pkg)
+            app.lockdin.enforce.RuleMode.APPROVED_ONLY -> r.copy(packages = r.packages + pkg)
+        }
+    }
 
     companion object {
         private const val PREFS = "lockdin"

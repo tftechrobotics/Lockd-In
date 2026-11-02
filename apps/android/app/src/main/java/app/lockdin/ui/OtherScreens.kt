@@ -365,7 +365,7 @@ private fun RemindersSettings(store: Store) {
 }
 
 @Composable
-private fun SwitchRow(label: String, supporting: String, on: Boolean, onChange: (Boolean) -> Unit) {
+fun SwitchRow(label: String, supporting: String, on: Boolean, onChange: (Boolean) -> Unit) {
     val c = LocalColors.current
     Row(
         Modifier.fillMaxWidth().heightIn(min = Dim.control + 4.dp)

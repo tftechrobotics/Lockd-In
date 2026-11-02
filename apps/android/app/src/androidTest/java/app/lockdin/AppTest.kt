@@ -404,6 +404,35 @@ class AppTest {
         org.junit.Assert.assertEquals(365, store.state.historyDays)
     }
 
+    @Test fun profileSoundTabSavesAmbientAndPlaylist() {
+        val store = launch(home = true)
+        rule.onNodeWithTag("tab-profiles").performClick()
+        rule.onNodeWithText("Study").performClick()
+        rule.onNodeWithText("Sound").performClick()
+        rule.onNodeWithText("Rain").performClick()
+        rule.onNodeWithContentDescription("Playlist link").performTextInput("not a playlist")
+        rule.onNodeWithText("Save").performClick()
+        rule.onNodeWithText("Paste a playlist link from Spotify", substring = true).assertIsDisplayed()
+        rule.onNodeWithContentDescription("Playlist link").performTextClearance()
+        rule.onNodeWithContentDescription("Playlist link").performTextInput("https://open.spotify.com/playlist/37i9dQZF1DX8NTLI2TtZa6")
+        rule.onNodeWithText("Controls your Spotify app", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Save").performClick()
+        val a = store.state.profiles.first { it.id == "study" }.audio
+        org.junit.Assert.assertEquals(app.lockdin.audio.Ambient.RAIN, a.ambient)
+        org.junit.Assert.assertEquals(app.lockdin.audio.Music.SPOTIFY, a.musicProvider)
+    }
+
+    @Test fun sessionShowsSoundControlsForItsProfile() {
+        val base = AppState(last = app.lockdin.state.LastChoice(25, 5, 1, "study"))
+        val audio = app.lockdin.state.ProfileAudio(app.lockdin.audio.Ambient.WAVES, musicLink = "https://music.youtube.com/playlist?list=PL1", autoPlay = false)
+        launch(base.copy(profiles = base.profiles.map { if (it.id == "study") it.copy(audio = audio) else it }))
+        rule.onNodeWithText("Start timer").performClick()
+        rule.onNodeWithContentDescription("Play waves").performScrollTo().assertExists()
+        rule.onNodeWithContentDescription("Play or pause YouTube Music").performScrollTo().assertExists()
+        rule.onNodeWithContentDescription("Next track in YouTube Music").assertExists()
+        rule.onNodeWithText("Plays in YouTube Music", substring = true).performScrollTo().assertIsDisplayed()
+    }
+
     @Test fun invalidCustomLengthExplained() {
         launch()
         rule.onNodeWithContentDescription("Custom minutes").performClick()

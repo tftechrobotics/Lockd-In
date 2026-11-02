@@ -98,7 +98,10 @@ class FocusService : Service() {
             try {
                 val a = store.state.active!!
                 val n = notification(a, evaluate(a, System.currentTimeMillis()), Protection.NOT_RESTRICTING, emptySet())
-                if (Build.VERSION.SDK_INT >= 34) startForeground(ONGOING_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+                // With ambient sound the service also plays media (declared type mediaPlayback).
+                val types = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
+                    (if (a.audio.ambient != app.lockdin.audio.Ambient.NONE) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0)
+                if (Build.VERSION.SDK_INT >= 34) startForeground(ONGOING_ID, n, types)
                 else startForeground(ONGOING_ID, n)
                 foreground = true
             } catch (e: Exception) {
@@ -155,6 +158,10 @@ class FocusService : Service() {
                 else "Focus is back on" to "${session.intention ?: "Your session"} until $at."
             }
         }
+        // Study audio (B2) follows the session: on in focus, paused for breaks unless kept.
+        app.lockdin.audio.StudyAudio.follow(
+            this, session, inFocus = snap.phase?.kind == PhaseKind.FOCUS, inBreak = snap.phase?.kind == PhaseKind.BREAK,
+        )
         val (detection, appMissing) = Capabilities.detection(this)
         val missing = BlockPolicy.missingFor(session.rules, detection, appMissing)
         val protection = BlockPolicy.protection(true, snap.restricting, session.rules, missing)
@@ -288,6 +295,7 @@ class FocusService : Service() {
 
     private fun stop(reason: String) {
         Log.i(TAG, "released: $reason")
+        app.lockdin.audio.StudyAudio.follow(this, null, inFocus = false, inBreak = false)
         handler.removeCallbacks(tick)
         scheduleWake(null)
         EnforcerStatus.publish(EnforcerStatus.Report(null, Protection.IDLE, emptySet()))

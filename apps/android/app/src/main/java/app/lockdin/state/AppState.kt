@@ -23,7 +23,24 @@ enum class ThemeChoice { SYSTEM, LIGHT, DARK }
 enum class Tone { CALM, DIRECT, PLAYFUL, QUIET }
 
 /** `rules` are this phone's own app rules for the profile (each device keeps its own). */
-data class Profile(val id: String, val name: String, val description: String, val builtIn: Boolean, val rules: AppRules = AppRules())
+data class Profile(val id: String, val name: String, val description: String, val builtIn: Boolean, val rules: AppRules = AppRules(), val audio: ProfileAudio = ProfileAudio())
+
+/**
+ * A profile's study audio (roadmap step 3, B2). `ambient` is generated on the phone; `musicLink`
+ * is a playlist in the person's own music app, which Lockd In opens and controls but does not play.
+ */
+data class ProfileAudio(
+    val ambient: app.lockdin.audio.Ambient = app.lockdin.audio.Ambient.NONE,
+    val level: Float = 0.6f,
+    val musicLink: String? = null,
+    /** Start the sound (and open the playlist, for starts made in the app) when focus begins. */
+    val autoPlay: Boolean = true,
+    /** Keep ambient sound on during breaks. Off: it pauses for breaks and comes back with focus. */
+    val duringBreaks: Boolean = false,
+) {
+    val hasSound: Boolean get() = ambient != app.lockdin.audio.Ambient.NONE || musicLink != null
+    val musicProvider: app.lockdin.audio.MusicProvider? get() = app.lockdin.audio.Music.providerOf(musicLink)
+}
 
 /**
  * A reusable session setup (roadmap step 2, B). `due` and `steps` are optional study details:
@@ -63,6 +80,8 @@ data class ActiveSession(
     val occurrenceKey: String? = null,
     /** The preset it was started from, if any (its steps show during the session). */
     val presetId: String? = null,
+    /** The profile's study audio when the session started. */
+    val audio: ProfileAudio = ProfileAudio(),
 )
 
 data class AppState(
@@ -111,7 +130,7 @@ object StateCodec {
         put("tone", s.tone.name)
         put("profiles", JSONArray(s.profiles.map {
             JSONObject().put("id", it.id).put("name", it.name).put("description", it.description).put("builtIn", it.builtIn)
-                .put("rules", rulesJson(it.rules))
+                .put("rules", rulesJson(it.rules)).put("audio", audioJson(it.audio))
         }))
         put("commitment", s.commitment.name)
         put("presets", JSONArray(s.presets.map { p ->
@@ -161,7 +180,7 @@ object StateCodec {
                 profiles = o.optJSONArray("profiles")?.objects()?.mapNotNull { p ->
                     val id = p.optString("id"); val name = p.optString("name")
                     if (id.isBlank() || name.isBlank()) null
-                    else Profile(id, name.take(40), p.optString("description").take(120), p.optBoolean("builtIn"), rulesOf(p.optJSONObject("rules")))
+                    else Profile(id, name.take(40), p.optString("description").take(120), p.optBoolean("builtIn"), rulesOf(p.optJSONObject("rules")), audioOf(p.optJSONObject("audio")))
                 }?.takeIf { it.isNotEmpty() } ?: base.profiles,
                 schedule = o.optJSONArray("schedule")?.objects()?.mapNotNull(::scheduleOf) ?: emptyList(),
                 last = o.optJSONObject("last")?.let {
@@ -239,6 +258,7 @@ object StateCodec {
             } ?: emptyMap(),
             if (a.isNull("occurrenceKey") || !a.has("occurrenceKey")) null else a.getString("occurrenceKey").take(120),
             if (a.isNull("presetId") || !a.has("presetId")) null else a.getString("presetId").take(64),
+            audioOf(a.optJSONObject("audio")),
         )
     } catch (e: Exception) {
         null
@@ -279,6 +299,21 @@ object StateCodec {
                 }))
         .put("occurrenceKey", a.occurrenceKey ?: JSONObject.NULL)
         .put("presetId", a.presetId ?: JSONObject.NULL)
+        .put("audio", audioJson(a.audio))
+
+    private fun audioJson(a: ProfileAudio): JSONObject = JSONObject().put("ambient", a.ambient.name).put("level", a.level.toDouble())
+        .put("musicLink", a.musicLink ?: JSONObject.NULL).put("autoPlay", a.autoPlay).put("duringBreaks", a.duringBreaks)
+
+    /** Missing or invalid audio reads as none. Links are kept only if they're a supported playlist link. */
+    private fun audioOf(o: JSONObject?): ProfileAudio {
+        if (o == null) return ProfileAudio()
+        return ProfileAudio(
+            enumOr(o.optString("ambient"), app.lockdin.audio.Ambient.NONE),
+            o.optDouble("level", 0.6).toFloat().let { if (it.isNaN()) 0.6f else it.coerceIn(0f, 1f) },
+            if (o.isNull("musicLink") || !o.has("musicLink")) null else app.lockdin.audio.Music.clean(o.getString("musicLink")),
+            o.optBoolean("autoPlay", true), o.optBoolean("duringBreaks", false),
+        )
+    }
 
     private fun rulesJson(r: AppRules): JSONObject =
         JSONObject().put("mode", r.mode.name).put("packages", JSONArray(r.packages.sorted())).put("sites", JSONArray(r.sites.sorted())).put("siteMode", r.siteMode.name)

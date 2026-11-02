@@ -36,6 +36,10 @@ enum class LIcon(val path: String) {
     Repeat("M4 11a7 7 0 0 1 12.6-4.2L19 9M19 4v5h-5M20 13a7 7 0 0 1-12.6 4.2L5 15M5 20v-5h5"),
     Focus("M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"),
     History("M3.5 12a8.5 8.5 0 1 0 2.5-6M3.5 4v4h4M12 7.5V12l3 2"),
+    Play("M8 5.5v13l10-6.5z"),
+    Pause("M8.5 5.5v13M15.5 5.5v13"),
+    Next("M6 6l8.5 6L6 18zM18 5.5v13"),
+    Sound("M4 9.5h3.5l4.5-4v13l-4.5-4H4zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"),
     Devices("M2 4h10v7H2zM5 14h4M7 11v3M13 6h3v9h-3z");
 
     val vector: ImageVector by lazy {

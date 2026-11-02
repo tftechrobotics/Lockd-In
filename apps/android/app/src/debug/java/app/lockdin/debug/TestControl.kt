@@ -27,7 +27,14 @@ class TestControl : BroadcastReceiver() {
                 val sites = intent.getStringExtra("sites")?.split(',')?.mapNotNull { app.lockdin.enforce.BlockPolicy.domainOf(it) }?.toSet() ?: emptySet()
                 store.update { s ->
                     s.copy(
-                        profiles = s.profiles.map { if (it.id == "study") it.copy(rules = AppRules(mode, pkgs, sites)) else it },
+                        profiles = s.profiles.map {
+                            if (it.id == "study") it.copy(
+                                rules = AppRules(mode, pkgs, sites),
+                                audio = app.lockdin.state.ProfileAudio(
+                                    ambient = intent.getStringExtra("ambient")?.let { a -> runCatching { app.lockdin.audio.Ambient.valueOf(a) }.getOrNull() } ?: app.lockdin.audio.Ambient.NONE,
+                                ),
+                            ) else it
+                        },
                         commitment = Commitment.DELAYED,
                     )
                 }

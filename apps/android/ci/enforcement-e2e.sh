@@ -398,6 +398,13 @@ r=$(trial_open) && record emergency-release pass "target opens right after emerg
 
 
 intro_phase
+# Study audio (B2): ambient sound starts with focus and stops on emergency recovery.
+ctl --es cmd finish; adb logcat -c
+ctl --es cmd start --ei focus 4 --ei break 1 --ei rounds 1 --es block "$T" --es ambient RAIN
+adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 5; home
+adb logcat -d -s LockdInAudio:I | grep -q "ambient_on kind=RAIN" && record B2-ambient-on pass "rain started with focus" || record B2-ambient-on FAIL "no ambient_on in log"
+ctl --es cmd emergency; sleep 4
+adb logcat -d -s LockdInAudio:I | grep -q "ambient_off" && record B2-ambient-off pass "stopped on emergency recovery" || record B2-ambient-off FAIL "ambient kept playing after emergency recovery"
 plan_phase
 # History (roadmap step 2): sessions left above are saved and survive the process being killed.
 adb shell am force-stop $A; sleep 2
