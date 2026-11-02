@@ -442,6 +442,25 @@ class AppTest {
         rule.onNodeWithText("Suggest times from my calendar").performScrollTo().assertIsDisplayed()
     }
 
+    @Test fun backgroundsAndQuotesAreOptionalAndSeparate() {
+        val store = launch(home = true)
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.onNodeWithText("Background").performScrollTo().performClick()
+        rule.onNodeWithText("Paper").performClick()
+        org.junit.Assert.assertEquals("PAPER", store.state.backdrop)
+        org.junit.Assert.assertFalse(store.state.quotesOn)
+        rule.onNodeWithText("Quotes").performScrollTo().performClick()
+        org.junit.Assert.assertTrue(store.state.quotesOn)
+        rule.onNodeWithTag("tab-focus").performClick()
+        rule.onNodeWithText("New session").performClick()
+        rule.onNodeWithText("Start timer").performClick()
+        val line = app.lockdin.ui.Quotes.forSession(store.state.active!!.id)
+        rule.onNodeWithText(line).assertIsDisplayed()
+        // The lock and its spoken label are unchanged by the background.
+        rule.onNodeWithContentDescription("Focus:", substring = true).assertExists()
+        shot("14-focus-paper-quote")
+    }
+
     @Test fun invalidCustomLengthExplained() {
         launch()
         rule.onNodeWithContentDescription("Custom minutes").performClick()

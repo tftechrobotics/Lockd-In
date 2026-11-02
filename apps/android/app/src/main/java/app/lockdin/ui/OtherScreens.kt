@@ -1,5 +1,7 @@
 package app.lockdin.ui
 
+import kotlinx.coroutines.launch
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -195,6 +197,7 @@ fun SettingsScreen(store: Store, history: app.lockdin.state.HistoryStore, zone: 
             Text(message(store.state.tone, Moment.BREAK_ENDING, "TAM 212")?.let { "Example: “$it”" } ?: "No messages during sessions.", style = UiType.caption, color = c.inkMuted,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
         }
+        LookSettings(store)
         RemindersSettings(store)
         CalendarSettings(store)
         Column {
@@ -384,3 +387,55 @@ fun SwitchRow(label: String, supporting: String, on: Boolean, onChange: (Boolean
         )
     }
 }
+
+
+/** Settings › Look (C2): optional background and quotes, each with its own switch. Off by default. */
+@Composable
+private fun LookSettings(store: Store) {
+    val c = LocalColors.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var photoError by remember { mutableStateOf<String?>(null) }
+    val pick = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) scope.launch {
+            val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { savePhoto(ctx, uri) }
+            if (ok) { photoError = null; store.update { it.copy(backdrop = "PHOTO") } } else photoError = "Couldn’t use that photo. Try another."
+        }
+    }
+    val current = runCatching { Backdrop.valueOf(store.state.backdrop) }.getOrDefault(Backdrop.NONE)
+    Column {
+        SectionLabel("Look")
+        SettingsGroup {
+            SettingMenuRow("Background", Backdrop.values().map { it to it.label }, current, { b ->
+                if (b == Backdrop.PHOTO && !photoFile(ctx).exists()) pick.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+                else store.update { it.copy(backdrop = b.name) }
+            })
+            if (current == Backdrop.PHOTO) {
+                GroupDivider()
+                SettingRow("Choose another photo", "", onClick = {
+                    pick.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+                })
+            }
+            GroupDivider()
+            SwitchRow("Quotes", "One short line per session, on the session and block screens. It doesn’t change during a round.", store.state.quotesOn) { v ->
+                store.update { it.copy(quotesOn = v) }
+            }
+        }
+        Spacer(Modifier.height(Dim.s2))
+        Text(photoError ?: "Shown behind the Focus screen only. The lock and text stay the same; photos are dimmed so text stays readable. Your photo stays on this phone.",
+            style = UiType.caption, color = if (photoError != null) c.danger else c.inkMuted)
+    }
+}
+
+/** Copies a picked photo into app storage, scaled to at most 1600 px. */
+private fun savePhoto(ctx: android.content.Context, uri: android.net.Uri): Boolean = runCatching {
+    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    ctx.contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+    var sample = 1
+    while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1600) sample *= 2
+    val bmp = ctx.contentResolver.openInputStream(uri)?.use {
+        android.graphics.BitmapFactory.decodeStream(it, null, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+    } ?: return false
+    photoFile(ctx).outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, it) }
+    true
+}.getOrDefault(false)

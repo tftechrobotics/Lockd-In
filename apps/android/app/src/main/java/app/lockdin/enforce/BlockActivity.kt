@@ -181,6 +181,10 @@ private fun BlockScreen(appLabel: String, isSite: Boolean, onReturn: () -> Unit,
                 Text("You’re working on: $it", style = UiType.body, color = c.ink, textAlign = TextAlign.Center)
             }
             whenLine?.let { Text(it, style = UiType.body, color = c.inkMuted, textAlign = TextAlign.Center) }
+            if (store.state.quotesOn && session != null) Text(
+                app.lockdin.ui.Quotes.forSession(session.id), style = UiType.caption.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
+                color = c.inkMuted, textAlign = TextAlign.Center,
+            )
             message(store.state.tone, Moment.FOCUS_START, session?.intention)?.let {
                 Text(it, style = UiType.caption, color = c.inkMuted, textAlign = TextAlign.Center)
             }

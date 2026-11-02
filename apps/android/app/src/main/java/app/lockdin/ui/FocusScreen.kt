@@ -610,6 +610,10 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
             modifier = Modifier.semantics { heading() })
         Spacer(Modifier.height(Dim.s1))
         Text(status, style = TimerType.status, color = c.inkMuted, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+        if (store.state.quotesOn) {
+            Spacer(Modifier.height(Dim.s1))
+            Text(Quotes.forSession(session.id), style = UiType.caption.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = c.inkMuted, textAlign = TextAlign.Center)
+        }
         if (protected) {
             Spacer(Modifier.height(Dim.s2))
             BlockingBadge()

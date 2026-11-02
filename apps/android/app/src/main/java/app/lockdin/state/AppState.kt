@@ -95,6 +95,9 @@ data class AppState(
     /** Default commitment for new sessions. */
     val commitment: Commitment = Commitment.DELAYED,
     val presets: List<Preset> = emptyList(),
+    /** Optional look (C2), both off by default: a background behind Focus, and a quote per session. */
+    val backdrop: String = "NONE",
+    val quotesOn: Boolean = false,
     /** Calendar suggestions (C): off until the person turns them on; calendars they excluded. */
     val calendarOn: Boolean = false,
     val calendarHidden: Set<Long> = emptySet(),
@@ -142,6 +145,8 @@ object StateCodec {
                 .put("due", p.due?.toString() ?: JSONObject.NULL).put("steps", JSONArray(p.steps))
         }))
         put("historyDays", s.historyDays)
+        put("backdrop", s.backdrop)
+        put("quotesOn", s.quotesOn)
         put("calendarOn", s.calendarOn)
         put("calendarHidden", JSONArray(s.calendarHidden.sorted()))
         put("startHaptics", s.startHaptics)
@@ -198,6 +203,8 @@ object StateCodec {
                 commitment = enumOr(o.optString("commitment"), Commitment.DELAYED),
                 presets = o.optJSONArray("presets")?.objects()?.mapNotNull(::presetOf)?.take(MAX_PRESETS) ?: emptyList(),
                 historyDays = o.optInt("historyDays", 365).let { if (it in app.lockdin.engine.History.RETENTION_CHOICES) it else 365 },
+                backdrop = o.optString("backdrop", "NONE").takeIf { it in BACKDROPS } ?: "NONE",
+                quotesOn = o.optBoolean("quotesOn", false),
                 calendarOn = o.optBoolean("calendarOn", false),
                 calendarHidden = longs(o.optJSONArray("calendarHidden")).take(200).toSet(),
                 startHaptics = o.optBoolean("startHaptics", true),
@@ -292,6 +299,7 @@ object StateCodec {
     private const val MAX_LOG = 300
     private const val MAX_STARTS = 40
     private const val MAX_PRESETS = 30
+    private val BACKDROPS = setOf("NONE", "PAPER", "LINEN", "CONTOURS", "HILLS", "PHOTO")
 
     private fun activeJson(a: ActiveSession): JSONObject = JSONObject().put("id", a.id).put("start", a.start)
                 .put("segments", JSONArray(a.segments.map { JSONObject().put("kind", it.kind.name).put("minutes", it.minutes) }))
