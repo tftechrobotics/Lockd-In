@@ -25,6 +25,22 @@ enum class Tone { CALM, DIRECT, PLAYFUL, QUIET }
 /** `rules` are this phone's own app rules for the profile (each device keeps its own). */
 data class Profile(val id: String, val name: String, val description: String, val builtIn: Boolean, val rules: AppRules = AppRules())
 
+/**
+ * A reusable session setup (roadmap step 2, B). `due` and `steps` are optional study details:
+ * the due date shows on the preset, the steps show during a session started from it.
+ */
+data class Preset(
+    val id: String,
+    val name: String,
+    val focusMinutes: Int,
+    val breakMinutes: Int,
+    val rounds: Int,
+    val profileId: String,
+    val task: String? = null,
+    val due: java.time.LocalDate? = null,
+    val steps: List<String> = emptyList(),
+)
+
 data class LastChoice(val focusMinutes: Int, val breakMinutes: Int, val rounds: Int, val profileId: String)
 
 data class ActiveSession(
@@ -45,6 +61,8 @@ data class ActiveSession(
     val blocked: Map<String, Int> = emptyMap(),
     /** Set when started for a planned occurrence ("<scheduleId>@<startMs>"). */
     val occurrenceKey: String? = null,
+    /** The preset it was started from, if any (its steps show during the session). */
+    val presetId: String? = null,
 )
 
 data class AppState(
@@ -57,6 +75,9 @@ data class AppState(
     val recentIntentions: List<String> = emptyList(),
     /** Default commitment for new sessions. */
     val commitment: Commitment = Commitment.DELAYED,
+    val presets: List<Preset> = emptyList(),
+    /** History kept for this many days; 0 = keep everything. */
+    val historyDays: Int = 365,
     /** Manual-start animation feedback: haptic clicks (on) and a quiet click sound (off). */
     val startHaptics: Boolean = true,
     val startSound: Boolean = false,
@@ -93,6 +114,12 @@ object StateCodec {
                 .put("rules", rulesJson(it.rules))
         }))
         put("commitment", s.commitment.name)
+        put("presets", JSONArray(s.presets.map { p ->
+            JSONObject().put("id", p.id).put("name", p.name).put("focusMinutes", p.focusMinutes).put("breakMinutes", p.breakMinutes)
+                .put("rounds", p.rounds).put("profileId", p.profileId).put("task", p.task ?: JSONObject.NULL)
+                .put("due", p.due?.toString() ?: JSONObject.NULL).put("steps", JSONArray(p.steps))
+        }))
+        put("historyDays", s.historyDays)
         put("startHaptics", s.startHaptics)
         put("startSound", s.startSound)
         put("schedule", JSONArray(s.schedule.map {
@@ -145,6 +172,8 @@ object StateCodec {
                     (0 until a.length()).mapNotNull { a.optString(it).takeIf { s -> s.isNotBlank() } }
                 }?.take(8) ?: emptyList(),
                 commitment = enumOr(o.optString("commitment"), Commitment.DELAYED),
+                presets = o.optJSONArray("presets")?.objects()?.mapNotNull(::presetOf)?.take(MAX_PRESETS) ?: emptyList(),
+                historyDays = o.optInt("historyDays", 365).let { if (it in app.lockdin.engine.History.RETENTION_CHOICES) it else 365 },
                 startHaptics = o.optBoolean("startHaptics", true),
                 startSound = o.optBoolean("startSound", false),
                 reminders = o.optJSONObject("reminders")?.let(::remindersOf) ?: ReminderSettings(),
@@ -175,6 +204,17 @@ object StateCodec {
         null // DateTimeException, JSONException, bad day numbers: drop the item
     }
 
+    private fun presetOf(p: JSONObject): Preset? = try {
+        Preset(
+            p.getString("id").take(64), p.getString("name").trim().take(60).ifEmpty { return null },
+            p.getInt("focusMinutes").coerceIn(1, 240), p.optInt("breakMinutes", 0).coerceIn(0, 60), p.optInt("rounds", 1).coerceIn(1, 6),
+            p.getString("profileId"),
+            if (p.isNull("task") || !p.has("task")) null else p.getString("task").take(120),
+            if (p.isNull("due") || !p.has("due")) null else runCatching { java.time.LocalDate.parse(p.getString("due")) }.getOrNull(),
+            p.optJSONArray("steps")?.let { a -> (0 until a.length()).mapNotNull { a.optString(it).trim().take(120).ifEmpty { null } } }?.take(20) ?: emptyList(),
+        )
+    } catch (e: JSONException) { null }
+
     private fun activeOf(a: JSONObject): ActiveSession? = try {
         val segs = a.getJSONArray("segments").objects().map { Segment(PhaseKind.valueOf(it.getString("kind")), it.getInt("minutes")) }
         val overrides = a.optJSONArray("overrides")?.objects()?.map {
@@ -198,6 +238,7 @@ object StateCodec {
                     .filterValues { it > 0 }
             } ?: emptyMap(),
             if (a.isNull("occurrenceKey") || !a.has("occurrenceKey")) null else a.getString("occurrenceKey").take(120),
+            if (a.isNull("presetId") || !a.has("presetId")) null else a.getString("presetId").take(64),
         )
     } catch (e: Exception) {
         null
@@ -223,6 +264,7 @@ object StateCodec {
     private const val MAX_BLOCKED_KEYS = 100
     private const val MAX_LOG = 300
     private const val MAX_STARTS = 40
+    private const val MAX_PRESETS = 30
 
     private fun activeJson(a: ActiveSession): JSONObject = JSONObject().put("id", a.id).put("start", a.start)
                 .put("segments", JSONArray(a.segments.map { JSONObject().put("kind", it.kind.name).put("minutes", it.minutes) }))
@@ -236,6 +278,7 @@ object StateCodec {
                         .put("cancelledAt", it.cancelledAt ?: JSONObject.NULL)
                 }))
         .put("occurrenceKey", a.occurrenceKey ?: JSONObject.NULL)
+        .put("presetId", a.presetId ?: JSONObject.NULL)
 
     private fun rulesJson(r: AppRules): JSONObject =
         JSONObject().put("mode", r.mode.name).put("packages", JSONArray(r.packages.sorted())).put("sites", JSONArray(r.sites.sorted())).put("siteMode", r.siteMode.name)

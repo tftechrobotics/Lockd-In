@@ -23,5 +23,9 @@ class LockdInApplication : Application() {
             }
         }
         lastPlanInputs = Store.get(this).state.let { it.schedule to it.reminders }
+        // History (roadmap step 2): every session is recorded as it is left, then old entries
+        // are pruned to the retention the person chose.
+        Store.get(this).onLeft = { a, s, now -> app.lockdin.state.HistoryStore.recordLeft(this, a, s, now) }
+        app.lockdin.state.HistoryStore.get(this).prune(Store.get(this).state.historyDays, System.currentTimeMillis())
     }
 }

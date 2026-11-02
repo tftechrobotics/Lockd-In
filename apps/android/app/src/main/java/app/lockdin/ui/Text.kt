@@ -41,6 +41,20 @@ object Fmt {
             else -> d.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault())
         }
     }
+
+    /** "today", "tomorrow", "Fri", "Nov 14", or "Nov 1 (passed)" for a preset's due date. */
+    fun dueLabel(d: java.time.LocalDate, now: Long, zone: ZoneId = ZoneId.systemDefault()): String {
+        val n = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+        val days = d.toEpochDay() - n.toEpochDay()
+        val md = d.format(DateTimeFormatter.ofPattern("MMM d", java.util.Locale.getDefault()))
+        return when {
+            days < 0 -> "$md (passed)"
+            days == 0L -> "today"
+            days == 1L -> "tomorrow"
+            days < 7 -> d.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())
+            else -> md
+        }
+    }
 }
 
 enum class Moment { FOCUS_START, BREAK_START, BREAK_ENDING, DONE }

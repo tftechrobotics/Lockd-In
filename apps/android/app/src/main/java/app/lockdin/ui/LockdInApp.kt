@@ -52,19 +52,26 @@ enum class Route(val label: String, val icon: LIcon, val tab: Boolean) {
     FOCUS("Focus", LIcon.Focus, true),
     SCHEDULE("Schedule", LIcon.Calendar, true),
     PROFILES("Profiles", LIcon.Book, true),
+    HISTORY("History", LIcon.History, true),
     DEVICES("Devices", LIcon.Devices, false),
     SETTINGS("Settings", LIcon.Gear, false),
 }
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun LockdInApp(store: Store, clock: AppClock = AppClock.System, zone: ZoneId = ZoneId.systemDefault(), dark: Boolean = isDark(store.state.theme)) {
+fun LockdInApp(
+    store: Store, clock: AppClock = AppClock.System, zone: ZoneId = ZoneId.systemDefault(), dark: Boolean = isDark(store.state.theme),
+    history: app.lockdin.state.HistoryStore? = null,
+) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val hist = history ?: remember { app.lockdin.state.HistoryStore.get(ctx) }
     LockdInTheme(dark) {
         val c = LocalColors.current
         var route by rememberSaveable { mutableStateOf(Route.FOCUS) }
         var lastTab by rememberSaveable { mutableStateOf(Route.FOCUS) }
         var editing by remember { mutableStateOf<ScheduledSession?>(null) }
         var editingProfile by remember { mutableStateOf<String?>(null) }
+        var editingPreset by remember { mutableStateOf<String?>(null) }
         fun go(r: Route) { if (r.tab) lastTab = r; route = r }
         // A notification asked for a screen (e.g. Reschedule → Schedule).
         val asked = Resumes.route
@@ -72,10 +79,11 @@ fun LockdInApp(store: Store, clock: AppClock = AppClock.System, zone: ZoneId = Z
             when (asked) { "schedule" -> go(Route.SCHEDULE); "focus" -> go(Route.FOCUS) }
             if (asked != null) Resumes.route = null
         }
-        BackHandler(enabled = editing != null || editingProfile != null || !route.tab || route != Route.FOCUS) {
+        BackHandler(enabled = editing != null || editingProfile != null || editingPreset != null || !route.tab || route != Route.FOCUS) {
             when {
                 editing != null -> editing = null
                 editingProfile != null -> editingProfile = null
+                editingPreset != null -> editingPreset = null
                 !route.tab -> go(lastTab)
                 else -> go(Route.FOCUS)
             }
@@ -95,6 +103,13 @@ fun LockdInApp(store: Store, clock: AppClock = AppClock.System, zone: ZoneId = Z
                 Modifier.fillMaxSize().background(c.ground)
                     .windowInsetsPadding(WindowInsets.safeDrawing).semantics { contentDescription = "Profile apps" },
             ) { ProfileEditor(store, p, onClose = { editingProfile = null }) }
+            return@LockdInTheme
+        }
+        store.state.presets.firstOrNull { it.id == editingPreset }?.let { p ->
+            Box(
+                Modifier.fillMaxSize().background(c.ground)
+                    .windowInsetsPadding(WindowInsets.safeDrawing).semantics { contentDescription = "Preset editor" },
+            ) { PresetEditor(store, p, clock.now(), zone, onClose = { editingPreset = null }) }
             return@LockdInTheme
         }
 
@@ -150,9 +165,10 @@ fun LockdInApp(store: Store, clock: AppClock = AppClock.System, zone: ZoneId = Z
                     when (route) {
                         Route.FOCUS -> FocusScreen(store, clock, zone, openDevices = { go(Route.DEVICES) }, openSchedule = { go(Route.SCHEDULE) })
                         Route.SCHEDULE -> ScheduleScreen(store, clock.now(), zone, onEdit = { editing = it })
-                        Route.PROFILES -> ProfilesScreen(store, onEdit = { editingProfile = it.id })
+                        Route.PROFILES -> ProfilesScreen(store, onEdit = { editingProfile = it.id }, onEditPreset = { editingPreset = it })
                         Route.DEVICES -> DevicesScreen()
-                        Route.SETTINGS -> SettingsScreen(store)
+                        Route.SETTINGS -> SettingsScreen(store, hist, zone)
+                        Route.HISTORY -> HistoryScreen(store, hist, clock, zone)
                     }
                 }
             }

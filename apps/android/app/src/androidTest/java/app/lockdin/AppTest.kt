@@ -63,12 +63,18 @@ class AppTest {
     private val clock = FakeClock(ZonedDateTime.of(2026, 11, 3, 18, 0, 0, 0, zone).toInstant().toEpochMilli())
 
     /** Launches the app. Unless `home`, goes from the idle lock to the session setup, as most tests start there. */
+    /** In-memory history for each test (never the app's real file). */
+    private var hist = app.lockdin.state.HistoryStore(emptyList()) {}
+
     private fun launch(state: AppState = AppState(), dark: Boolean = false, fontScale: Float = 1f, home: Boolean = false): Store {
         val store = Store(state) {}
+        hist = app.lockdin.state.HistoryStore(emptyList()) {}
+        store.clock = { clock.now() }
+        store.onLeft = { a, st, now -> hist.record(a, st, now) }
         rule.setContent {
             val d = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(d.density, fontScale)) {
-                LockdInApp(store, clock, zone, dark)
+                LockdInApp(store, clock, zone, dark, history = hist)
             }
         }
         if (!home && state.active == null) rule.onNodeWithText("New session").performClick()
@@ -318,6 +324,84 @@ class AppTest {
         val s = AppState()
         org.junit.Assert.assertTrue(s.startHaptics)
         org.junit.Assert.assertFalse(s.startSound)
+    }
+
+    @Test fun finishedSessionAppearsInHistoryAndCanBeDeleted() {
+        val store = launch(AppState(last = app.lockdin.state.LastChoice(25, 5, 1, "study")))
+        rule.onNodeWithText("Start timer").performClick()
+        clock.advanceMinutes(26); tick(store)
+        rule.onNodeWithText("Done").performClick()
+        org.junit.Assert.assertEquals(1, hist.entries.size)
+        org.junit.Assert.assertEquals(app.lockdin.engine.Outcome.COMPLETED, hist.entries.single().outcome)
+        rule.onNodeWithTag("tab-history").performClick()
+        rule.onNodeWithText("This week").assertIsDisplayed()
+        rule.onNodeWithText("25 min focused").assertIsDisplayed()
+        rule.onNodeWithText("Focus session").performClick()
+        rule.onNodeWithText("Finished as planned", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Delete this session").performScrollTo().performClick()
+        rule.onAllNodesWithText("Delete").onLast().performClick()
+        rule.onNodeWithText("No sessions yet").assertIsDisplayed()
+        org.junit.Assert.assertTrue(hist.entries.isEmpty())
+    }
+
+    @Test fun historyIsEmptyAtFirst() {
+        launch(home = true)
+        rule.onNodeWithTag("tab-history").performClick()
+        rule.onNodeWithText("No sessions yet").assertIsDisplayed()
+    }
+
+    @Test fun presetIsSavedAndStartsInOneTapFromHome() {
+        val store = launch()
+        rule.onNode(hasSetTextAction()).performTextInput("Physics review")
+        rule.onNodeWithText("Save as preset").performScrollTo().performClick()
+        rule.onNodeWithContentDescription("Preset name").assertExists()
+        rule.onAllNodesWithText("Save").onLast().performClick()
+        org.junit.Assert.assertEquals("Physics review", store.state.presets.single().name)
+        rule.onNodeWithText("Back").performClick()
+        rule.onNodeWithText("Start a preset").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Physics review", substring = true).performScrollTo().performClick()
+        val a = store.state.active
+        org.junit.Assert.assertNotNull(a)
+        org.junit.Assert.assertEquals("Physics review", a!!.intention)
+        org.junit.Assert.assertEquals(store.state.presets.single().id, a.presetId)
+    }
+
+    @Test fun presetStepsShowDuringTheSession() {
+        val p = app.lockdin.state.Preset("p1", "Essay", 40, 0, 1, "study", task = "Essay", steps = listOf("Outline", "Draft intro"))
+        val store = launch(AppState(presets = listOf(p)), home = true)
+        rule.onNodeWithText("Essay", substring = true).performScrollTo().performClick()
+        openDetails()
+        rule.onNodeWithText("Steps").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Draft intro").performScrollTo().performClick()
+        org.junit.Assert.assertEquals("p1", store.state.active?.presetId)
+    }
+
+    @Test fun presetEditorChangesDueDateFreeFieldsAndDeletes() {
+        val p = app.lockdin.state.Preset("p1", "Essay", 40, 0, 1, "study")
+        val store = launch(AppState(presets = listOf(p)), home = true)
+        rule.onNodeWithTag("tab-profiles").performClick()
+        rule.onNodeWithText("Essay").performScrollTo().performClick()
+        rule.onNodeWithContentDescription("New step").performTextInput("Outline")
+        rule.onNodeWithText("Add").performClick()
+        rule.onNodeWithText("Save").performClick()
+        org.junit.Assert.assertEquals(listOf("Outline"), store.state.presets.single().steps)
+        rule.onNodeWithText("Essay").performScrollTo().performClick()
+        rule.onNodeWithText("Delete").performClick()
+        rule.onAllNodesWithText("Delete").onLast().performClick()
+        org.junit.Assert.assertTrue(store.state.presets.isEmpty())
+    }
+
+    @Test fun historySettingsRetentionAndDeleteAll() {
+        val store = launch(home = true)
+        hist.add(app.lockdin.engine.HistoryEntry("e1", clock.now() - 3_600_000, clock.now() - 1_800_000, clock.now() - 1_800_000,
+            1_800_000, 1_800_000, 1, 1, "Read", "study", "Study", app.lockdin.engine.Outcome.COMPLETED), 365, clock.now())
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.onNodeWithText("Keep history").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("1 session. Opens Android’s share sheet.", substring = true).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Delete all history").performScrollTo().performClick()
+        rule.onAllNodesWithText("Delete").onLast().performClick()
+        org.junit.Assert.assertTrue(hist.entries.isEmpty())
+        org.junit.Assert.assertEquals(365, store.state.historyDays)
     }
 
     @Test fun invalidCustomLengthExplained() {

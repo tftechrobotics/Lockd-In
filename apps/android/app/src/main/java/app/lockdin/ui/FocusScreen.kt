@@ -1,6 +1,7 @@
 package app.lockdin.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.foundation.BorderStroke
@@ -123,6 +124,7 @@ fun FocusScreen(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -> 
 }
 
 /** The idle lock: the time of day on its face, the next planned session below, one way to begin. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit, openSchedule: () -> Unit, onViewLast: () -> Unit = {}) {
     val c = LocalColors.current
@@ -157,6 +159,27 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
                         if (upcoming?.session?.autoStart == true) Text("Starts automatically", style = UiType.caption.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
                     }
                 }
+                // Presets: one tap starts the session (a manual start, so the start sequence plays).
+                if (store.state.presets.isNotEmpty()) {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+                        Text("Start a preset", style = UiType.section, color = c.inkMuted, modifier = Modifier.semantics { heading() })
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(Dim.s2), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+                            store.state.presets.take(6).forEach { p ->
+                                val due = p.due?.let { " · due ${Fmt.dueLabel(it, now, zone)}" } ?: ""
+                                Surface(
+                                    shape = CircleShape, color = Color.Transparent, contentColor = c.ink, border = BorderStroke(1.dp, c.line),
+                                    modifier = Modifier.heightIn(min = Dim.control).clickable(role = Role.Button, onClickLabel = "Start ${p.name}") {
+                                        startPreset(store, p, clock.now())
+                                    },
+                                ) {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                                        Text("${p.name} · ${durationLabel(p.focusMinutes * p.rounds)}$due", style = UiType.label)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 // The last finished session stays here until dismissed.
                 store.state.lastSession?.let { last ->
                     val blockedTimes = last.blocked.values.sum()
@@ -182,6 +205,17 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
         },
         actions = { MainButton("New session", onNew) },
     )
+}
+
+/** Starts a preset now as a manual start (the start sequence plays). */
+fun startPreset(store: Store, p: app.lockdin.state.Preset, now: Long) {
+    val profile = if (store.state.profiles.any { it.id == p.profileId }) p.profileId else store.state.last.profileId
+    store.startSession(
+        now, Session.roundsPlan(p.rounds, p.focusMinutes, if (p.rounds > 1) p.breakMinutes else 0), p.task, profile,
+        LastChoice(p.focusMinutes, if (p.breakMinutes > 0) p.breakMinutes else store.state.last.breakMinutes, p.rounds, profile),
+        presetId = p.id,
+    )
+    store.state.active?.let { StartIntro.request(it.id) }
 }
 
 /** Scrolling content with the action area pinned below it (above the bottom navigation). */
@@ -216,6 +250,8 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
     var profileId by rememberSaveable { mutableStateOf(s.last.profileId) }
     var customOpen by rememberSaveable { mutableStateOf(s.last.focusMinutes !in LENGTHS) }
     var roundsOpen by rememberSaveable { mutableStateOf(false) }
+    var presetId by rememberSaveable { mutableStateOf<String?>(null) }
+    var savingPreset by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val focusManager = LocalFocusManager.current
     val now = clock.now()
@@ -244,6 +280,23 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
                         LockdIcon(LIcon.Back, size = 18.dp, tint = c.ink)
                         Spacer(Modifier.width(Dim.s1))
                         Text("Back", style = UiType.label, color = c.ink)
+                    }
+                }
+            }
+            if (s.presets.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+                    Text("Presets", style = UiType.section, color = c.inkMuted, modifier = Modifier.semantics { heading() })
+                    ProfileChips(s.presets.map { it.id to it.name }, presetId ?: "") { id ->
+                        s.presets.firstOrNull { it.id == id }?.let { p ->
+                            presetId = p.id
+                            intention = p.task ?: ""
+                            focus = p.focusMinutes
+                            customOpen = p.focusMinutes !in LENGTHS
+                            rounds = maxOf(2, p.rounds)
+                            breakMin = if (p.rounds > 1) p.breakMinutes else 0
+                            if (s.profiles.any { it.id == p.profileId }) profileId = p.profileId
+                            error = null
+                        }
                     }
                 }
             }
@@ -278,6 +331,8 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
                 Question("Which profile?")
                 ProfileChips(s.profiles.map { it.id to it.name }, profileId) { profileId = it }
             }
+
+            TextAction("Save as preset", { savingPreset = true })
 
             error?.let {
                 Surface(color = c.dangerSoft, shape = RoundedCornerShape(Dim.radius), modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Assertive }) {
@@ -321,12 +376,46 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
                     store.startSession(
                         clock.now(), segments, intention, profileId,
                         LastChoice(focus, if (breakMin > 0) breakMin else s.last.breakMinutes, effectiveRounds, profileId),
+                        presetId = presetId,
                     )
                     // The start sequence plays once, for this manual start only.
                     store.state.active?.let { StartIntro.request(it.id) }
                 }
             })
         },
+    )
+    if (savingPreset) NamePresetDialog(
+        initial = intention.trim().ifEmpty { profileName },
+        onDismiss = { savingPreset = false },
+    ) { name ->
+        val p = app.lockdin.state.Preset(
+            Store.newId(), name, focus, if (effectiveRounds > 1) breakMin else 0, effectiveRounds, profileId,
+            task = intention.trim().ifEmpty { null },
+        )
+        store.update { it.copy(presets = (it.presets + p).takeLast(30)) }
+        presetId = p.id
+        savingPreset = false
+    }
+}
+
+@Composable
+fun NamePresetDialog(initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    val c = LocalColors.current
+    var name by rememberSaveable { mutableStateOf(initial.take(60)) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss, containerColor = c.surface,
+        title = { Text("Save as preset", style = UiType.title, color = c.ink) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+                Text("Saves the task, length, breaks and profile. Start it in one tap from Home.", style = UiType.body, color = c.inkMuted)
+                androidx.compose.material3.OutlinedTextField(
+                    name, { name = it.take(60) }, singleLine = true, shape = RoundedCornerShape(Dim.radius), colors = fieldColors(),
+                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Preset name" },
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { name.trim().takeIf { it.isNotEmpty() }?.let(onSave) }, enabled = name.isNotBlank()) { Text("Save", style = UiType.label, color = c.ink) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", style = UiType.label, color = c.ink) } },
     )
 }
 
@@ -544,11 +633,38 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
         MoreToggle("Details and options", more || pending) { more = !more }
         if (more || pending) {
             Column(Modifier.fillMaxWidth().padding(top = Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s4)) {
+                store.state.presets.firstOrNull { it.id == session.presetId }?.steps?.takeIf { it.isNotEmpty() }?.let { StepsList(session.id, it) }
                 SessionRail(occ.phases, now, zone)
                 FactList(facts)
                 nudge?.let { Text(it, style = UiType.body, color = c.inkMuted) }
                 note()
                 OutPanel(store, session, snap, now, clock)
+            }
+        }
+    }
+}
+
+/** The preset's steps, ticked off during this session only (not saved). */
+@Composable
+private fun StepsList(sessionId: String, steps: List<String>) {
+    val c = LocalColors.current
+    var done by rememberSaveable(sessionId) { mutableStateOf(emptyList<Int>()) }
+    Column {
+        SectionLabel("Steps")
+        SettingsGroup {
+            steps.forEachIndexed { i, step ->
+                if (i > 0) GroupDivider()
+                val on = i in done
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = Dim.control + 4.dp)
+                        .toggleable(on, role = Role.Checkbox) { done = if (on) done - i else done + i }
+                        .padding(horizontal = Dim.s4),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(step, style = UiType.body, color = if (on) c.inkMuted else c.ink, modifier = Modifier.weight(1f))
+                    androidx.compose.material3.Checkbox(on, onCheckedChange = null,
+                        colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = c.ink, uncheckedColor = c.controlLine, checkmarkColor = c.onInk))
+                }
             }
         }
     }

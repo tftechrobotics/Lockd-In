@@ -55,7 +55,7 @@ fun ScrollScreen(content: @Composable () -> Unit) {
 // ---------------- Profiles ----------------
 
 @Composable
-fun ProfilesScreen(store: Store, onEdit: (Profile) -> Unit = {}) {
+fun ProfilesScreen(store: Store, onEdit: (Profile) -> Unit = {}, onEditPreset: (String) -> Unit = {}) {
     val c = LocalColors.current
     var naming by rememberSaveable { mutableStateOf(false) }
     ScrollScreen {
@@ -82,6 +82,30 @@ fun ProfilesScreen(store: Store, onEdit: (Profile) -> Unit = {}) {
             }
         }
         SecondaryButton("New profile", { naming = true }, modifier = Modifier.fillMaxWidth())
+        Column {
+            SectionLabel("Presets")
+            if (store.state.presets.isEmpty()) Text(
+                "Save a session setup as a preset from New session › Save as preset. Presets start in one tap from Home.",
+                style = UiType.caption, color = c.inkMuted,
+            ) else SettingsGroup {
+                store.state.presets.forEachIndexed { i, p ->
+                    if (i > 0) GroupDivider()
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 64.dp)
+                            .clickable(role = Role.Button, onClickLabel = "Edit") { onEditPreset(p.id) }
+                            .semantics(mergeDescendants = true) {}
+                            .padding(horizontal = Dim.s4, vertical = Dim.s3),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(p.name, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
+                            Text(presetSummary(p, store.state.profiles), style = UiType.caption, color = c.inkMuted, maxLines = 2)
+                        }
+                        LockdIcon(LIcon.Chevron, size = 18.dp, tint = c.inkMuted)
+                    }
+                }
+            }
+        }
     }
     if (naming) NewProfileDialog(onDismiss = { naming = false }) { n ->
         val p = Profile(Store.newId(), n, "Only what you add", false)
@@ -144,9 +168,12 @@ fun DevicesScreen() {
 // ---------------- Settings ----------------
 
 @Composable
-fun SettingsScreen(store: Store) {
+fun SettingsScreen(store: Store, history: app.lockdin.state.HistoryStore, zone: java.time.ZoneId = java.time.ZoneId.systemDefault()) {
     val c = LocalColors.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     var confirm by remember { mutableStateOf(false) }
+    var confirmHistory by remember { mutableStateOf(false) }
+    var exportError by remember { mutableStateOf<String?>(null) }
     ScrollScreen {
         ScreenTitle("Settings")
         Column {
@@ -197,6 +224,26 @@ fun SettingsScreen(store: Store) {
             Text("Applies to new sessions. Emergency recovery always ends a session immediately, at every level.", style = UiType.caption, color = c.inkMuted)
         }
         Column {
+            SectionLabel("History")
+            SettingsGroup {
+                SettingMenuRow(
+                    "Keep history", app.lockdin.engine.History.RETENTION_CHOICES.map { it to if (it == 0) "Forever" else "$it days" },
+                    store.state.historyDays, { v ->
+                        store.update { it.copy(historyDays = v) }
+                        history.prune(v, System.currentTimeMillis())
+                    },
+                )
+                GroupDivider()
+                SettingRow("Export as CSV", "", supporting = "${history.entries.size} session${if (history.entries.size == 1) "" else "s"}. Opens Android’s share sheet.",
+                    enabled = history.entries.isNotEmpty(), onClick = {
+                        exportError = runCatching { shareHistoryCsv(ctx, history, zone) }.exceptionOrNull()?.let { "Couldn’t create the file. Try again." }
+                    })
+                GroupDivider()
+                Row(Modifier.padding(horizontal = Dim.s2)) { TextAction("Delete all history", { confirmHistory = true }, danger = true) }
+            }
+            exportError?.let { Text(it, style = UiType.caption, color = c.danger) }
+        }
+        Column {
             SectionLabel("Data")
             SettingsGroup {
                 SettingRow("Stored on this phone only", "", supporting = "Excluded from backups. Nothing is sent anywhere.", chevron = null)
@@ -205,16 +252,38 @@ fun SettingsScreen(store: Store) {
             }
         }
     }
+    if (confirmHistory) {
+        AlertDialog(
+            onDismissRequest = { confirmHistory = false },
+            title = { Text("Delete all history?", style = Type.title) },
+            text = { Text("Removes every saved session from this phone. Your schedule, profiles and presets stay. This can’t be undone.", style = UiType.body) },
+            confirmButton = { TextButton(onClick = { history.clear(); confirmHistory = false }) { Text("Delete", style = UiType.label, color = c.danger) } },
+            dismissButton = { TextButton(onClick = { confirmHistory = false }) { Text("Cancel", style = UiType.label, color = c.ink) } },
+            containerColor = c.surface,
+        )
+    }
     if (confirm) {
         AlertDialog(
             onDismissRequest = { confirm = false },
             title = { Text("Delete Lockd In data?", style = Type.title) },
-            text = { Text("Removes your schedule, custom profiles and any session in progress. This can’t be undone.", style = UiType.body) },
-            confirmButton = { TextButton(onClick = { store.clearAll(); confirm = false }) { Text("Delete", style = UiType.label, color = c.danger) } },
+            text = { Text("Removes your schedule, custom profiles, presets, history and any session in progress. This can’t be undone.", style = UiType.body) },
+            confirmButton = { TextButton(onClick = { store.clearAll(); history.clear(); confirm = false }) { Text("Delete", style = UiType.label, color = c.danger) } },
             dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel", style = UiType.label, color = c.ink) } },
             containerColor = c.surface,
         )
     }
+}
+
+/** Writes the history CSV to app cache and opens the share sheet (FileProvider; read permission only). */
+private fun shareHistoryCsv(ctx: android.content.Context, history: app.lockdin.state.HistoryStore, zone: java.time.ZoneId) {
+    val dir = java.io.File(ctx.cacheDir, "exports").apply { mkdirs() }
+    val file = java.io.File(dir, "lockd-in-history.csv")
+    file.writeText(app.lockdin.engine.History.csv(history.entries, zone))
+    val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.files", file)
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/csv")
+        .putExtra(android.content.Intent.EXTRA_STREAM, uri)
+        .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    ctx.startActivity(android.content.Intent.createChooser(send, "Export history"))
 }
 
 @Composable

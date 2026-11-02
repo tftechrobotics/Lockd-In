@@ -35,7 +35,22 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
         onChange?.invoke(state)
     }
 
-    fun startSession(now: Long, segments: List<Segment>, intention: String?, profileId: String, last: LastChoice, occurrenceKey: String? = null) = update { s ->
+    /**
+     * Called with each session as it is left (finished, replaced or cleared) and the time it was
+     * left, before it disappears from the state. The app records it in history.
+     */
+    var onLeft: ((ActiveSession, AppState, Long) -> Unit)? = null
+
+    /** Time source for history entries; tests substitute their clock. */
+    var clock: () -> Long = { java.lang.System.currentTimeMillis() }
+
+    private fun leaving(s: AppState) { s.active?.let { a -> runCatching { onLeft?.invoke(a, s, clock()) } } }
+
+    fun startSession(
+        now: Long, segments: List<Segment>, intention: String?, profileId: String, last: LastChoice,
+        occurrenceKey: String? = null, presetId: String? = null,
+    ) = update { s ->
+        leaving(s)
         val text = intention?.trim()?.take(120)?.takeIf { it.isNotEmpty() }
         s.copy(
             last = last,
@@ -44,6 +59,7 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
                 rules = s.profiles.firstOrNull { it.id == profileId }?.rules ?: app.lockdin.enforce.AppRules(),
                 commitment = s.commitment,
                 occurrenceKey = occurrenceKey,
+                presetId = presetId,
             ),
             recentStarts = (s.recentStarts + now).takeLast(40),
             lastSession = null,
@@ -60,7 +76,7 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
      * Leaves the finished session. `dismissed` = the person tapped Done; otherwise (the recap
      * timed out) Home keeps a "Last session" card until they dismiss it.
      */
-    fun finish(dismissed: Boolean = true) = update { it.copy(active = null, lastSession = if (dismissed) null else it.active) }
+    fun finish(dismissed: Boolean = true) = update { leaving(it); it.copy(active = null, lastSession = if (dismissed) null else it.active) }
 
     fun dismissLastSession() = update { it.copy(lastSession = null) }
 

@@ -399,6 +399,10 @@ r=$(trial_open) && record emergency-release pass "target opens right after emerg
 
 intro_phase
 plan_phase
+# History (roadmap step 2): sessions left above are saved and survive the process being killed.
+adb shell am force-stop $A; sleep 2
+n=$(adb shell run-as $A cat no_backup/history.v1.json 2>/dev/null | grep -o '"outcome"' | wc -l | tr -d ' ')
+[ "${n:-0}" -ge 3 ] && record B-history-persists pass "$n finished sessions in history after force-stop" || record B-history-persists FAIL "history has ${n:-0} entries after force-stop"
 
 adb logcat -d -s LockdInFocus LockdInTest LockdInPlan ActivityTaskManager:W ActivityManager:W > "$OUT/logcat.txt" 2>/dev/null || true
 # On-device detection time: from Android's record of the app coming to the front to the

@@ -108,7 +108,8 @@ object Session {
         return if (inside && kindOk) phase else null
     }
 
-    private fun takesEffect(o: OverrideRecord, occ: Occurrence): Long? {
+    /** When an override really takes effect (null if it never does); also used for history. */
+    fun takesEffect(o: OverrideRecord, occ: Occurrence): Long? {
         val org = origin(o, occ) ?: return null
         val eff = effectiveAt(o)
         val limit = if (o.scope == OverrideScope.CURRENT_FOCUS_PERIOD) org.end else occ.end
