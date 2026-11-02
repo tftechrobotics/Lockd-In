@@ -125,9 +125,9 @@ class HistoryTest {
     }
 
     @Test fun lookSettingsRoundTripAndUnknownBackdropFallsBack() {
-        val s = AppState(backdrop = "HILLS", quotesOn = true)
+        val s = AppState(backdrop = "MOUNTAINS", backdropWords = "Build the future", quotesOn = true)
         assertEquals(s, StateCodec.decode(StateCodec.encode(s)))
-        assertEquals("NONE", StateCodec.decode(StateCodec.encode(s).replace("\"HILLS\"", "\"LAVA\"")).backdrop)
+        assertEquals("NONE", StateCodec.decode(StateCodec.encode(s).replace("\"MOUNTAINS\"", "\"PAPER\"")).backdrop)
         assertEquals(AppState().backdrop, "NONE")
         assertEquals(false, AppState().quotesOn)
     }

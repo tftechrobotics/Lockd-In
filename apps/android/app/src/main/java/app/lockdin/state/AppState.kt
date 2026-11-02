@@ -121,6 +121,8 @@ data class AppState(
     val checkInMinutes: Int = 0,
     /** Optional look (C2), both off by default: a background behind Focus, and a quote per session. */
     val backdrop: String = "NONE",
+    /** The line drawn large by the "Words to work by" background. */
+    val backdropWords: String = "One thing at a time",
     val quotesOn: Boolean = false,
     /** Calendar suggestions (C): off until the person turns them on; calendars they excluded. */
     val calendarOn: Boolean = false,
@@ -182,6 +184,7 @@ object StateCodec {
         put("questionTimes", JSONArray(s.questionTimes.takeLast(50)))
         put("checkInMinutes", s.checkInMinutes)
         put("backdrop", s.backdrop)
+        put("backdropWords", s.backdropWords)
         put("quotesOn", s.quotesOn)
         put("calendarOn", s.calendarOn)
         put("calendarHidden", JSONArray(s.calendarHidden.sorted()))
@@ -249,6 +252,7 @@ object StateCodec {
                 questionTimes = longs(o.optJSONArray("questionTimes")).takeLast(50),
                 checkInMinutes = o.optInt("checkInMinutes", 0).let { if (it in app.lockdin.engine.CheckIns.IDLE_CHOICES) it else 0 },
                 backdrop = o.optString("backdrop", "NONE").takeIf { it in BACKDROPS } ?: "NONE",
+                backdropWords = o.optString("backdropWords", "One thing at a time").trim().take(40).ifEmpty { "One thing at a time" },
                 quotesOn = o.optBoolean("quotesOn", false),
                 calendarOn = o.optBoolean("calendarOn", false),
                 calendarHidden = longs(o.optJSONArray("calendarHidden")).take(200).toSet(),
@@ -350,7 +354,8 @@ object StateCodec {
     private const val MAX_LOG = 300
     private const val MAX_STARTS = 40
     private const val MAX_PRESETS = 30
-    private val BACKDROPS = setOf("NONE", "PAPER", "LINEN", "CONTOURS", "HILLS", "PHOTO")
+    // Earlier pattern backgrounds (PAPER, LINEN, CONTOURS, HILLS) were replaced by scenes; they read as NONE.
+    private val BACKDROPS = setOf("NONE", "LIBRARY", "MOUNTAINS", "WORDS", "BLUEPRINT", "PHOTO")
 
     private fun activeJson(a: ActiveSession): JSONObject = JSONObject().put("id", a.id).put("start", a.start)
                 .put("segments", JSONArray(a.segments.map { JSONObject().put("kind", it.kind.name).put("minutes", it.minutes) }))

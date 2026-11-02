@@ -1,10 +1,12 @@
-// Optional backgrounds and quotes (roadmap step 5, C2). Both are off by default; the plain
-// cream/espresso design and the sculpted lock stay the default and are never changed by them.
-// Backgrounds are static (drawn once, no animation). A photo sits under a scrim so text keeps
-// its contrast. Quotes are short original lines, one per session, never rotating in a round.
+// Optional backgrounds and quotes (roadmap step 5, C2; scene set revised by the owner 2026-11-02).
+// Off by default. The sculpted lock and the screen's text are never changed: scenes are low-key
+// (the image under the text is capped for 4.5:1 with light text, see design/backgrounds/gen.py)
+// and the light theme lays a cream scrim over them. All scenes are static: nothing moves.
 package app.lockdin.ui
 
 import android.graphics.BitmapFactory
+import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -14,22 +16,42 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
+import app.lockdin.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.sin
 
-enum class Backdrop(val label: String) { NONE("None"), PAPER("Paper"), LINEN("Linen"), CONTOURS("Contours"), HILLS("Hills"), PHOTO("Your photo") }
+enum class Backdrop(val label: String) {
+    NONE("None"),
+    LIBRARY("Library after hours"),
+    MOUNTAINS("Quiet ambition"),
+    WORDS("Words to work by"),
+    BLUEPRINT("Your reason"),
+    PHOTO("Your photo"),
+}
+
+const val DEFAULT_BACKDROP_WORDS = "One thing at a time"
 
 object Quotes {
     /** Original short lines: encouraging, never shaming, no claims about how anyone feels. */
@@ -64,79 +86,165 @@ fun photoFile(ctx: android.content.Context) = File(ctx.filesDir, "backdrop.jpg")
 
 /** Content over the chosen background. With no background this is just `content`. */
 @Composable
-fun BackdropBox(choice: Backdrop, content: @Composable BoxScope.() -> Unit) {
+fun BackdropBox(choice: Backdrop, words: String = DEFAULT_BACKDROP_WORDS, content: @Composable BoxScope.() -> Unit) {
     if (choice == Backdrop.NONE) { Box(Modifier.fillMaxSize(), content = content); return }
-    val c = LocalColors.current
-    val ctx = LocalContext.current
     Box(Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize().clearAndSetSemantics { }) {
-            when (choice) {
-                Backdrop.PHOTO -> {
-                    val bmp by produceState<android.graphics.Bitmap?>(null) {
-                        value = withContext(Dispatchers.IO) { runCatching { BitmapFactory.decodeFile(photoFile(ctx).path) }.getOrNull() }
-                    }
-                    bmp?.let {
-                        Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                        // Scrim: keeps text at the same contrast as the plain design.
-                        Box(Modifier.fillMaxSize().background(c.ground.copy(alpha = 0.82f)))
-                    }
-                }
-                else -> Pattern(choice)
-            }
-        }
+        BackdropLayer(choice, words, Modifier.fillMaxSize())
         content()
     }
 }
 
-/** Static, low-contrast patterns in the theme's own ink: drawn once, never animated. */
+/** The background alone (also used, scaled down, for the picker's previews). */
 @Composable
-private fun Pattern(choice: Backdrop) {
-    val ink = LocalColors.current.ink
-    val taupe = LocalColors.current.inkMuted
-    Canvas(Modifier.fillMaxSize()) {
+fun BackdropLayer(choice: Backdrop, words: String, modifier: Modifier) {
+    val c = LocalColors.current
+    val dark = c == DarkColors
+    val ctx = LocalContext.current
+    Box(modifier.clearAndSetSemantics { }) {
         when (choice) {
-            Backdrop.PAPER -> {
-                var seed = 0x2545F491L
-                fun rnd(): Float { seed = (seed * 6364136223846793005L + 1442695040888963407L); return ((seed ushr 33).toInt() and 0xFFFF) / 65535f }
-                repeat(((size.width * size.height) / 900f).toInt().coerceAtMost(4000)) {
-                    drawCircle(ink.copy(alpha = 0.05f), radius = 0.6.dp.toPx() + rnd() * 0.5.dp.toPx(), center = Offset(rnd() * size.width, rnd() * size.height))
+            Backdrop.NONE -> Unit
+            Backdrop.LIBRARY, Backdrop.MOUNTAINS -> {
+                Image(
+                    painterResource(if (choice == Backdrop.LIBRARY) R.drawable.bg_library else R.drawable.bg_mountains),
+                    contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
+                )
+                // Light theme: a cream veil keeps dark text at full contrast; dark: a light touch.
+                Box(Modifier.fillMaxSize().background(c.ground.copy(alpha = if (dark) 0.12f else 0.64f)))
+            }
+            Backdrop.PHOTO -> {
+                val bmp by produceState<android.graphics.Bitmap?>(null) {
+                    value = withContext(Dispatchers.IO) { runCatching { BitmapFactory.decodeFile(photoFile(ctx).path) }.getOrNull() }
+                }
+                bmp?.let {
+                    Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    Box(Modifier.fillMaxSize().background(c.ground.copy(alpha = if (dark) 0.72f else 0.8f)))
                 }
             }
-            Backdrop.LINEN -> {
-                val step = 7.dp.toPx(); val col = ink.copy(alpha = 0.035f); val w = 1.dp.toPx()
-                var x = -size.height
-                while (x < size.width) {
-                    drawLine(col, Offset(x, 0f), Offset(x + size.height, size.height), w)
-                    drawLine(col, Offset(x + size.height, 0f), Offset(x, size.height), w)
-                    x += step
-                }
-            }
-            Backdrop.CONTOURS -> {
-                val col = ink.copy(alpha = 0.06f)
-                for (k in 0 until 14) {
-                    val p = Path()
-                    val base = size.height * (k + 0.5f) / 14f
-                    var x = 0f
-                    p.moveTo(0f, base)
-                    while (x <= size.width) {
-                        val y = base + sin((x / size.width * 2 * PI + k * 0.7).toFloat()) * 18.dp.toPx() + sin((x / size.width * 5 * PI + k).toFloat()) * 6.dp.toPx()
-                        p.lineTo(x, y); x += 8f
-                    }
-                    drawPath(p, col, style = Stroke(1.2.dp.toPx()))
-                }
-            }
-            Backdrop.HILLS -> {
-                fun hill(top: Float, amp: Float, phase: Float, alpha: Float) {
-                    val p = Path(); p.moveTo(0f, size.height)
-                    var x = 0f
-                    while (x <= size.width) { p.lineTo(x, top + sin((x / size.width * PI * 1.6 + phase).toFloat()) * amp); x += 6f }
-                    p.lineTo(size.width, size.height); p.close()
-                    drawPath(p, taupe.copy(alpha = alpha))
-                }
-                hill(size.height * 0.78f, 26.dp.toPx(), 0.4f, 0.07f)
-                hill(size.height * 0.86f, 18.dp.toPx(), 2.1f, 0.09f)
-            }
-            else -> Unit
+            Backdrop.WORDS -> Words(words, c.ink.copy(alpha = if (dark) 0.11f else 0.08f))
+            Backdrop.BLUEPRINT -> Blueprint(c.ink.copy(alpha = if (dark) 0.16f else 0.13f))
         }
     }
+}
+
+/**
+ * Large condensed serif words behind the lock, split into two lines above and below it.
+ * Uses the phone's own serif face, narrowed, so there's no font file to license.
+ */
+@Composable
+private fun Words(text: String, color: Color) {
+    val lines = remember(text) { splitLines(text.trim().ifEmpty { DEFAULT_BACKDROP_WORDS }.uppercase()) }
+    Canvas(Modifier.fillMaxSize()) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+            textScaleX = 0.56f
+            this.color = color.toArgb()
+            textAlign = Paint.Align.CENTER
+        }
+        val slots = if (lines.size == 1) listOf(0.42f) else listOf(0.36f, 0.70f)
+        lines.take(2).forEachIndexed { i, line ->
+            // Fill ~94% of the width, but never taller than a fifth of the screen.
+            paint.textSize = 100f
+            val w = paint.measureText(line).coerceAtLeast(1f)
+            paint.textSize = minOf(100f * size.width * 0.94f / w, size.height / 5f)
+            drawIntoCanvas { it.nativeCanvas.drawText(line, size.width / 2, size.height * slots[i], paint) }
+        }
+    }
+}
+
+private fun splitLines(t: String): List<String> {
+    val words = t.split(Regex("\\s+")).filter { it.isNotEmpty() }
+    if (words.size <= 1 || t.length <= 9) return listOf(t)
+    // Two lines of about equal length.
+    var best = 1; var bestDiff = Int.MAX_VALUE
+    for (k in 1 until words.size) {
+        val diff = kotlin.math.abs(words.take(k).joinToString(" ").length - words.drop(k).joinToString(" ").length)
+        if (diff < bestDiff) { bestDiff = diff; best = k }
+    }
+    return listOf(words.take(best).joinToString(" "), words.drop(best).joinToString(" "))
+}
+
+/** Blueprint-style drawings of things worth building: gears, an arm, a tracked base, a grid. */
+@Composable
+private fun Blueprint(ink: Color) {
+    Canvas(Modifier.fillMaxSize()) {
+        val u = size.width / 100f
+        val thin = Stroke(0.7.dp.toPx())
+        val line = Stroke(1.2.dp.toPx())
+        // Fine grid
+        val grid = ink.copy(alpha = ink.alpha * 0.35f)
+        var x = 0f
+        while (x < size.width) { drawLine(grid, Offset(x, 0f), Offset(x, size.height), 0.5.dp.toPx()); x += 8 * u }
+        var y = 0f
+        while (y < size.height) { drawLine(grid, Offset(0f, y), Offset(size.width, y), 0.5.dp.toPx()); y += 8 * u }
+        // Top left: a robot arm (base, two links, gripper) with joint circles.
+        arm(ink, line, thin, Offset(4 * u, 52 * u), u)
+        // Right: a large gear with a smaller one meshing.
+        gear(ink, line, Offset(92 * u, 70 * u), 22 * u, 18)
+        gear(ink, line, Offset(66 * u, 50 * u), 11 * u, 10)
+        // Bottom: a tracked base.
+        track(ink, line, thin, Offset(8 * u, size.height - 40 * u), 84 * u, u)
+        // Dimension line with arrows and a label.
+        val dy = size.height - 46 * u
+        drawLine(ink, Offset(8 * u, dy), Offset(92 * u, dy), 0.7.dp.toPx())
+        arrow(ink, Offset(8 * u, dy), 1f, u); arrow(ink, Offset(92 * u, dy), -1f, u)
+        drawIntoCanvas {
+            val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = ink.toArgb(); textSize = 2.6f * u; typeface = Typeface.MONOSPACE; textAlign = Paint.Align.CENTER }
+            it.nativeCanvas.drawText("420.0", 50 * u, dy - 1.2f * u, p)
+            p.textAlign = Paint.Align.LEFT
+            it.nativeCanvas.drawText("REV A  ·  SCALE 1:4", 6 * u, size.height - 8 * u, p)
+        }
+    }
+}
+
+private fun DrawScope.gear(ink: Color, s: Stroke, c: Offset, r: Float, teeth: Int) {
+    val p = Path()
+    val n = teeth * 4
+    for (i in 0..n) {
+        val a = 2 * PI * i / n
+        val rr = if ((i / 2) % 2 == 0) r else r * 0.86f
+        val pt = Offset(c.x + (rr * cos(a)).toFloat(), c.y + (rr * sin(a)).toFloat())
+        if (i == 0) p.moveTo(pt.x, pt.y) else p.lineTo(pt.x, pt.y)
+    }
+    p.close()
+    drawPath(p, ink, style = s)
+    drawCircle(ink, r * 0.55f, c, style = s)
+    drawCircle(ink, r * 0.14f, c, style = s)
+    for (k in 0 until 5) {
+        val a = 2 * PI * k / 5
+        drawCircle(ink, r * 0.09f, Offset(c.x + (r * 0.36f * cos(a)).toFloat(), c.y + (r * 0.36f * sin(a)).toFloat()), style = s)
+    }
+}
+
+private fun DrawScope.arm(ink: Color, s: Stroke, thin: Stroke, base: Offset, u: Float) {
+    drawRect(ink, Offset(base.x, base.y), Size(16 * u, 5 * u), style = s)
+    val j0 = Offset(base.x + 8 * u, base.y)
+    val j1 = Offset(j0.x + 10 * u, j0.y - 22 * u)
+    val j2 = Offset(j1.x + 20 * u, j1.y - 8 * u)
+    fun link(a: Offset, b: Offset, w: Float) {
+        val ang = kotlin.math.atan2(b.y - a.y, b.x - a.x) * 180f / PI.toFloat()
+        val len = kotlin.math.hypot(b.x - a.x, b.y - a.y)
+        rotate(ang, pivot = a) { drawRoundRect(ink, Offset(a.x, a.y - w / 2), Size(len, w), androidx.compose.ui.geometry.CornerRadius(w / 2), style = s) }
+    }
+    link(j0, j1, 4 * u); link(j1, j2, 3 * u)
+    listOf(j0, j1, j2).forEach { drawCircle(ink, 2.6f * u, it, style = s); drawCircle(ink, 0.9f * u, it, style = thin) }
+    // Gripper
+    drawLine(ink, j2, Offset(j2.x + 5 * u, j2.y - 3 * u), s.width); drawLine(ink, j2, Offset(j2.x + 5 * u, j2.y + 3 * u), s.width)
+}
+
+private fun DrawScope.track(ink: Color, s: Stroke, thin: Stroke, at: Offset, w: Float, u: Float) {
+    val h = 14 * u
+    drawRoundRect(ink, at, Size(w, h), androidx.compose.ui.geometry.CornerRadius(h / 2), style = s)
+    val wheels = 6
+    for (i in 0 until wheels) {
+        val cx = at.x + h / 2 + i * (w - h) / (wheels - 1)
+        drawCircle(ink, h * 0.36f, Offset(cx, at.y + h / 2), style = s)
+        drawCircle(ink, h * 0.1f, Offset(cx, at.y + h / 2), style = thin)
+    }
+    var x = at.x + h / 2
+    while (x < at.x + w - h / 2) { drawLine(ink, Offset(x, at.y), Offset(x, at.y - 1.2f * u), thin.width); x += 3 * u }
+}
+
+private fun DrawScope.arrow(ink: Color, tip: Offset, dir: Float, u: Float) {
+    drawLine(ink, tip, Offset(tip.x + dir * 2 * u, tip.y - 1.2f * u), 0.7.dp.toPx())
+    drawLine(ink, tip, Offset(tip.x + dir * 2 * u, tip.y + 1.2f * u), 0.7.dp.toPx())
 }

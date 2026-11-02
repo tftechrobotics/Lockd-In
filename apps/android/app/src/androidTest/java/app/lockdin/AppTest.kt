@@ -448,9 +448,8 @@ class AppTest {
     @Test fun backgroundsAndQuotesAreOptionalAndSeparate() {
         val store = launch(home = true)
         rule.onNodeWithContentDescription("Settings").performClick()
-        rule.onNodeWithText("Background").performScrollTo().performClick()
-        rule.onNodeWithText("Paper").performClick()
-        org.junit.Assert.assertEquals("PAPER", store.state.backdrop)
+        rule.onNodeWithText("Quiet ambition").performScrollTo().performClick()
+        org.junit.Assert.assertEquals("MOUNTAINS", store.state.backdrop)
         org.junit.Assert.assertFalse(store.state.quotesOn)
         rule.onNodeWithText("Quotes").performScrollTo().performClick()
         org.junit.Assert.assertTrue(store.state.quotesOn)
@@ -461,7 +460,7 @@ class AppTest {
         rule.onNodeWithText(line).assertIsDisplayed()
         // The lock and its spoken label are unchanged by the background.
         rule.onNodeWithContentDescription("Focus:", substring = true).assertExists()
-        shot("14-focus-paper-quote")
+        shot("14-focus-mountains-quote")
     }
 
     @Test fun ownMessagesShowDuringTheSession() {
@@ -541,6 +540,21 @@ class AppTest {
         rule.onNodeWithText("Focus length").performScrollTo().performClick()
         rule.onNodeWithText("25 min").performClick()
         org.junit.Assert.assertEquals(25, store.state.last.focusMinutes)
+    }
+
+    @Test fun screenshotBackgroundScenes() {
+        // One running session per background, dark (as designed) and the words scene in light.
+        val scenes = listOf("LIBRARY" to true, "MOUNTAINS" to true, "WORDS" to true, "BLUEPRINT" to true, "LIBRARY" to false, "WORDS" to false)
+        val dark = androidx.compose.runtime.mutableStateOf(true)
+        val store = Store(AppState(last = app.lockdin.state.LastChoice(25, 5, 1, "study"), quotesOn = true)) {}
+        rule.setContent { LockdInApp(store, clock, zone, dark.value, history = hist) }
+        store.startSession(clock.now(), app.lockdin.engine.Session.roundsPlan(1, 25, 5), "Problem set 4", "study", store.state.last)
+        scenes.forEachIndexed { i, (b, d) ->
+            dark.value = d
+            store.update { it.copy(backdrop = b, theme = if (d) app.lockdin.state.ThemeChoice.DARK else app.lockdin.state.ThemeChoice.LIGHT) }
+            rule.waitForIdle()
+            shot("3$i-bg-${b.lowercase()}-${if (d) "dark" else "light"}")
+        }
     }
 
     @Test fun invalidCustomLengthExplained() {

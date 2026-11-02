@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -414,18 +416,53 @@ private fun LookSettings(store: Store) {
     val current = runCatching { Backdrop.valueOf(store.state.backdrop) }.getOrDefault(Backdrop.NONE)
     Column {
         SectionLabel("Look")
+        Text("Background", style = UiType.label, color = c.ink)
+        Spacer(Modifier.height(Dim.s2))
+        // Picker with real previews of each background (the same drawing, scaled down).
+        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(Dim.s2)) {
+            items(Backdrop.values().size) { i ->
+                val b = Backdrop.values()[i]
+                val on = b == current
+                Column(
+                    Modifier.width(92.dp).selectable(on, role = Role.RadioButton, onClick = {
+                        if (b == Backdrop.PHOTO && !photoFile(ctx).exists()) pick.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        else store.update { it.copy(backdrop = b.name) }
+                    }),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    androidx.compose.material3.Surface(
+                        shape = RoundedCornerShape(12.dp), color = c.ground,
+                        border = androidx.compose.foundation.BorderStroke(if (on) 2.dp else 1.dp, if (on) c.ink else c.line),
+                        modifier = Modifier.width(92.dp).height(164.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            BackdropLayer(b, store.state.backdropWords, Modifier.fillMaxSize())
+                            if (b == Backdrop.NONE) Text("Plain", style = UiType.caption, color = c.inkMuted)
+                            if (b == Backdrop.PHOTO && !photoFile(ctx).exists()) LockdIcon(LIcon.Plus, tint = c.inkMuted, description = null)
+                        }
+                    }
+                    Spacer(Modifier.height(Dim.s1))
+                    Text(b.label, style = UiType.caption, color = if (on) c.ink else c.inkMuted, maxLines = 2,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                }
+            }
+        }
+        Spacer(Modifier.height(Dim.s3))
         SettingsGroup {
-            SettingMenuRow("Background", Backdrop.values().map { it to it.label }, current, { b ->
-                if (b == Backdrop.PHOTO && !photoFile(ctx).exists()) pick.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
-                else store.update { it.copy(backdrop = b.name) }
-            })
+            if (current == Backdrop.WORDS) {
+                var words by remember { mutableStateOf(store.state.backdropWords) }
+                Column(Modifier.padding(horizontal = Dim.s4, vertical = Dim.s3)) {
+                    OutlinedTextField(words, { words = it.take(40); store.update { s -> s.copy(backdropWords = words.trim().ifEmpty { "One thing at a time" }) } },
+                        singleLine = true, label = { Text("Your words") }, shape = RoundedCornerShape(Dim.radius), colors = fieldColors(),
+                        modifier = Modifier.fillMaxWidth())
+                }
+            }
             if (current == Backdrop.PHOTO) {
-                GroupDivider()
                 SettingRow("Choose another photo", "", onClick = {
                     pick.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
                 })
             }
-            GroupDivider()
+            if (current == Backdrop.WORDS || current == Backdrop.PHOTO) GroupDivider()
             SwitchRow("Quotes", "One short line per session, on the session and block screens. It doesn’t change during a round.", store.state.quotesOn) { v ->
                 store.update { it.copy(quotesOn = v) }
             }

@@ -180,7 +180,7 @@ fun LockdInApp(
             ) {
                 Box(Modifier.widthIn(max = 600.dp).fillMaxSize().semantics { contentDescription = "${route.label} screen" }) {
                     when (route) {
-                        Route.FOCUS -> BackdropBox(runCatching { Backdrop.valueOf(store.state.backdrop) }.getOrDefault(Backdrop.NONE)) {
+                        Route.FOCUS -> BackdropBox(runCatching { Backdrop.valueOf(store.state.backdrop) }.getOrDefault(Backdrop.NONE), store.state.backdropWords) {
                             FocusScreen(store, clock, zone, openDevices = { go(Route.DEVICES) }, openSchedule = { go(Route.SCHEDULE) })
                         }
                         Route.SCHEDULE -> ScheduleScreen(store, clock.now(), zone, onEdit = { editing = it })
