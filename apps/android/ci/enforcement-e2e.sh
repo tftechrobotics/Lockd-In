@@ -187,9 +187,12 @@ ce_phase() {
   adb emu geo fix -88.30 40.00 >/dev/null 2>&1; sleep 5
   adb logcat -c
   ctl --es cmd place --es lat 40.1106 --es lon -88.2073; sleep 5
+  adb shell appops set $A android:mock_location allow || true
+  ctl --es cmd mockloc --es lat 40.00 --es lon -88.30; sleep 8
   seen=""
   for _ in $(seq 1 30); do
     adb emu geo fix -88.2073 40.1106 >/dev/null 2>&1
+    ctl --es cmd mockloc --es lat 40.1106 --es lon -88.2073
     adb logcat -d -s LockdInPlaces:I | grep -q "place_arrive CIPlace" && { seen=1; break; }
     sleep 5
   done
@@ -197,6 +200,15 @@ ce_phase() {
   [ -n "$seen" ] && record E-place-arrive pass "arrival noticed: $(adb logcat -d -s LockdInPlaces:I | grep place_arrive | tail -1 | sed 's/.*place_arrive //')" \
     || record E-place-arrive FAIL "no arrival within 150 s on the emulator ($pl)"
   notif_has "at CIPlace" && record E-place-remind pass "reminder posted" || record E-place-remind FAIL "no reminder notification"
+  note "  $(adb logcat -d -s LockdInTest:I | grep mockloc | tail -1)"
+  # App logic alone (no geofence delivery): arrival in the window posts the reminder once a day.
+  ctl --es cmd finish; adb shell cmd notification cancel_all >/dev/null 2>&1 || adb shell service call notification 1 >/dev/null 2>&1
+  adb shell "run-as $A true" >/dev/null 2>&1
+  ctl --es cmd place --es lat 40.1106 --es lon -88.2073; sleep 2
+  adb logcat -c; ctl --es cmd arrive; sleep 3
+  adb logcat -d -s LockdInPlaces:I | grep -qE "place_arrive CIPlace: (app.lockdin.engine.Arrival\$Remind|.*Remind)|already today" \
+    && record E-place-logic pass "$(adb logcat -d -s LockdInPlaces:I | grep place_arrive | tail -1 | sed 's/.*place_arrive //')" \
+    || record E-place-logic FAIL "$(adb logcat -d -s LockdInPlaces:I | tail -2 | tr '\n' ' ')"
 }
 
 plan_phase() {

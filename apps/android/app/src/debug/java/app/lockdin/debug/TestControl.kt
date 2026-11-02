@@ -104,6 +104,21 @@ class TestControl : BroadcastReceiver() {
             }
             // Marks the first-run introduction as seen (the E2E drives the main screens).
             "onboarded" -> store.update { it.copy(onboarded = true) }
+            // Feeds a location to the fused provider (mock mode) so geofences can trigger on CI.
+            "mockloc" -> runCatching {
+                val client = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+                val loc = android.location.Location("fused").apply {
+                    latitude = intent.getStringExtra("lat")!!.toDouble(); longitude = intent.getStringExtra("lon")!!.toDouble()
+                    accuracy = 5f; time = System.currentTimeMillis(); elapsedRealtimeNanos = android.os.SystemClock.elapsedRealtimeNanos()
+                }
+                @Suppress("MissingPermission")
+                client.setMockMode(true).addOnCompleteListener {
+                    @Suppress("MissingPermission")
+                    client.setMockLocation(loc).addOnCompleteListener { r -> Log.i("LockdInTest", "mockloc ok=${r.isSuccessful} ${r.exception?.javaClass?.simpleName ?: ""}") }
+                }
+            }.onFailure { Log.w("LockdInTest", "mockloc failed: ${it.javaClass.simpleName}") }
+            // Runs the arrival decision for the CI place directly (app logic without geofence delivery).
+            "arrive" -> store.state.places.firstOrNull()?.let { app.lockdin.loc.Geofences.arrived(context, it) }
             "emergency" -> store.state.active?.let { a ->
                 store.setControls(a.id) { it.copy(emergencyRecoveryAt = System.currentTimeMillis()) }
             }
