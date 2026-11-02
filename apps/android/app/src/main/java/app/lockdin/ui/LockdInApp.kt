@@ -72,6 +72,7 @@ fun LockdInApp(
         var editing by remember { mutableStateOf<ScheduledSession?>(null) }
         var editingProfile by remember { mutableStateOf<String?>(null) }
         var editingPreset by remember { mutableStateOf<String?>(null) }
+        var editingPlace by remember { mutableStateOf<app.lockdin.engine.Place?>(null) }
         fun go(r: Route) { if (r.tab) lastTab = r; route = r }
         // A notification asked for a screen (e.g. Reschedule → Schedule).
         val asked = Resumes.route
@@ -79,8 +80,9 @@ fun LockdInApp(
             when (asked) { "schedule" -> go(Route.SCHEDULE); "focus" -> go(Route.FOCUS) }
             if (asked != null) Resumes.route = null
         }
-        BackHandler(enabled = editing != null || editingProfile != null || editingPreset != null || !route.tab || route != Route.FOCUS) {
+        BackHandler(enabled = editing != null || editingProfile != null || editingPreset != null || editingPlace != null || !route.tab || route != Route.FOCUS) {
             when {
+                editingPlace != null -> editingPlace = null
                 editing != null -> editing = null
                 editingProfile != null -> editingProfile = null
                 editingPreset != null -> editingPreset = null
@@ -103,6 +105,13 @@ fun LockdInApp(
                 Modifier.fillMaxSize().background(c.ground)
                     .windowInsetsPadding(WindowInsets.safeDrawing).semantics { contentDescription = "Profile apps" },
             ) { ProfileEditor(store, p, onClose = { editingProfile = null }) }
+            return@LockdInTheme
+        }
+        editingPlace?.let { pl ->
+            Box(
+                Modifier.fillMaxSize().background(c.ground)
+                    .windowInsetsPadding(WindowInsets.safeDrawing).semantics { contentDescription = "Place editor" },
+            ) { PlaceEditor(store, pl, onClose = { editingPlace = null }) }
             return@LockdInTheme
         }
         store.state.presets.firstOrNull { it.id == editingPreset }?.let { p ->
@@ -169,7 +178,7 @@ fun LockdInApp(
                         Route.SCHEDULE -> ScheduleScreen(store, clock.now(), zone, onEdit = { editing = it })
                         Route.PROFILES -> ProfilesScreen(store, onEdit = { editingProfile = it.id }, onEditPreset = { editingPreset = it })
                         Route.DEVICES -> DevicesScreen()
-                        Route.SETTINGS -> SettingsScreen(store, hist, zone)
+                        Route.SETTINGS -> SettingsScreen(store, hist, zone, onEditPlace = { editingPlace = it })
                         Route.HISTORY -> HistoryScreen(store, hist, clock, zone)
                     }
                 }

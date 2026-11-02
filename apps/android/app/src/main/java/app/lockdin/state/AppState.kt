@@ -107,6 +107,9 @@ data class AppState(
     /** Default commitment for new sessions. */
     val commitment: Commitment = Commitment.DELAYED,
     val presets: List<Preset> = emptyList(),
+    /** Location routines (E): places, and a switch that pauses all of them. */
+    val places: List<app.lockdin.engine.Place> = emptyList(),
+    val placesPaused: Boolean = false,
     /** Coaching (D): the person's own messages (Custom tone) and a message for specific apps' block screens. */
     val customMessages: List<String> = emptyList(),
     val appMessages: Map<String, String> = emptyMap(),
@@ -164,6 +167,13 @@ object StateCodec {
                 .put("due", p.due?.toString() ?: JSONObject.NULL).put("steps", JSONArray(p.steps))
         }))
         put("historyDays", s.historyDays)
+        put("places", JSONArray(s.places.map { p ->
+            JSONObject().put("id", p.id).put("name", p.name).put("lat", p.lat).put("lon", p.lon).put("radiusM", p.radiusM)
+                .put("profileId", p.profileId).put("days", JSONArray(p.days.map { it.value }.sorted()))
+                .put("from", p.from.toString()).put("to", p.to.toString()).put("focusMinutes", p.focusMinutes)
+                .put("autoStart", p.autoStart).put("arriveGraceMin", p.arriveGraceMin).put("enabled", p.enabled)
+        }))
+        put("placesPaused", s.placesPaused)
         put("customMessages", JSONArray(s.customMessages))
         put("appMessages", JSONObject().apply { s.appMessages.forEach { (k, v) -> put(k, v) } })
         put("questionTimes", JSONArray(s.questionTimes.takeLast(50)))
@@ -226,6 +236,8 @@ object StateCodec {
                 commitment = enumOr(o.optString("commitment"), Commitment.DELAYED),
                 presets = o.optJSONArray("presets")?.objects()?.mapNotNull(::presetOf)?.take(MAX_PRESETS) ?: emptyList(),
                 historyDays = o.optInt("historyDays", 365).let { if (it in app.lockdin.engine.History.RETENTION_CHOICES) it else 365 },
+                places = o.optJSONArray("places")?.objects()?.mapNotNull(::placeOf)?.take(20) ?: emptyList(),
+                placesPaused = o.optBoolean("placesPaused", false),
                 customMessages = o.optJSONArray("customMessages")?.let { a -> (0 until a.length()).mapNotNull { a.optString(it).trim().take(140).ifEmpty { null } } }?.take(10) ?: emptyList(),
                 appMessages = o.optJSONObject("appMessages")?.let { m ->
                     m.keys().asSequence().filter(::validPackage).take(50).associateWith { m.optString(it).trim().take(140) }.filterValues { it.isNotEmpty() }
@@ -353,6 +365,19 @@ object StateCodec {
         .put("questions", questionsJson(a.questions))
         .put("checkIn", JSONObject().put("askedAt", a.checkIn.askedAt ?: JSONObject.NULL).put("answeredAt", a.checkIn.answeredAt ?: JSONObject.NULL)
             .put("snoozedUntil", a.checkIn.snoozedUntil ?: JSONObject.NULL).put("answers", JSONObject().apply { a.checkIn.answers.forEach { (k, v) -> put(k, v) } }))
+
+    private fun placeOf(p: JSONObject): app.lockdin.engine.Place? = runCatching {
+        val lat = p.getDouble("lat"); val lon = p.getDouble("lon")
+        require(lat in -90.0..90.0 && lon in -180.0..180.0)
+        app.lockdin.engine.Place(
+            p.getString("id").take(64), p.getString("name").trim().take(40).ifEmpty { "Place" }, lat, lon,
+            p.optInt("radiusM", 150).coerceIn(50, 1000), p.getString("profileId"),
+            p.optJSONArray("days")?.let { a -> (0 until a.length()).mapNotNull { runCatching { java.time.DayOfWeek.of(a.getInt(it)) }.getOrNull() }.toSet() } ?: emptySet(),
+            java.time.LocalTime.parse(p.optString("from", "08:00")), java.time.LocalTime.parse(p.optString("to", "22:00")),
+            p.optInt("focusMinutes", 40).coerceIn(5, 240), p.optBoolean("autoStart", false),
+            p.optInt("arriveGraceMin", 3).coerceIn(0, 30), p.optBoolean("enabled", true),
+        )
+    }.getOrNull()
 
     private fun questionsJson(q: app.lockdin.engine.QuestionLog): JSONObject = JSONObject()
         .put("items", JSONArray(q.items.takeLast(200).map {

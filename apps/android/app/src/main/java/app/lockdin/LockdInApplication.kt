@@ -24,6 +24,15 @@ class LockdInApplication : Application() {
             }
         }
         lastPlanInputs = Store.get(this).state.let { it.schedule to it.reminders }
+        // Location routines (E): geofences follow the places and the pause switch.
+        var lastPlaces: Any? = Store.get(this).state.let { it.places to it.placesPaused }
+        runCatching { app.lockdin.loc.Geofences.sync(this) }
+        val prevChange = Store.get(this).onChange
+        Store.get(this).onChange = { st ->
+            prevChange?.invoke(st)
+            val p = st.places to st.placesPaused
+            if (p != lastPlaces) { lastPlaces = p; runCatching { app.lockdin.loc.Geofences.sync(this) } }
+        }
         // History (roadmap step 2): every session is recorded as it is left, then old entries
         // are pruned to the retention the person chose.
         Store.get(this).onLeft = { a, s, now -> app.lockdin.state.HistoryStore.recordLeft(this, a, s, now) }

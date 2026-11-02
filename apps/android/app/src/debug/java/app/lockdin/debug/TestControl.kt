@@ -80,6 +80,16 @@ class TestControl : BroadcastReceiver() {
                 val windows = app.lockdin.engine.CalendarPlan.freeWindows(ev, today, zone, now) + app.lockdin.engine.CalendarPlan.freeWindows(ev, today.plusDays(1), zone, now)
                 Log.i("LockdInTest", "calendar permitted=${app.lockdin.cal.DeviceCalendar.permitted(context)} calendars=${app.lockdin.cal.DeviceCalendar.calendars(context).size} events=${ev.size} titles=${ev.joinToString("|") { it.title }} windows=${windows.size}")
             }
+            // Adds an all-day place at lat/lon (no grace) and registers geofences (E).
+            "place" -> {
+                val p = app.lockdin.engine.Place(
+                    "ciplace", "CIPlace", intent.getStringExtra("lat")!!.toDouble(), intent.getStringExtra("lon")!!.toDouble(),
+                    radiusM = 150, profileId = "study", from = java.time.LocalTime.MIN, to = java.time.LocalTime.of(23, 59),
+                    arriveGraceMin = 0,
+                )
+                store.update { it.copy(places = listOf(p), placesPaused = false) }
+                app.lockdin.loc.Geofences.sync(context)
+            }
             "emergency" -> store.state.active?.let { a ->
                 store.setControls(a.id) { it.copy(emergencyRecoveryAt = System.currentTimeMillis()) }
             }

@@ -500,6 +500,24 @@ class AppTest {
         org.junit.Assert.assertEquals(15, store.state.checkInMinutes)
     }
 
+    @Test fun placeNeedsANameAndALocationAndCanBePaused() {
+        val lib = app.lockdin.engine.Place("p1", "Library", 40.1, -88.2, profileId = "study")
+        val store = launch(AppState(places = listOf(lib)), home = true)
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.onNodeWithText("Library").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Pause location routines").performScrollTo().performClick()
+        org.junit.Assert.assertTrue(store.state.placesPaused)
+        rule.onNodeWithText("Add a place").performScrollTo().performClick()
+        rule.onNodeWithText("Save").performClick()
+        rule.onNodeWithText("Give the place a name.").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Name, e.g. Library").performTextInput("Café")
+        rule.onNodeWithText("Save").performClick()
+        rule.onNodeWithText("Save your current location first.").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Start automatically").performScrollTo().performClick()
+        rule.onNodeWithText("Keep reminders").performClick()
+        org.junit.Assert.assertEquals(1, store.state.places.size)
+    }
+
     @Test fun invalidCustomLengthExplained() {
         launch()
         rule.onNodeWithContentDescription("Custom minutes").performClick()

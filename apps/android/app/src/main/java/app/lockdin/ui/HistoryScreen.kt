@@ -252,7 +252,7 @@ private fun HistoryDetail(e: HistoryEntry, zone: ZoneId, now: Long, onBack: () -
             add("Time" to "${Fmt.clock(e.start, zone)}–${Fmt.clock(e.end, zone)}")
             if (e.roundsPlanned > 1) add("Rounds" to "${e.roundsDone} of ${e.roundsPlanned}")
             add("Profile" to e.profileName)
-            if (e.occurrenceKey != null) add("Planned" to "From your schedule")
+            e.occurrenceKey?.let { add("Started" to if (it.startsWith("PLACE:")) "When you arrived at a place" else "From your schedule") }
         })
         Column {
             SectionLabel("Blocked during this session")

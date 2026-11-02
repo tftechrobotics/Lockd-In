@@ -418,6 +418,25 @@ adb shell content insert --uri content://com.android.calendar/events --bind cale
 adb logcat -c; ctl --es cmd calendar; sleep 2
 line=$(adb logcat -d -s LockdInTest:I | grep "calendar permitted" | tail -1)
 echo "$line" | grep -q "titles=.*CIExam" && record C-calendar-read pass "device calendar read: ${line#*permitted=}" || record C-calendar-read FAIL "event not read: ${line:-no log}"
+# Location routines (E): arriving at a saved place (emulator location) gives a reminder.
+adb shell pm grant $A android.permission.ACCESS_FINE_LOCATION || true
+adb shell pm grant $A android.permission.ACCESS_COARSE_LOCATION || true
+adb shell pm grant $A android.permission.ACCESS_BACKGROUND_LOCATION || true
+adb shell settings put secure location_mode 3 || true
+ctl --es cmd finish
+adb emu geo fix -88.30 40.00 >/dev/null 2>&1; sleep 5
+adb logcat -c
+ctl --es cmd place --es lat 40.1106 --es lon -88.2073; sleep 5
+seen=""
+for _ in $(seq 1 30); do
+  adb emu geo fix -88.2073 40.1106 >/dev/null 2>&1
+  adb logcat -d -s LockdInPlaces:I | grep -q "place_arrive CIPlace" && { seen=1; break; }
+  sleep 5
+done
+pl=$(adb logcat -d -s LockdInPlaces:I | tail -5 | tr '\n' ' ')
+[ -n "$seen" ] && record E-place-arrive pass "arrival noticed: $(adb logcat -d -s LockdInPlaces:I | grep place_arrive | tail -1 | sed 's/.*place_arrive //')" \
+  || record E-place-arrive FAIL "no arrival within 150 s on the emulator ($pl)"
+notif_has "at CIPlace" && record E-place-remind pass "reminder posted" || record E-place-remind FAIL "no reminder notification"
 # History (roadmap step 2): sessions left above are saved and survive the process being killed.
 adb shell am force-stop $A; sleep 2
 n=$(adb shell run-as $A cat no_backup/history.v1.json 2>/dev/null | grep -o '"outcome"' | wc -l | tr -d ' ')

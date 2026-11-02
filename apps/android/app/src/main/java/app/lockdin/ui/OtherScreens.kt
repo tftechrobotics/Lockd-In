@@ -170,7 +170,10 @@ fun DevicesScreen() {
 // ---------------- Settings ----------------
 
 @Composable
-fun SettingsScreen(store: Store, history: app.lockdin.state.HistoryStore, zone: java.time.ZoneId = java.time.ZoneId.systemDefault()) {
+fun SettingsScreen(
+    store: Store, history: app.lockdin.state.HistoryStore, zone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
+    onEditPlace: (app.lockdin.engine.Place) -> Unit = {},
+) {
     val c = LocalColors.current
     val ctx = androidx.compose.ui.platform.LocalContext.current
     var confirm by remember { mutableStateOf(false) }
@@ -203,6 +206,7 @@ fun SettingsScreen(store: Store, history: app.lockdin.state.HistoryStore, zone: 
         LookSettings(store)
         RemindersSettings(store)
         CalendarSettings(store)
+        PlacesSettings(store, onEditPlace)
         Column {
             SectionLabel("Starting a session")
             SettingsGroup {
