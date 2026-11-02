@@ -110,3 +110,12 @@ Three kinds of entry, kept apart on purpose:
 - Backgrounds show only while the lock is closed (blocking confirmed during focus); not on Home, setup, breaks, timer-only sessions or other tabs (owner, 2026-11-02).
 - Your reason (blueprint) stays drawn in code, with stronger lines (alpha 0.24 / 0.20).
 - Per the owner, no emulator run for this image-only change; checked by build only.
+
+## R47 — Music: saved playlists and music control through notification access (2026-11-02)
+- Owner reports: starting focus opened the music app over the lock animation, and opening a playlist link didn't start it playing. One link per profile was too limiting.
+- Lockd In no longer switches to the music app when a session starts. Music starts in the background and the start sequence stays on screen.
+- Saved playlists (up to 20, each a name and a link) replace the single link. Each profile picks its starting playlist, and the session screen can switch to any saved one. Links profiles used before this change are added to the list automatically.
+- The owner chose **notification access** (Android's only route to other apps' media players). Lockd In's listener overrides no notification callbacks, so it never reads or keeps notifications. With access granted, Lockd In calls `playFromUri` on the music app's player: a `spotify:` URI for Spotify, the link itself for the others. If the app has no player yet, it is woken with a media key sent only to that app.
+- Without access, Lockd In can only resume the music app, which plays whatever it played last. "Open in …" opens the playlist in its app; for YouTube Music this uses the `watch?list=` form, which plays on its own.
+- Not possible for an individual developer: Spotify's App Remote SDK (development mode is limited to 5 users, Feb 2026). Apple MusicKit is the $99/yr item deferred in R45. SoundCloud has no playback API.
+- Which apps honour `playFromUri` is unverified; it must be checked on a phone (checklist item 27).
