@@ -71,6 +71,8 @@ class FocusService : Service() {
     private var musicLastElapsed = 0L
     private var musicUsed = -1L
     private var musicSavedAt = 0L
+    private var musicSession: String? = null
+    private var musicCounting = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -221,7 +223,11 @@ class FocusService : Service() {
         // Music browsing allowance (R48): counted by its own one-second check while it can run.
         if (session.audio.access == app.lockdin.audio.MusicAccess.LIMITED && interactive && snap.restricting &&
             !app.lockdin.audio.MusicAllowance.spent(session.audio, maxOf(musicUsed, session.musicUsedMs))) {
-            if (!handler.hasCallbacks(musicTick)) { musicLastElapsed = SystemClock.elapsedRealtime(); handler.post(musicTick) }
+            if (!handler.hasCallbacks(musicTick)) {
+                if (musicSession != session.id) { musicSession = session.id; musicUsed = session.musicUsedMs }
+                musicLastElapsed = SystemClock.elapsedRealtime(); handler.post(musicTick)
+                Log.i(TAG, "music_count_on used=${maxOf(musicUsed, session.musicUsedMs)}")
+            }
         } else if (handler.hasCallbacks(musicTick)) {
             handler.removeCallbacks(musicTick); saveMusic(force = true)
         }
@@ -249,6 +255,7 @@ class FocusService : Service() {
         val interactive = getSystemService(PowerManager::class.java).isInteractive
         val front = frontApp(now)
         val counting = snap.restricting && interactive && front != null && front in a.musicApps
+        if (counting != musicCounting) { musicCounting = counting; Log.i(TAG, "music_counting=$counting front=$front used=$musicUsed") }
         val before = musicUsed
         musicUsed = app.lockdin.audio.MusicAllowance.step(musicUsed, delta, counting, app.lockdin.audio.MusicAllowance.allowanceMs(a))
         val warn = app.lockdin.audio.MusicAllowance.shouldWarn(a, musicUsed, session.musicWarned)

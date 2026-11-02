@@ -326,6 +326,7 @@ if [ "${ONLY:-}" = ce ]; then
 fi
 if [ "${ONLY:-}" = audio ]; then
   audio_phase
+  echo "::notice title=Study audio log (EMULATOR)::$(adb logcat -d -s LockdInFocus:I LockdInAudio:I | grep -E 'music|audio|play|cover' | tail -40 | sed 's/%/%25/g' | tr '\n' '\r' | sed 's/\r/%0A/g' | cut -c1-6000)"
   cat "$RESULTS"; echo "::notice title=Study audio (EMULATOR)::$(tr '\n' ' ' < "$RESULTS")"
   exit $FAILED
 fi
