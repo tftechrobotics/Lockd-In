@@ -131,6 +131,11 @@ intro_phase() {
   adb shell settings put system accelerometer_rotation 0
   adb shell settings put system user_rotation 1; sleep 2; adb shell settings put system user_rotation 0; sleep 2
   trial_blocked >/dev/null; adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2
+  # Owner report: after the block screen, later manual starts didn't turn the dial. Leave the
+  # block screen with its own "Return to work" button, as a person would.
+  launch_target; wait_top "${BLOCK//./\\.}" 6000 >/dev/null && { tap_text "Return to work" || note "  no Return to work button"; }; sleep 2
+  n=$(adb shell dumpsys activity activities | grep -oE 'ActivityRecord\{[0-9a-f]+ u0 app\.lockdin/\.MainActivity' | sort -u | wc -l | tr -d ' ')
+  [ "$n" -le 1 ] && record intro-single-main pass "one main screen after Return to work ($n)" || record intro-single-main FAIL "$n main screens after Return to work"
   p2=$(intro_count "played session=")
   [ "$p2" = "$p1" ] && record intro-no-replay pass "no replay after reopening, rotation and a blocked app" || record intro-no-replay FAIL "replayed $((p2 - p1)) times"
   # Dark theme recording (same sequence).
@@ -143,7 +148,7 @@ intro_phase() {
     adb shell screencap -p /sdcard/s.png; adb pull /sdcard/s.png "$OUT/lock-dark.png" >/dev/null 2>&1
   fi
   adb shell cmd uimode night no; p2=$(intro_count "played session=")
-  # Timer only: the turn plays, the shackle stays open.
+  # Timer only (and a later start after the block screen): the turn plays, the shackle stays open.
   ctl --es cmd finish; ctl --es cmd rules; sleep 1
   c2=$(intro_count "shackle_closed")
   if manual_start "Start timer"; then

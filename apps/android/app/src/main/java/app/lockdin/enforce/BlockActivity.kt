@@ -76,7 +76,7 @@ class BlockActivity : ComponentActivity() {
                     isSite = intent.getStringExtra(EXTRA_SITE) != null,
                     onReturn = ::goHome,
                     onOptions = {
-                        startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
                         finish()
                     },
                     onLifted = ::finish,

@@ -462,7 +462,11 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
     val task = session.intention
     val report by liveReport()
     // Manual start only; consumed once, so reopening, rotation and scheduled starts never play it.
-    val intro = remember(session.id) { if (StartIntro.consume(session.id)) session.id else null }
+    // Only a screen that is in front may claim it (a hidden copy must never use it up).
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    val intro = remember(session.id) {
+        if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED) && StartIntro.consume(session.id)) session.id else null
+    }
     // Closed lock and "blocking" wording only from a fresh, verified report by the service.
     val protected = snap.restricting && EnforcerStatus.protecting(session.id, report)
     val permissionNeeded = report?.sessionId == session.id && report?.protection == Protection.PERMISSION_NEEDED
