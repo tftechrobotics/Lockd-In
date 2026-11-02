@@ -179,12 +179,12 @@ def light_print(im):
     a = np.asarray(im).astype(np.float32) / 255.0
     L = lum(np.asarray(im).astype(np.float32))
     t = np.clip(L / 0.13, 0, 1) ** 0.8                     # 0 = darkest, 1 = brightest highlight
-    target = 0.50 + 0.36 * t                                # relative luminance 0.50 … 0.86
+    target = 0.64 + 0.24 * t                                # relative luminance 0.64 … 0.88
     cream = np.array([243, 236, 225]) / 255.0               # hue of the light theme's ground
     base = cream * (target / 0.84)[..., None] ** (1 / 2.2)  # approx. gamma for the target luminance
     # Keep a hint of the original colour (warm lamp, book spines).
     chroma = a - a.mean(axis=2, keepdims=True)
-    out = np.clip(base + chroma * 0.6, 0, 1)
+    out = np.clip(base + chroma * 0.5, 0, 1)
     return Image.fromarray((out * 255).astype(np.uint8))
 
 def band_min(img):

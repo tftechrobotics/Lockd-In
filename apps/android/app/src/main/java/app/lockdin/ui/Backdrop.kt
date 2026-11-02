@@ -100,7 +100,8 @@ fun BackdropLayer(choice: Backdrop, words: String, modifier: Modifier) {
     val c = LocalColors.current
     val dark = c == DarkColors
     val ctx = LocalContext.current
-    Box(modifier.clearAndSetSemantics { }) {
+    // The scene supplies its own ground: the screen behind it is transparent.
+    Box(modifier.clearAndSetSemantics { }.background(if (choice == Backdrop.NONE) Color.Transparent else c.ground)) {
         when (choice) {
             Backdrop.NONE -> Unit
             Backdrop.LIBRARY, Backdrop.MOUNTAINS -> {
