@@ -30,6 +30,7 @@ import androidx.media3.session.MediaSession
 import app.lockdin.R
 import app.lockdin.state.ActiveSession
 
+@androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
 object StudyPlayer {
     private const val TAG = "LockdInAudio"
     private const val PREVIEW_MS = 15_000L

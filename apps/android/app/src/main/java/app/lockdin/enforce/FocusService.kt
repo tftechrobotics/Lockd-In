@@ -373,6 +373,8 @@ class FocusService : Service() {
         lastMissing = if (p == Protection.PERMISSION_NEEDED) missing else emptySet()
     }
 
+    // MediaStyleNotificationHelper is marked unstable by Media3 (its API may change between versions).
+    @androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
     private fun notification(session: ActiveSession, snap: Snapshot?, p: Protection, missing: Set<Capability>): Notification {
         val until = snap?.phase?.end?.let { DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it)) }
         val (title, text) = when {
