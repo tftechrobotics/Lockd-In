@@ -67,15 +67,21 @@ class BlockActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = goHome()
         })
-        requestAudioFocus()
         val store = Store.get(this)
+        val pkg = intent.getStringExtra(EXTRA_PKG)
+        val music = musicTimeUp(store.state.active, pkg)
+        // Narrow exception (R48): covering a chosen music app whose browsing time is up must not
+        // stop its playback, and Lockd In's own study audio keeps playing. Every other cover
+        // still asks other apps to stop playing sound.
+        if (!music && !app.lockdin.audio.StudyPlayer.isPlaying) requestAudioFocus()
         setContent {
             LockdInTheme(isDark(store.state.theme)) {
                 BlockScreen(
                     appLabel = intent.getStringExtra(EXTRA_SITE) ?: InstalledApps.label(this, intent.getStringExtra(EXTRA_PKG) ?: ""),
                     isSite = intent.getStringExtra(EXTRA_SITE) != null,
-                    pkg = intent.getStringExtra(EXTRA_PKG),
-                    onReturn = ::goHome,
+                    pkg = pkg,
+                    musicTimeUp = music,
+                    onReturn = if (music) ::openLockdIn else ::goHome,
                     onOptions = {
                         startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
                         finish()
@@ -119,6 +125,11 @@ class BlockActivity : ComponentActivity() {
         focusRequest = req
     }
 
+    private fun openLockdIn() {
+        startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+        finish()
+    }
+
     private fun goHome() {
         startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         finish()
@@ -139,8 +150,13 @@ class BlockActivity : ComponentActivity() {
     }
 }
 
+/** A chosen music app covered because this session's browsing allowance is spent (R48). */
+internal fun musicTimeUp(session: app.lockdin.state.ActiveSession?, pkg: String?): Boolean =
+    session != null && pkg != null && session.audio.access == app.lockdin.audio.MusicAccess.LIMITED &&
+        pkg in session.audio.musicApps && app.lockdin.audio.MusicAllowance.spent(session.audio, session.musicUsedMs)
+
 @Composable
-private fun BlockScreen(appLabel: String, isSite: Boolean, pkg: String? = null, onReturn: () -> Unit, onOptions: () -> Unit, onLifted: () -> Unit) {
+private fun BlockScreen(appLabel: String, isSite: Boolean, pkg: String? = null, musicTimeUp: Boolean = false, onReturn: () -> Unit, onOptions: () -> Unit, onLifted: () -> Unit) {
     val c = LocalColors.current
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val store = Store.get(ctx)
@@ -175,8 +191,12 @@ private fun BlockScreen(appLabel: String, isSite: Boolean, pkg: String? = null, 
         Column(Modifier.widthIn(max = 480.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
             LockdIcon(LIcon.Focus, size = 40.dp, tint = c.ink)
             Text(
-                "$appLabel is blocked during focus", style = Type.title, color = c.ink, textAlign = TextAlign.Center,
+                if (musicTimeUp) "Music browsing time is up" else "$appLabel is blocked during focus", style = Type.title, color = c.ink, textAlign = TextAlign.Center,
                 modifier = Modifier.semantics { heading() },
+            )
+            if (musicTimeUp) Text(
+                "Your music can keep playing. Use the media controls in your notifications or lock screen to pause or skip.",
+                style = UiType.body, color = c.ink, textAlign = TextAlign.Center,
             )
             session?.intention?.let {
                 Text("You’re working on: $it", style = UiType.body, color = c.ink, textAlign = TextAlign.Center)
@@ -196,7 +216,7 @@ private fun BlockScreen(appLabel: String, isSite: Boolean, pkg: String? = null, 
                 style = UiType.caption, color = c.inkMuted, textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(Dim.s4))
-            MainButton("Return to work", onReturn)
+            MainButton(if (musicTimeUp) "Return to focus" else "Return to work", onReturn)
             SecondaryButton(
                 if (session?.commitment == Commitment.LOCKED) "Emergency options" else "Session options",
                 onOptions, modifier = Modifier.fillMaxWidth(),

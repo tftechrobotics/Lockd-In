@@ -104,6 +104,51 @@ manual_start() { # manual_start <button text>
   sleep 1.5
   tap_text "$1"
 }
+# Study audio (R48). Built-in audio: starts with a fresh focus period, keeps playing when a
+# blocked app is covered, stops on emergency recovery. Music allowance: background playback
+# doesn't count, one warning near the end, then the music app is covered without stopping its
+# sound (the probe target's tone pauses only if something takes audio focus).
+music_used() { adb shell run-as $A cat shared_prefs/lockdin.xml 2>/dev/null | grep -oE 'musicUsedMs&quot;:[0-9]+' | grep -oE '[0-9]+$' | head -1; }
+study_playing() { adb shell dumpsys media_session 2>/dev/null | grep -A12 'lockdin-study' | grep -qE 'state=PlaybackState \{state=(3|PLAYING)'; }
+target_log() { adb shell run-as $T cat files/target.jsonl 2>/dev/null; }
+audio_phase() {
+  ctl --es cmd finish; adb logcat -c; sleep 1
+  ctl --es cmd start --ei focus 4 --ei break 1 --ei rounds 1 --es block "$T" --es audio RAIN
+  adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 6; home
+  adb logcat -d -s LockdInAudio:I | grep -q "auto_start phase=0" && record R48-audio-autostart pass "Rain started with the focus period" || record R48-audio-autostart FAIL "no auto_start in log"
+  study_playing && record R48-audio-background pass "media session playing with Lockd In in the background" || record R48-audio-background FAIL "media session not playing ($(adb shell dumpsys media_session | grep -A6 lockdin-study | tr -s ' ' | head -4 | tr '\n' ' '))"
+  adb shell dumpsys notification --noredact 2>/dev/null | grep -q 'MediaStyle\|android.mediaSession' && record R48-audio-notification pass "media-style session notification" || record R48-audio-notification FAIL "no media notification"
+  r=$(trial_blocked 10000) && { study_playing && record R48-audio-survives-cover pass "built-in audio kept playing through a block screen" || record R48-audio-survives-cover FAIL "built-in audio stopped by the block screen"; } || record R48-audio-survives-cover FAIL "target not covered ($r)"
+  ctl --es cmd emergency; sleep 5
+  study_playing && record R48-audio-stops FAIL "still playing after emergency recovery" || record R48-audio-stops pass "faded out and stopped on emergency recovery"
+
+  # Music allowance: target as the chosen music app, 1 minute, 20 s already used (40 s left).
+  ctl --es cmd finish; sleep 1
+  adb shell run-as $T rm -f files/target.jsonl 2>/dev/null
+  ctl --es cmd start --ei focus 6 --ei break 1 --ei rounds 1 --es block "" --es music LIMITED --es musicApps "$T" --ei allowance 1 --el musicUsed 20000
+  sleep 3
+  launch_target; wait_top "^$T/" 5000 >/dev/null
+  tap_text "Start / stop quiet tone" || tap_text "START / STOP QUIET TONE"
+  sleep 4; home; sleep 2
+  u1=$(music_used); sleep 12; u2=$(music_used)
+  if [ -n "$u1" ] && [ "$u1" = "$u2" ] && [ "$u1" -gt 20000 ]; then record R48-allowance-background pass "foreground use counted (${u1} ms), 12 s of background playback didn't ($u2 ms)"
+  else record R48-allowance-background FAIL "used before=$u1 after=$u2 (expected >20000 and unchanged)"; fi
+  launch_target
+  seen=""; start=$(now_ms)
+  while (( $(now_ms) - start < 30000 )); do notif_has "seconds of music browsing left" && { seen=$(( $(now_ms) - start )); break; }; sleep 0.5; done
+  [ -n "$seen" ] && record R48-allowance-warning pass "warning ${seen} ms after returning to the app" || record R48-allowance-warning FAIL "no 30-second warning"
+  r=$(wait_top "${BLOCK//./\\.}" 45000) && record R48-allowance-cover pass "music app covered when the allowance ran out (${r} ms)" || record R48-allowance-cover FAIL "not covered: $r"
+  find_text "Music browsing time is up" >/dev/null && record R48-allowance-text pass "block screen says music browsing time is up" || record R48-allowance-text FAIL "music wording not shown"
+  sleep 3
+  tl=$(target_log)
+  if echo "$tl" | grep -q '"tone_started"' && ! echo "$tl" | grep -q 'lost_audio_focus\|"tone_stopped"'; then record R48-allowance-keeps-playing pass "the music app's sound kept playing under the block screen (no audio-focus loss)"
+  else record R48-allowance-keeps-playing FAIL "tone stopped or never started: $(echo "$tl" | grep -oE '"evt":"[a-z_]+"' | tail -5 | tr '\n' ' ')"; fi
+  # Other blocked apps still get the normal cover (audio focus requested): checked by the
+  # main trials above; the exception is limited to chosen music apps whose time is up.
+  home; ctl --es cmd emergency; sleep 2
+  adb shell am force-stop $T
+}
+
 intro_phase() {
   ctl --es cmd finish; ctl --es cmd rules --es block "$T"
   anim_scale 1
@@ -279,6 +324,11 @@ if [ "${ONLY:-}" = ce ]; then
   cat "$RESULTS"; echo "::notice title=Calendar and places (EMULATOR)::$(tr '\n' ' ' < "$RESULTS")"
   exit $FAILED
 fi
+if [ "${ONLY:-}" = audio ]; then
+  audio_phase
+  cat "$RESULTS"; echo "::notice title=Study audio (EMULATOR)::$(tr '\n' ' ' < "$RESULTS")"
+  exit $FAILED
+fi
 if [ "${ONLY:-}" = intro ]; then
   adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2; home
   intro_phase
@@ -451,13 +501,7 @@ r=$(trial_open) && record emergency-release pass "target opens right after emerg
 
 
 intro_phase
-# Study audio (B2): ambient sound starts with focus and stops on emergency recovery.
-ctl --es cmd finish; adb logcat -c
-ctl --es cmd start --ei focus 4 --ei break 1 --ei rounds 1 --es block "$T" --es ambient RAIN
-adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 5; home
-adb logcat -d -s LockdInAudio:I | grep -q "ambient_on kind=RAIN" && record B2-ambient-on pass "rain started with focus" || record B2-ambient-on FAIL "no ambient_on in log"
-ctl --es cmd emergency; sleep 4
-adb logcat -d -s LockdInAudio:I | grep -q "ambient_off" && record B2-ambient-off pass "stopped on emergency recovery" || record B2-ambient-off FAIL "ambient kept playing after emergency recovery"
+audio_phase
 plan_phase
 ce_phase
 # History (roadmap step 2): sessions left above are saved and survive the process being killed.

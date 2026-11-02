@@ -166,6 +166,13 @@ object BlockPolicy {
         }
     }
 
+    /** For a running session: its rules, plus the music-app access it started with (R48). */
+    fun isRestrictedIn(pkg: String, session: app.lockdin.state.ActiveSession, essentials: Set<String>): Boolean {
+        if (pkg.isBlank() || pkg in ALWAYS_ALLOWED || pkg in essentials) return false
+        app.lockdin.audio.MusicAllowance.decide(pkg, session.audio, session.musicUsedMs)?.let { return it }
+        return isRestricted(pkg, session.rules, essentials)
+    }
+
     fun isRestricted(pkg: String, rules: AppRules, essentials: Set<String>): Boolean {
         if (pkg.isBlank() || pkg in ALWAYS_ALLOWED || pkg in essentials) return false
         return when (rules.mode) {

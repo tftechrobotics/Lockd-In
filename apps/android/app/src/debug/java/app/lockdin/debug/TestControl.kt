@@ -30,8 +30,16 @@ class TestControl : BroadcastReceiver() {
                         profiles = s.profiles.map {
                             if (it.id == "study") it.copy(
                                 rules = AppRules(mode, pkgs, sites),
+                                // Study audio (R48): audio=PIANO|STRINGS|RAIN turns built-in audio on with
+                                // "play when focus starts"; music=LIMITED|ALWAYS with musicApps=a,b and allowance=min.
                                 audio = app.lockdin.state.ProfileAudio(
-                                    ambient = intent.getStringExtra("ambient")?.let { a -> runCatching { app.lockdin.audio.Ambient.valueOf(a) }.getOrNull() } ?: app.lockdin.audio.Ambient.NONE,
+                                    builtIn = intent.getStringExtra("audio") != null,
+                                    collection = intent.getStringExtra("audio")?.let { a -> runCatching { app.lockdin.audio.AudioCollection.valueOf(a) }.getOrNull() } ?: app.lockdin.audio.AudioCollection.PIANO,
+                                    playOnStart = intent.getStringExtra("audio") != null,
+                                    breaks = if (intent.getBooleanExtra("audioBreaks", false)) app.lockdin.audio.BreakAudio.CONTINUE else app.lockdin.audio.BreakAudio.PAUSE,
+                                    access = intent.getStringExtra("music")?.let { m -> runCatching { app.lockdin.audio.MusicAccess.valueOf(m) }.getOrNull() } ?: app.lockdin.audio.MusicAccess.NORMAL,
+                                    musicApps = intent.getStringExtra("musicApps")?.split(',')?.filter { it.isNotBlank() }?.toSet() ?: emptySet(),
+                                    allowanceMin = intent.getIntExtra("allowance", 5),
                                 ),
                             ) else it
                         },
@@ -42,6 +50,8 @@ class TestControl : BroadcastReceiver() {
                     System.currentTimeMillis(), Session.roundsPlan(rounds, focus, brk), "CI enforcement test", "study",
                     LastChoice(focus, brk, rounds, "study"),
                 )
+                // Music allowance already used (ms), to reach the warning and the end quickly.
+                intent.getLongExtra("musicUsed", 0L).takeIf { it > 0 }?.let { u -> store.state.active?.let { store.setMusicUse(it.id, u) } }
             }
             // Plans a one-time session today at HH:mm (`at`), optionally starting automatically.
             "plan" -> {

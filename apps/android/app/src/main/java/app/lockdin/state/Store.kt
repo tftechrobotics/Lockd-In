@@ -49,6 +49,8 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
     fun startSession(
         now: Long, segments: List<Segment>, intention: String?, profileId: String, last: LastChoice,
         occurrenceKey: String? = null, presetId: String? = null,
+        /** Choices made at setup for this session only (collection, allowance); null = the profile's. */
+        audio: ProfileAudio? = null,
     ) = update { s0 ->
         leaving(s0)
         val s = keepQuestionTimes(s0)
@@ -57,8 +59,8 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
             last = last,
             active = ActiveSession(
                 newId(), now, segments, text, profileId, SessionControls(),
-                rules = sessionRules(s.profiles.firstOrNull { it.id == profileId }),
-                audio = s.profiles.firstOrNull { it.id == profileId }?.audio ?: ProfileAudio(),
+                rules = sessionRules(s.profiles.firstOrNull { it.id == profileId }, audio),
+                audio = audio ?: s.profiles.firstOrNull { it.id == profileId }?.audio ?: ProfileAudio(),
                 commitment = s.commitment,
                 occurrenceKey = occurrenceKey,
                 presetId = presetId,
@@ -113,16 +115,29 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
     fun clearAll() = update { AppState() }
 
     /**
-     * The rules a session runs with: the profile's, except that its own music app (if it has a
-     * playlist) is never blocked during the session, so the music can be opened and controlled.
+     * The rules a session runs with: the profile's, adjusted for its music apps (R48). ALWAYS:
+     * the chosen apps are never covered. LIMITED: they are covered once the allowance is spent,
+     * so they're added to what the rules restrict and MusicAllowance.decide lets them through
+     * until then. The session keeps this snapshot, so editing the profile mid-session changes
+     * nothing until the next session.
      */
-    private fun sessionRules(p: Profile?): app.lockdin.enforce.AppRules {
+    private fun sessionRules(p: Profile?, audio: ProfileAudio?): app.lockdin.enforce.AppRules {
         val r = p?.rules ?: return app.lockdin.enforce.AppRules()
-        val pkg = p.audio.musicProvider?.pkg ?: return r
+        val a = audio ?: p.audio
+        val apps = a.accessApps
+        if (apps.isEmpty()) return r
+        val restrict = a.access == app.lockdin.audio.MusicAccess.LIMITED
         return when (r.mode) {
-            app.lockdin.enforce.RuleMode.BLOCK_LIST -> r.copy(packages = r.packages - pkg)
-            app.lockdin.enforce.RuleMode.APPROVED_ONLY -> r.copy(packages = r.packages + pkg)
+            app.lockdin.enforce.RuleMode.BLOCK_LIST -> r.copy(packages = if (restrict) r.packages + apps else r.packages - apps)
+            app.lockdin.enforce.RuleMode.APPROVED_ONLY -> r.copy(packages = if (restrict) r.packages - apps else r.packages + apps)
         }
+    }
+
+    /** Music browsing counted by FocusService (persisted so restarts and reboots keep it). */
+    fun setMusicUse(sessionId: String, usedMs: Long, warned: Boolean? = null) = update { s ->
+        val a = s.active
+        if (a == null || a.id != sessionId) s
+        else s.copy(active = a.copy(musicUsedMs = maxOf(a.musicUsedMs, usedMs), musicWarned = warned ?: a.musicWarned))
     }
 
     companion object {

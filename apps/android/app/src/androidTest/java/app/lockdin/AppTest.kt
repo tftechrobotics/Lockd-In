@@ -407,42 +407,41 @@ class AppTest {
         org.junit.Assert.assertEquals(365, store.state.historyDays)
     }
 
-    @Test fun profileSoundTabSavesAmbientAndPlaylist() {
+    @Test fun profileAudioTabSavesBuiltInAudioAndMusicAccess() {
         val store = launch(home = true)
         rule.onNodeWithTag("tab-profiles").performClick()
         rule.onNodeWithText("Study").performClick()
-        rule.onNodeWithText("Sound").performClick()
-        rule.onNodeWithText("Rain").performClick()
-        rule.onNodeWithText("Add a playlist").performScrollTo().performClick()
-        rule.onNodeWithContentDescription("Playlist link").performScrollTo().performTextInput("not a playlist")
-        rule.onNodeWithText("Save playlist").performScrollTo().performClick()
-        rule.onNodeWithText("Paste a playlist link from Spotify, YouTube Music, Apple Music or SoundCloud").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithContentDescription("Playlist link").performTextClearance()
-        rule.onNodeWithContentDescription("Playlist link").performTextInput("https://open.spotify.com/playlist/37i9dQZF1DX8NTLI2TtZa6")
-        rule.onNodeWithContentDescription("Playlist name").performTextInput("Deep work")
-        rule.onNodeWithText("Save playlist").performScrollTo().performClick()
-        rule.onNodeWithText("Deep work").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("Spotify stays available", substring = true).performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("allow music control", substring = true).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Audio").performClick()
+        rule.onNodeWithText("Play study audio").performClick()
+        rule.onNodeWithText("Strings").performScrollTo().performClick()
+        rule.onNodeWithText("Development recordings", substring = true).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Limited browsing").performScrollTo().performClick()
+        rule.onNodeWithText("5 min (suggested)").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Allowing an app allows everything in it", substring = true).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Save").performClick()
+        // Limited access with no app chosen isn't saved.
+        rule.onNodeWithText("Choose at least one music app", substring = true).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Follow blocking rules").performScrollTo().performClick()
         rule.onNodeWithText("Save").performClick()
         val a = store.state.profiles.first { it.id == "study" }.audio
-        org.junit.Assert.assertEquals(app.lockdin.audio.Ambient.RAIN, a.ambient)
-        org.junit.Assert.assertEquals(app.lockdin.audio.Music.SPOTIFY, a.musicProvider)
-        org.junit.Assert.assertEquals(listOf("Deep work"), store.state.playlists.map { it.name })
+        org.junit.Assert.assertTrue(a.builtIn)
+        org.junit.Assert.assertEquals(app.lockdin.audio.AudioCollection.STRINGS, a.collection)
+        org.junit.Assert.assertEquals(app.lockdin.audio.MusicAccess.NORMAL, a.access)
     }
 
-    @Test fun sessionShowsSoundControlsForItsProfile() {
+    @Test fun sessionShowsCompactAudioControlAndAllowance() {
         val base = AppState(last = app.lockdin.state.LastChoice(25, 5, 1, "study"))
-        val audio = app.lockdin.state.ProfileAudio(app.lockdin.audio.Ambient.WAVES, musicLink = "https://music.youtube.com/playlist?list=PL1", autoPlay = false)
-        launch(base.copy(profiles = base.profiles.map { if (it.id == "study") it.copy(audio = audio) else it },
-            playlists = listOf(app.lockdin.state.SavedPlaylist("Lofi", "https://music.youtube.com/playlist?list=PL1"))))
+        val audio = app.lockdin.state.ProfileAudio(builtIn = true, collection = app.lockdin.audio.AudioCollection.RAIN,
+            access = app.lockdin.audio.MusicAccess.LIMITED, musicApps = setOf("com.spotify.music"))
+        launch(base.copy(profiles = base.profiles.map { if (it.id == "study") it.copy(audio = audio) else it }))
+        rule.onNodeWithText("Audio: Rain · music apps 5 min").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Start timer").performClick()
-        rule.onNodeWithText("Lofi").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("Play this playlist").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithContentDescription("Play waves").performScrollTo().assertExists()
-        rule.onNodeWithContentDescription("Play or pause YouTube Music").performScrollTo().assertExists()
-        rule.onNodeWithContentDescription("Next track in YouTube Music").assertExists()
-        rule.onNodeWithText("Plays in YouTube Music", substring = true).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithContentDescription("Play study audio").performScrollTo().assertExists()
+        rule.onNodeWithText("Music apps: 5:00 of browsing left").performScrollTo().assertIsDisplayed()
+        // Options stay folded away until asked for.
+        rule.onNodeWithContentDescription("Study audio volume").assertDoesNotExist()
+        rule.onNodeWithContentDescription("Show audio options").performClick()
+        rule.onNodeWithContentDescription("Study audio volume").assertExists()
     }
 
     @Test fun scheduleOffersCalendarSuggestionsOnlyWhenAsked() {

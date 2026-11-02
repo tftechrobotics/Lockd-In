@@ -67,6 +67,10 @@ class FocusService : Service() {
     private var lastInteraction = System.currentTimeMillis()
 
     private val tick = Runnable { runTick() }
+    private val musicTick = Runnable { runMusicTick() }
+    private var musicLastElapsed = 0L
+    private var musicUsed = -1L
+    private var musicSavedAt = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -85,10 +89,18 @@ class FocusService : Service() {
         }
         ContextCompat.registerReceiver(this, r, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         screenReceiver = r
+        app.lockdin.audio.StudyPlayer.onChange = { lastNotice = null; kick() }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val store = Store.get(this)
+        // Media notification buttons (built-in study audio).
+        store.state.active?.let { a ->
+            when (intent?.action) {
+                ACTION_AUDIO_TOGGLE -> app.lockdin.audio.StudyPlayer.toggle(this, a.audio)
+                ACTION_AUDIO_NEXT -> app.lockdin.audio.StudyPlayer.next()
+            }
+        }
         if (!shouldRun(store.state, System.currentTimeMillis())) {
             stop("not_running")
             return START_NOT_STICKY
@@ -101,7 +113,7 @@ class FocusService : Service() {
                 val n = notification(a, evaluate(a, System.currentTimeMillis()), Protection.NOT_RESTRICTING, emptySet())
                 // With ambient sound the service also plays media (declared type mediaPlayback).
                 val types = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
-                    (if (a.audio.ambient != app.lockdin.audio.Ambient.NONE) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0)
+                    (if (a.audio.builtIn) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0)
                 if (Build.VERSION.SDK_INT >= 34) startForeground(ONGOING_ID, n, types)
                 else startForeground(ONGOING_ID, n)
                 foreground = true
@@ -129,6 +141,8 @@ class FocusService : Service() {
     override fun onDestroy() {
         isRunning = false
         handler.removeCallbacks(tick)
+        handler.removeCallbacks(musicTick)
+        app.lockdin.audio.StudyPlayer.onChange = null
         screenReceiver?.let { runCatching { unregisterReceiver(it) } }
         super.onDestroy()
     }
@@ -160,9 +174,11 @@ class FocusService : Service() {
             }
         }
         app.lockdin.widget.LockdInWidget.update(this)
-        // Study audio (B2) follows the session: on in focus, paused for breaks unless kept.
-        app.lockdin.audio.StudyAudio.follow(
-            this, session, inFocus = snap.phase?.kind == PhaseKind.FOCUS, inBreak = snap.phase?.kind == PhaseKind.BREAK,
+        // Built-in study audio (R48) follows the session: starts with a fresh focus period if the
+        // profile asks, pauses for breaks unless kept, fades out at the end.
+        app.lockdin.audio.StudyPlayer.follow(
+            this, session, snap.phase?.index, inFocus = snap.phase?.kind == PhaseKind.FOCUS, inBreak = snap.phase?.kind == PhaseKind.BREAK,
+            phaseStart = snap.phase?.start, now = now,
         )
         val (detection, appMissing) = Capabilities.detection(this)
         val missing = BlockPolicy.missingFor(session.rules, detection, appMissing)
@@ -197,14 +213,85 @@ class FocusService : Service() {
             if (interactive && session.rules.restrictsApps && !FocusAccessibilityService.connected) {
                 pollForeground(now)
                 currentTop?.let { top ->
-                    if (BlockPolicy.isRestricted(top, session.rules, essentials(now))) cover(top)
+                    if (BlockPolicy.isRestrictedIn(top, session, essentials(now))) cover(top)
                 }
             }
         }
         wasRestricting = protection == Protection.PROTECTING
+        // Music browsing allowance (R48): counted by its own one-second check while it can run.
+        if (session.audio.access == app.lockdin.audio.MusicAccess.LIMITED && interactive && snap.restricting &&
+            !app.lockdin.audio.MusicAllowance.spent(session.audio, maxOf(musicUsed, session.musicUsedMs))) {
+            if (!handler.hasCallbacks(musicTick)) { musicLastElapsed = SystemClock.elapsedRealtime(); handler.post(musicTick) }
+        } else if (handler.hasCallbacks(musicTick)) {
+            handler.removeCallbacks(musicTick); saveMusic(force = true)
+        }
 
         scheduleWake(listOfNotNull(snap.nextTransition, nextCheckIn?.takeIf { it > now }).minOrNull())
         handler.postDelayed(tick, if (interactive && protection == Protection.PROTECTING && !FocusAccessibilityService.connected) POLL_MS else IDLE_MS)
+    }
+
+    /**
+     * Counts foreground time in the chosen music apps during focus. Each step uses the
+     * elapsedRealtime gap since the last one (capped), so wall-clock changes can't refill the
+     * allowance and a missed check never adds a big jump. Saved every few seconds and on
+     * every change of state, so restarts and reboots keep what was used.
+     */
+    private fun runMusicTick() {
+        val store = Store.get(this)
+        val session = store.state.active ?: return
+        val a = session.audio
+        val t = SystemClock.elapsedRealtime()
+        val delta = t - musicLastElapsed
+        musicLastElapsed = t
+        if (musicUsed < session.musicUsedMs) musicUsed = session.musicUsedMs
+        val now = System.currentTimeMillis()
+        val snap = evaluate(session, now)
+        val interactive = getSystemService(PowerManager::class.java).isInteractive
+        val front = frontApp(now)
+        val counting = snap.restricting && interactive && front != null && front in a.musicApps
+        val before = musicUsed
+        musicUsed = app.lockdin.audio.MusicAllowance.step(musicUsed, delta, counting, app.lockdin.audio.MusicAllowance.allowanceMs(a))
+        val warn = app.lockdin.audio.MusicAllowance.shouldWarn(a, musicUsed, session.musicWarned)
+        if (warn) musicWarning(app.lockdin.audio.MusicAllowance.remainingMs(a, musicUsed))
+        val spent = app.lockdin.audio.MusicAllowance.spent(a, musicUsed)
+        saveMusic(force = warn || spent || (!counting && before != session.musicUsedMs), warned = if (warn) true else null)
+        if (spent) {
+            Log.i(TAG, "music_allowance_spent")
+            if (front != null && front in a.musicApps) cover(front)
+            return
+        }
+        if (snap.restricting && interactive) handler.postDelayed(musicTick, 1_000)
+    }
+
+    private fun saveMusic(force: Boolean, warned: Boolean? = null) {
+        val session = Store.get(this).state.active ?: return
+        val t = SystemClock.elapsedRealtime()
+        if (musicUsed <= session.musicUsedMs && warned == null) return
+        if (!force && t - musicSavedAt < 5_000) return
+        musicSavedAt = t
+        Store.get(this).setMusicUse(session.id, musicUsed, warned)
+    }
+
+    /** The app in front: from Accessibility when bound, otherwise from usage events. */
+    private fun frontApp(now: Long): String? {
+        if (FocusAccessibilityService.connected) return FocusAccessibilityService.frontPackage()
+        pollForeground(now)
+        return currentTop
+    }
+
+    private fun musicWarning(remainingMs: Long) {
+        if (!app.lockdin.sched.Notifier.permitted(this, CHANNEL_SESSION)) return
+        val secs = (remainingMs + 999) / 1000
+        val n = Notification.Builder(this, CHANNEL_SESSION)
+            .setContentTitle("$secs seconds of music browsing left")
+            .setContentText("Your music can keep playing after that.")
+            .setSmallIcon(R.drawable.ic_stat_lock)
+            .setContentIntent(openApp(this))
+            .setAutoCancel(true)
+            .setTimeoutAfter(60_000)
+            .build()
+        runCatching { getSystemService(NotificationManager::class.java).notify(MUSIC_ID, n) }
+        Log.i(TAG, "music_warning remaining_s=$secs")
     }
 
     /** Posts a session notice once (survives service restarts via the plan log). */
@@ -297,6 +384,32 @@ class FocusService : Service() {
             !session.rules.restrictsAnything -> "Focusing until $until" to "Timer only. No apps are blocked on this phone."
             else -> "Focusing until $until" to "Apps are available."
         }
+        val player = app.lockdin.audio.StudyPlayer
+        val media = player.mediaSession?.takeIf { player.loaded != null }
+        if (media != null) {
+            // Built-in study audio is loaded: the session notification also carries its media
+            // controls (and Android shows them on the lock screen and in quick settings).
+            val toggle = androidx.core.app.NotificationCompat.Action(
+                if (player.isPlaying) R.drawable.ic_stat_pause else R.drawable.ic_stat_play,
+                if (player.isPlaying) "Pause" else "Play", serviceIntent(ACTION_AUDIO_TOGGLE, 10),
+            )
+            val b = androidx.core.app.NotificationCompat.Builder(this, CHANNEL_SESSION)
+                .setContentTitle(title)
+                .setContentText(listOfNotNull(player.trackTitle, text).joinToString(" · "))
+                .setSmallIcon(R.drawable.ic_stat_lock)
+                .setContentIntent(openApp(this))
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setSilent(true)
+                .setCategory(Notification.CATEGORY_SERVICE)
+                .setForegroundServiceBehavior(androidx.core.app.NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+                .addAction(toggle)
+            val hasNext = player.loaded?.let { player.hasNext(it) } == true
+            if (hasNext) b.addAction(androidx.core.app.NotificationCompat.Action(R.drawable.ic_stat_next, "Next", serviceIntent(ACTION_AUDIO_NEXT, 11)))
+            b.setStyle(androidx.media3.session.MediaStyleNotificationHelper.MediaStyle(media)
+                .setShowActionsInCompactView(*(if (hasNext) intArrayOf(0, 1) else intArrayOf(0))))
+            return b.build()
+        }
         return Notification.Builder(this, CHANNEL_SESSION)
             .setContentTitle(title)
             .setContentText(text)
@@ -309,9 +422,15 @@ class FocusService : Service() {
             .build()
     }
 
+    private fun serviceIntent(action: String, code: Int): PendingIntent = PendingIntent.getForegroundService(
+        this, code, Intent(this, FocusService::class.java).setAction(action), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+
     private fun stop(reason: String) {
         Log.i(TAG, "released: $reason")
-        app.lockdin.audio.StudyAudio.follow(this, null, inFocus = false, inBreak = false)
+        handler.removeCallbacks(musicTick)
+        saveMusic(force = true)
+        app.lockdin.audio.StudyPlayer.endSession()
         app.lockdin.widget.LockdInWidget.update(this)
         handler.removeCallbacks(tick)
         scheduleWake(null)
@@ -335,6 +454,9 @@ class FocusService : Service() {
         private const val LOOKBACK_MS = 30 * 60_000L
         private const val OVERLAP_MS = 10_000L
         const val ACTION_TICK = "app.lockdin.TICK"
+        const val ACTION_AUDIO_TOGGLE = "app.lockdin.AUDIO_TOGGLE"
+        const val ACTION_AUDIO_NEXT = "app.lockdin.AUDIO_NEXT"
+        private const val MUSIC_ID = 4
 
         /** This process's service instance exists. Process death resets it. */
         @Volatile var isRunning = false

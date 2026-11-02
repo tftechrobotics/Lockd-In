@@ -20,6 +20,8 @@
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <!-- Ambient study sound plays from the session service (B2). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Keeps the CPU awake while built-in study audio plays with the screen off (R48). -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Resume a running session after a restart; re-arm planned sessions. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -47,6 +49,13 @@
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
+        </intent>
+        <!-- Music apps the person can choose for music access (R48): apps that offer a media browser. -->
+        <intent>
+            <action android:name="android.media.browse.MediaBrowserService" />
+        </intent>
+        <intent>
+            <action android:name="androidx.media3.session.MediaSessionService" />
         </intent>
     </queries>
 
@@ -78,17 +87,6 @@
             android:launchMode="singleTask"
             android:taskAffinity="app.lockdin.block" />
 
-        <!-- Music control (B2, R47): notification access lets Lockd In control the music app's
-             player. It overrides no notification callbacks, so it never reads notifications. -->
-        <service
-            android:name=".audio.MediaAccessService"
-            android:exported="true"
-            android:label="Lockd In music control"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
         <service
             android:name=".enforce.FocusService"
             android:exported="false"

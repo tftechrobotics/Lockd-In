@@ -65,7 +65,7 @@ class FocusAccessibilityService : AccessibilityService() {
         if (pkg == null || pkg == packageName) return
         val now = System.currentTimeMillis()
         when {
-            BlockPolicy.isRestricted(pkg, rules, essentials(now)) -> { Log.i(TAG, "${source}_cover"); cover(pkg, null, null) }
+            Store.get(this).state.active?.let { BlockPolicy.isRestrictedIn(pkg, it, essentials(now)) } ?: false -> { Log.i(TAG, "${source}_cover"); cover(pkg, null, null) }
             unsupportedBrowserBlocked(pkg, rules) -> { Log.i(TAG, "${source}_cover"); cover(pkg, null, null) }
             else -> checkAddress(pkg, rules, force = true)
         }
@@ -81,6 +81,7 @@ class FocusAccessibilityService : AccessibilityService() {
         handler.removeCallbacks(check)
         handler.postDelayed(check, CHECK_MS)
         connected = true
+        instance = this
         Log.i(TAG, "connected")
         FocusService.sync(this)
     }
@@ -88,6 +89,7 @@ class FocusAccessibilityService : AccessibilityService() {
     override fun onUnbind(intent: android.content.Intent?): Boolean {
         handler.removeCallbacks(check)
         connected = false
+        instance = null
         Log.i(TAG, "disconnected")
         return super.onUnbind(intent)
     }
@@ -95,6 +97,7 @@ class FocusAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         handler.removeCallbacks(check)
         connected = false
+        instance = null
         super.onDestroy()
     }
 
@@ -103,7 +106,6 @@ class FocusAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val e = event ?: return
         val pkg = e.packageName?.toString() ?: return
-        if (e.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) lastWindowPkg = pkg
         if (pkg == packageName) return
         val session = Store.get(this).state.active ?: return
         val now = System.currentTimeMillis()
@@ -122,7 +124,7 @@ class FocusAccessibilityService : AccessibilityService() {
                     return
                 }
                 when {
-                    BlockPolicy.isRestricted(pkg, rules, essentials(now)) ->
+                    BlockPolicy.isRestrictedIn(pkg, session, essentials(now)) ->
                         // Event time is on the uptime clock; report the delay to our request.
                         cover(pkg, null, SystemClock.uptimeMillis() - e.eventTime)
                     unsupportedBrowserBlocked(pkg, rules) -> cover(pkg, null, null)
@@ -235,9 +237,12 @@ class FocusAccessibilityService : AccessibilityService() {
         @Volatile var connected = false
             private set
 
-        /** Package of the last window that came up (read-only use: sending a music app back, R47). */
-        @Volatile var lastWindowPkg: String? = null
-            private set
+        private var instance: FocusAccessibilityService? = null
+
+        /** The app that owns the window in front, if the service is bound (music allowance, R48). */
+        fun frontPackage(): String? = instance?.let { s ->
+            runCatching { s.rootInActiveWindow?.packageName?.toString() }.getOrNull()
+        }
 
         /** Address-bar view IDs of supported browsers. Others are blocked as whole apps only. */
         val BROWSER_URL_BARS: Map<String, String> = mapOf(

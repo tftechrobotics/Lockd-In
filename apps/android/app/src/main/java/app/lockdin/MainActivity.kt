@@ -34,12 +34,6 @@ class MainActivity : ComponentActivity() {
         intent.getStringExtra(EXTRA_ROUTE)?.let { Resumes.openRoute(it) }
     }
 
-    override fun onStop() {
-        super.onStop()
-        // A music app that pulls itself to the front when asked to play is sent back (B2, R47).
-        if (!isChangingConfigurations) app.lockdin.audio.StudyAudio.onLockdInHidden(this)
-    }
-
     override fun onResume() {
         super.onResume()
         // Permissions may have changed in Settings; a session may need its service restarted

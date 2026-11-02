@@ -1,10 +1,12 @@
 package app.lockdin
 
-import app.lockdin.audio.Ambient
-import app.lockdin.audio.AmbientSynth
-import app.lockdin.audio.AudioPlan
-import app.lockdin.audio.Music
+import app.lockdin.audio.AudioCollection
+import app.lockdin.audio.AudioRules
+import app.lockdin.audio.BreakAudio
+import app.lockdin.audio.MusicAccess
+import app.lockdin.audio.MusicAllowance
 import app.lockdin.enforce.AppRules
+import app.lockdin.enforce.BlockPolicy
 import app.lockdin.enforce.RuleMode
 import app.lockdin.engine.Session
 import app.lockdin.state.AppState
@@ -17,88 +19,168 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.abs
 
+/** Study audio and the music browsing allowance (R48). */
 class AudioTest {
-    @Test fun everyAmbientSoundIsAudibleBoundedAndDeterministic() {
-        for (k in Ambient.values().filter { it != Ambient.NONE }) {
-            val a = ShortArray(22_050 * 3); AmbientSynth(k, seed = 7).fill(a)
-            val b = ShortArray(22_050 * 3); AmbientSynth(k, seed = 7).fill(b)
-            assertTrue(k.name, a.contentEquals(b))
-            val rms = kotlin.math.sqrt(a.map { it.toDouble() * it }.average())
-            assertTrue("${k.name} rms=$rms", rms > 300)            // audible
-            assertTrue(k.name, a.all { abs(it.toInt()) < 31_200 })  // never clips
-        }
-        val silent = ShortArray(1000); AmbientSynth(Ambient.NONE).fill(silent)
-        assertTrue(silent.all { it.toInt() == 0 })
+    private val spotify = "com.spotify.music"
+    private val ytm = "com.google.android.apps.youtube.music"
+    private val limited = ProfileAudio(access = MusicAccess.LIMITED, musicApps = setOf(spotify, ytm), allowanceMin = 5)
+
+    @Test fun collectionsAreSmallCuratedAndInstrumental() {
+        assertEquals(listOf("Piano", "Strings", "Rain"), AudioCollection.values().map { it.label })
+        AudioCollection.values().forEach { assertTrue(it.tracks.isNotEmpty() && it.tracks.size <= 5) }
+        assertTrue(AudioCollection.RAIN.loop)
+        assertFalse(AudioCollection.PIANO.loop)
     }
 
-    @Test fun recognisesPlaylistLinks() {
-        assertEquals(Music.SPOTIFY, Music.providerOf("https://open.spotify.com/playlist/37i9dQZF1DX8NTLI2TtZa6?si=x"))
-        assertEquals(Music.SPOTIFY, Music.providerOf("spotify:playlist:37i9dQZF1DX8NTLI2TtZa6"))
-        assertEquals(Music.YOUTUBE_MUSIC, Music.providerOf("https://music.youtube.com/playlist?list=PL123"))
-        assertEquals(Music.APPLE_MUSIC, Music.providerOf("https://music.apple.com/us/playlist/study/pl.abc"))
-        assertEquals(Music.SOUNDCLOUD, Music.providerOf("https://soundcloud.com/user/sets/focus"))
-        assertNull(Music.providerOf("https://www.youtube.com/watch?v=x"))
-        assertNull(Music.providerOf("https://open.spotify.com.evil.example/playlist/x"))
-        assertNull(Music.providerOf("not a link"))
-        assertEquals("https://soundcloud.com/a/sets/b", Music.clean(" http://soundcloud.com/a/sets/b "))
+    @Test fun builtInAudioIsOffByDefaultAndIndependentOfMusicAccess() {
+        val d = ProfileAudio()
+        assertFalse(d.builtIn); assertFalse(d.playOnStart); assertEquals(MusicAccess.NORMAL, d.access)
+        assertEquals(5, d.allowanceMin)
+        // Either setting works without the other.
+        assertTrue(ProfileAudio(builtIn = true).accessApps.isEmpty())
+        assertEquals(setOf(spotify, ytm), limited.accessApps)
+        assertTrue(ProfileAudio(access = MusicAccess.NORMAL, musicApps = setOf(spotify)).accessApps.isEmpty())
     }
 
-    @Test fun ambientFollowsFocusBreaksAndThePersonsChoice() {
-        val a = ProfileAudio(ambient = Ambient.RAIN)
-        assertTrue(AudioPlan.ambientWanted(a, "s", inFocus = true, inBreak = false, pausedFor = null, startedFor = null))
-        assertFalse(AudioPlan.ambientWanted(a, "s", false, true, null, null))                  // paused for breaks
-        assertTrue(AudioPlan.ambientWanted(a.copy(duringBreaks = true), "s", false, true, null, null))
-        assertFalse(AudioPlan.ambientWanted(a, "s", true, false, "s", null))                   // person paused
-        assertTrue(AudioPlan.ambientWanted(a, "s2", true, false, "s", null))                   // a new session starts fresh
-        assertFalse(AudioPlan.ambientWanted(a.copy(autoPlay = false), "s", true, false, null, null))
-        assertTrue(AudioPlan.ambientWanted(a.copy(autoPlay = false), "s", true, false, null, "s"))
-        assertFalse(AudioPlan.ambientWanted(ProfileAudio(), "s", true, false, null, null))
-        assertFalse(AudioPlan.ambientWanted(a, "s", false, false, null, null))                 // session over
+    @Test fun onlyForegroundFocusTimeCounts() {
+        val all = MusicAllowance.allowanceMs(limited)
+        var used = 0L
+        // One second in front during focus counts.
+        used = MusicAllowance.step(used, 1_000, counting = true, allowanceMs = all); assertEquals(1_000, used)
+        // Background playback, screen off, other apps, breaks: not counting.
+        repeat(600) { used = MusicAllowance.step(used, 1_000, counting = false, allowanceMs = all) }
+        assertEquals(1_000, used)
     }
 
-    @Test fun theProfilesMusicAppIsNeverBlockedInItsSessions() {
-        val spotify = Music.SPOTIFY.pkg
-        val audio = ProfileAudio(musicLink = "https://open.spotify.com/playlist/x")
-        fun started(rules: AppRules): AppRules {
-            val base = AppState()
-            val store = Store(base.copy(profiles = base.profiles.map { if (it.id == "study") it.copy(rules = rules, audio = audio) else it })) {}
-            store.startSession(1_793_300_000_000, Session.roundsPlan(1, 25, 5), null, "study", LastChoice(25, 5, 1, "study"))
-            return store.state.active!!.rules
-        }
-        assertFalse(spotify in started(AppRules(RuleMode.BLOCK_LIST, setOf(spotify, "com.x"))).packages)
-        assertTrue(spotify in started(AppRules(RuleMode.APPROVED_ONLY, setOf("com.notes"))).packages)
+    @Test fun aLongGapNeverAddsMoreThanOneStep() {
+        // A missed check (or a wall-clock jump, which the service never feeds in) can't spend the allowance at once.
+        assertEquals(MusicAllowance.MAX_STEP_MS, MusicAllowance.step(0, 3_600_000, counting = true, allowanceMs = 300_000))
+        assertEquals(0, MusicAllowance.step(0, -5_000, counting = true, allowanceMs = 300_000))
     }
 
-    @Test fun audioSettingsRoundTripAndBadLinksDrop() {
+    @Test fun sharedAcrossAppsAndNeverAboveTheAllowance() {
+        val all = MusicAllowance.allowanceMs(limited)
+        var used = 0L
+        // Switching apps doesn't reset or double anything: it is one number per session.
+        repeat(200) { used = MusicAllowance.step(used, 1_000, true, all) }   // Spotify
+        repeat(200) { used = MusicAllowance.step(used, 1_000, true, all) }   // YouTube Music
+        assertEquals(all, used)
+        assertTrue(MusicAllowance.spent(limited, used))
+        assertEquals(0, MusicAllowance.remainingMs(limited, used))
+    }
+
+    @Test fun oneWarningAtThirtySeconds() {
+        val all = MusicAllowance.allowanceMs(limited)
+        assertFalse(MusicAllowance.shouldWarn(limited, all - 31_000, warned = false))
+        assertTrue(MusicAllowance.shouldWarn(limited, all - 30_000, warned = false))
+        assertFalse(MusicAllowance.shouldWarn(limited, all - 10_000, warned = true))
+        assertFalse(MusicAllowance.shouldWarn(limited, all, warned = false))       // already spent: no warning
+        assertFalse(MusicAllowance.shouldWarn(ProfileAudio(), 0, warned = false))   // not limited
+    }
+
+    @Test fun accessDecisions() {
+        val all = MusicAllowance.allowanceMs(limited)
+        assertEquals(false, MusicAllowance.decide(spotify, limited, 0))
+        assertEquals(true, MusicAllowance.decide(spotify, limited, all))
+        assertNull(MusicAllowance.decide("com.instagram.android", limited, all))  // not chosen: normal rules
+        assertEquals(false, MusicAllowance.decide(spotify, limited.copy(access = MusicAccess.ALWAYS), all))
+        assertNull(MusicAllowance.decide(spotify, limited.copy(access = MusicAccess.NORMAL), 0))
+    }
+
+    private fun started(rules: AppRules, audio: ProfileAudio): app.lockdin.state.ActiveSession {
         val base = AppState()
-        val audio = ProfileAudio(Ambient.WAVES, 0.3f, "https://music.youtube.com/playlist?list=PL1", autoPlay = false, duringBreaks = true)
-        val s = base.copy(profiles = base.profiles.map { if (it.id == "study") it.copy(audio = audio) else it },
-            playlists = listOf(app.lockdin.state.SavedPlaylist("Lofi", "https://music.youtube.com/playlist?list=PL1")))
+        val store = Store(base.copy(profiles = base.profiles.map { if (it.id == "study") it.copy(rules = rules, audio = audio) else it })) {}
+        store.startSession(1_793_300_000_000, Session.roundsPlan(1, 25, 5), null, "study", LastChoice(25, 5, 1, "study"))
+        return store.state.active!!
+    }
+
+    @Test fun limitedAppsAreAllowedUntilSpentThenCovered() {
+        // Block list that doesn't list Spotify, approved-only that does: LIMITED still limits it.
+        for (rules in listOf(AppRules(RuleMode.BLOCK_LIST, setOf("com.x")), AppRules(RuleMode.APPROVED_ONLY, setOf(spotify, "com.notes")))) {
+            val s = started(rules, limited)
+            assertTrue(s.rules.restrictsAnything)
+            assertFalse(BlockPolicy.isRestrictedIn(spotify, s, emptySet()))
+            assertTrue(BlockPolicy.isRestrictedIn(spotify, s.copy(musicUsedMs = MusicAllowance.allowanceMs(limited)), emptySet()))
+        }
+    }
+
+    @Test fun alwaysAllowedAppsAreNeverCoveredAndNormalChangesNothing() {
+        val always = limited.copy(access = MusicAccess.ALWAYS)
+        val s = started(AppRules(RuleMode.BLOCK_LIST, setOf(spotify, "com.x")), always)
+        assertFalse(BlockPolicy.isRestrictedIn(spotify, s, emptySet()))
+        assertTrue(BlockPolicy.isRestrictedIn("com.x", s, emptySet()))
+        val n = started(AppRules(RuleMode.BLOCK_LIST, setOf(spotify)), limited.copy(access = MusicAccess.NORMAL))
+        assertTrue(BlockPolicy.isRestrictedIn(spotify, n, emptySet()))
+    }
+
+    @Test fun setupChoiceAppliesToThisSessionOnly() {
+        val base = AppState()
+        val store = Store(base.copy(profiles = base.profiles.map { if (it.id == "study") it.copy(audio = limited) else it })) {}
+        store.startSession(1_793_300_000_000, Session.roundsPlan(1, 25, 5), null, "study", LastChoice(25, 5, 1, "study"),
+            audio = limited.copy(allowanceMin = 10, builtIn = true, collection = AudioCollection.STRINGS))
+        assertEquals(10, store.state.active!!.audio.allowanceMin)
+        assertEquals(5, store.state.profiles.first { it.id == "study" }.audio.allowanceMin)
+    }
+
+    @Test fun musicUseNeverGoesBackwards() {
+        val base = AppState()
+        val store = Store(base) {}
+        store.startSession(1_793_300_000_000, Session.roundsPlan(1, 25, 5), null, "study", LastChoice(25, 5, 1, "study"))
+        val id = store.state.active!!.id
+        store.setMusicUse(id, 60_000)
+        store.setMusicUse(id, 10_000)
+        assertEquals(60_000, store.state.active!!.musicUsedMs)
+        store.setMusicUse("other", 999_000)
+        assertEquals(60_000, store.state.active!!.musicUsedMs)
+    }
+
+    @Test fun audioStartsOnlyForAFreshFocusPeriod() {
+        val a = ProfileAudio(builtIn = true, playOnStart = true)
+        val t = 1_793_300_000_000
+        assertTrue(AudioRules.autoStart(a, t, t + 2_000, alreadyFor = false))
+        assertFalse(AudioRules.autoStart(a, t, t + 30 * 60_000, alreadyFor = false))  // restart after reboot/recovery
+        assertFalse(AudioRules.autoStart(a.copy(playOnStart = false), t, t, alreadyFor = false))
+        assertFalse(AudioRules.autoStart(a.copy(builtIn = false), t, t, alreadyFor = false))
+        assertFalse(AudioRules.autoStart(a, t, t, alreadyFor = true))
+        // After a break: back on only if it was playing and the profile pauses for breaks.
+        assertTrue(AudioRules.resumeAfterBreak(a.copy(playOnStart = false), true, t, t + 1_000))
+        assertFalse(AudioRules.resumeAfterBreak(a, false, t, t + 1_000))
+        assertFalse(AudioRules.resumeAfterBreak(a.copy(breaks = BreakAudio.CONTINUE), true, t, t + 1_000))
+    }
+
+    @Test fun formatRemaining() {
+        assertEquals("5:00", MusicAllowance.format(300_000))
+        assertEquals("0:01", MusicAllowance.format(1))
+        assertEquals("0:00", MusicAllowance.format(0))
+    }
+
+    // CI only (needs org.json).
+    @Test fun audioRoundTripsAndOldSettingsMigrate() {
+        val base = AppState()
+        val audio = ProfileAudio(true, AudioCollection.STRINGS, 0.3f, true, BreakAudio.CONTINUE, MusicAccess.LIMITED, setOf(spotify), 10)
+        val s = base.copy(profiles = base.profiles.map { if (it.id == "study") it.copy(audio = audio) else it })
         assertEquals(s, StateCodec.decode(StateCodec.encode(s)))
-        val raw = StateCodec.encode(s).replace("https://music.youtube.com/playlist?list=PL1", "https://evil.example/x").replace("\"WAVES\"", "\"NOPE\"")
-        val d = StateCodec.decode(raw).profiles.first { it.id == "study" }.audio
-        assertNull(d.musicLink); assertEquals(Ambient.NONE, d.ambient)
+        // A B2 save: generated ambient sound and a playlist link.
+        val old = StateCodec.encode(base).replace(
+            Regex("\"audio\":\\{[^}]*\\}"),
+            "\"audio\":{\"ambient\":\"WAVES\",\"level\":0.4,\"musicLink\":\"https://open.spotify.com/playlist/x\",\"autoPlay\":true,\"duringBreaks\":true}",
+        )
+        val d = StateCodec.decode(old).profiles.first().audio
+        assertTrue(d.builtIn); assertEquals(AudioCollection.RAIN, d.collection); assertTrue(d.playOnStart)
+        assertEquals(BreakAudio.CONTINUE, d.breaks); assertEquals(MusicAccess.NORMAL, d.access)
+        // Junk reads as off.
+        val junk = StateCodec.encode(s).replace("\"STRINGS\"", "\"NOPE\"").replace("\"LIMITED\"", "\"???\"")
+        val j = StateCodec.decode(junk).profiles.first { it.id == "study" }.audio
+        assertEquals(AudioCollection.PIANO, j.collection); assertEquals(MusicAccess.NORMAL, j.access)
     }
 
-    @Test fun playUrisAndOpenLinks() {
-        assertEquals("spotify:playlist:37i9dQZF1DX8NTLI2TtZa6", Music.playUri("https://open.spotify.com/playlist/37i9dQZF1DX8NTLI2TtZa6?si=abc"))
-        assertEquals("spotify:album:4aawyAB9vmqN3uQ7FjRGTy", Music.playUri("https://open.spotify.com/intl-de/album/4aawyAB9vmqN3uQ7FjRGTy"))
-        assertEquals("https://music.youtube.com/playlist?list=PL1", Music.playUri("https://music.youtube.com/playlist?list=PL1"))
-        assertEquals("https://music.youtube.com/watch?list=PL1", Music.openUri("https://music.youtube.com/playlist?list=PL1&si=x"))
-        assertEquals("https://soundcloud.com/a/sets/b", Music.openUri("https://soundcloud.com/a/sets/b"))
-        assertEquals("Spotify playlist", Music.defaultName("https://open.spotify.com/playlist/x"))
-    }
-
-    // CI only (needs org.json): saved playlists round-trip, and an older profile link is kept as a saved playlist.
-    @Test fun savedPlaylistsRoundTripAndMigrate() {
-        val s = AppState(playlists = listOf(app.lockdin.state.SavedPlaylist("Deep work", "https://open.spotify.com/playlist/A")))
-        assertEquals(s.playlists, StateCodec.decode(StateCodec.encode(s)).playlists)
-        val old = AppState(profiles = AppState().profiles.map { if (it.id == "study") it.copy(audio = ProfileAudio(musicLink = "https://music.youtube.com/playlist?list=PL9")) else it })
-        val raw = StateCodec.encode(old).replace("\"playlists\":[]", "\"playlists\":null")
-        val d = StateCodec.decode(raw).playlists
-        assertEquals(listOf("https://music.youtube.com/playlist?list=PL9"), d.map { it.link })
-        assertEquals("YouTube Music playlist", d.single().name)
+    @Test fun allowanceSurvivesARestart() {
+        val base = AppState()
+        val store = Store(base.copy(profiles = base.profiles.map { if (it.id == "study") it.copy(audio = limited) else it })) {}
+        store.startSession(1_793_300_000_000, Session.roundsPlan(1, 25, 5), null, "study", LastChoice(25, 5, 1, "study"))
+        store.setMusicUse(store.state.active!!.id, 123_000, warned = true)
+        val back = StateCodec.decode(StateCodec.encode(store.state)).active!!
+        assertEquals(123_000, back.musicUsedMs); assertTrue(back.musicWarned)
     }
 }

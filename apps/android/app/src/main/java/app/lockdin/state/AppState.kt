@@ -25,22 +25,8 @@ enum class Tone { CALM, DIRECT, PLAYFUL, CUSTOM, QUIET }
 /** `rules` are this phone's own app rules for the profile (each device keeps its own). */
 data class Profile(val id: String, val name: String, val description: String, val builtIn: Boolean, val rules: AppRules = AppRules(), val audio: ProfileAudio = ProfileAudio())
 
-/**
- * A profile's study audio (roadmap step 3, B2). `ambient` is generated on the phone; `musicLink`
- * is a playlist in the person's own music app, which Lockd In opens and controls but does not play.
- */
-data class ProfileAudio(
-    val ambient: app.lockdin.audio.Ambient = app.lockdin.audio.Ambient.NONE,
-    val level: Float = 0.6f,
-    val musicLink: String? = null,
-    /** Start the sound (and open the playlist, for starts made in the app) when focus begins. */
-    val autoPlay: Boolean = true,
-    /** Keep ambient sound on during breaks. Off: it pauses for breaks and comes back with focus. */
-    val duringBreaks: Boolean = false,
-) {
-    val hasSound: Boolean get() = ambient != app.lockdin.audio.Ambient.NONE || musicLink != null
-    val musicProvider: app.lockdin.audio.MusicProvider? get() = app.lockdin.audio.Music.providerOf(musicLink)
-}
+/** A profile's study audio and music-app access (R48); defined in app.lockdin.audio. */
+typealias ProfileAudio = app.lockdin.audio.ProfileAudio
 
 /**
  * A reusable session setup (roadmap step 2, B). `due` and `steps` are optional study details:
@@ -88,18 +74,17 @@ data class ActiveSession(
     val occurrenceKey: String? = null,
     /** The preset it was started from, if any (its steps show during the session). */
     val presetId: String? = null,
-    /** The profile's study audio when the session started. */
+    /** The profile's study audio when the session started (with any choice made at setup). */
     val audio: ProfileAudio = ProfileAudio(),
+    /** Music browsing used so far in this session (LIMITED access), counted by FocusService. */
+    val musicUsedMs: Long = 0,
+    /** The 30-second warning was given. */
+    val musicWarned: Boolean = false,
     /** Question timing for this session (D), if the person used it. */
     val questions: app.lockdin.engine.QuestionLog = app.lockdin.engine.QuestionLog(),
     /** Inactivity check-ins in this session (D). */
     val checkIn: CheckInState = CheckInState(),
 )
-
-/** A playlist the person saved (B2): a name they chose and a link in their own music app. */
-data class SavedPlaylist(val name: String, val link: String) {
-    val provider: app.lockdin.audio.MusicProvider? get() = app.lockdin.audio.Music.providerOf(link)
-}
 
 data class AppState(
     val theme: ThemeChoice = ThemeChoice.SYSTEM,
@@ -112,8 +97,6 @@ data class AppState(
     /** Default commitment for new sessions. */
     val commitment: Commitment = Commitment.DELAYED,
     val presets: List<Preset> = emptyList(),
-    /** Saved playlists (B2). A profile's `musicLink` is one of these; any session can switch between them. */
-    val playlists: List<SavedPlaylist> = emptyList(),
     /** First-run introduction seen (new installs start with false; see Store.get). */
     val onboarded: Boolean = true,
     /** Location routines (E): places, and a switch that pauses all of them. */
@@ -177,7 +160,6 @@ object StateCodec {
                 .put("rounds", p.rounds).put("profileId", p.profileId).put("task", p.task ?: JSONObject.NULL)
                 .put("due", p.due?.toString() ?: JSONObject.NULL).put("steps", JSONArray(p.steps))
         }))
-        put("playlists", JSONArray(s.playlists.map { JSONObject().put("name", it.name).put("link", it.link) }))
         put("historyDays", s.historyDays)
         put("onboarded", s.onboarded)
         put("places", JSONArray(s.places.map { p ->
@@ -249,7 +231,6 @@ object StateCodec {
                 }?.take(8) ?: emptyList(),
                 commitment = enumOr(o.optString("commitment"), Commitment.DELAYED),
                 presets = o.optJSONArray("presets")?.objects()?.mapNotNull(::presetOf)?.take(MAX_PRESETS) ?: emptyList(),
-                playlists = playlistsOf(o),
                 historyDays = o.optInt("historyDays", 365).let { if (it in app.lockdin.engine.History.RETENTION_CHOICES) it else 365 },
                 onboarded = o.optBoolean("onboarded", true),
                 places = o.optJSONArray("places")?.objects()?.mapNotNull(::placeOf)?.take(20) ?: emptyList(),
@@ -295,19 +276,6 @@ object StateCodec {
         null // DateTimeException, JSONException, bad day numbers: drop the item
     }
 
-    /** Saved playlists; links a profile used before the list existed are added so nothing is lost. */
-    private fun playlistsOf(o: JSONObject): List<SavedPlaylist> {
-        val saved = o.optJSONArray("playlists")?.objects()?.mapNotNull { j ->
-            val link = app.lockdin.audio.Music.clean(j.optString("link")) ?: return@mapNotNull null
-            SavedPlaylist(j.optString("name").trim().take(40).ifEmpty { app.lockdin.audio.Music.defaultName(link) }, link)
-        } ?: emptyList()
-        val fromProfiles = o.optJSONArray("profiles")?.objects()?.mapNotNull { p ->
-            p.optJSONObject("audio")?.let { a -> if (a.isNull("musicLink") || !a.has("musicLink")) null else app.lockdin.audio.Music.clean(a.optString("musicLink")) }
-        } ?: emptyList()
-        val all = saved + fromProfiles.filter { l -> saved.none { it.link == l } }.distinct().map { SavedPlaylist(app.lockdin.audio.Music.defaultName(it), it) }
-        return all.distinctBy { it.link }.take(MAX_PLAYLISTS)
-    }
-
     private fun presetOf(p: JSONObject): Preset? = try {
         Preset(
             p.getString("id").take(64), p.getString("name").trim().take(60).ifEmpty { return null },
@@ -344,6 +312,8 @@ object StateCodec {
             if (a.isNull("occurrenceKey") || !a.has("occurrenceKey")) null else a.getString("occurrenceKey").take(120),
             if (a.isNull("presetId") || !a.has("presetId")) null else a.getString("presetId").take(64),
             audioOf(a.optJSONObject("audio")),
+            a.optLong("musicUsedMs", 0).coerceIn(0, 24 * 3_600_000L),
+            a.optBoolean("musicWarned", false),
             questionsOf(a.optJSONObject("questions")),
             a.optJSONObject("checkIn")?.let { c ->
                 fun t(k: String) = if (c.isNull(k) || !c.has(k)) null else c.getLong(k)
@@ -376,7 +346,6 @@ object StateCodec {
     private const val MAX_LOG = 300
     private const val MAX_STARTS = 40
     private const val MAX_PRESETS = 30
-    const val MAX_PLAYLISTS = 20
     // Earlier pattern backgrounds (PAPER, LINEN, CONTOURS, HILLS) were replaced by scenes; they read as NONE.
     private val BACKDROPS = setOf("NONE", "LIBRARY", "MOUNTAINS", "WORDS", "BLUEPRINT", "PHOTO")
 
@@ -393,7 +362,7 @@ object StateCodec {
                 }))
         .put("occurrenceKey", a.occurrenceKey ?: JSONObject.NULL)
         .put("presetId", a.presetId ?: JSONObject.NULL)
-        .put("audio", audioJson(a.audio))
+        .put("audio", audioJson(a.audio)).put("musicUsedMs", a.musicUsedMs).put("musicWarned", a.musicWarned)
         .put("questions", questionsJson(a.questions))
         .put("checkIn", JSONObject().put("askedAt", a.checkIn.askedAt ?: JSONObject.NULL).put("answeredAt", a.checkIn.answeredAt ?: JSONObject.NULL)
             .put("snoozedUntil", a.checkIn.snoozedUntil ?: JSONObject.NULL).put("answers", JSONObject().apply { a.checkIn.answers.forEach { (k, v) -> put(k, v) } }))
@@ -426,17 +395,36 @@ object StateCodec {
         return app.lockdin.engine.QuestionLog(items, t(o, "pausedAt"), t(o, "quietUntil"), o.optBoolean("finished"))
     }
 
-    private fun audioJson(a: ProfileAudio): JSONObject = JSONObject().put("ambient", a.ambient.name).put("level", a.level.toDouble())
-        .put("musicLink", a.musicLink ?: JSONObject.NULL).put("autoPlay", a.autoPlay).put("duringBreaks", a.duringBreaks)
+    private fun audioJson(a: ProfileAudio): JSONObject = JSONObject()
+        .put("builtIn", a.builtIn).put("collection", a.collection.name).put("volume", a.volume.toDouble())
+        .put("playOnStart", a.playOnStart).put("breaks", a.breaks.name)
+        .put("access", a.access.name).put("musicApps", JSONArray(a.musicApps.sorted())).put("allowanceMin", a.allowanceMin)
 
-    /** Missing or invalid audio reads as none. Links are kept only if they're a supported playlist link. */
+    /**
+     * Missing or invalid audio reads as off. Older saves (B2: generated ambient sound and a
+     * playlist link) carry over as built-in Rain with the same start and break choices; the
+     * playlist link is dropped (R48 replaces it).
+     */
     private fun audioOf(o: JSONObject?): ProfileAudio {
         if (o == null) return ProfileAudio()
+        if (!o.has("builtIn") && o.has("ambient")) {
+            val old = o.optString("ambient", "NONE")
+            return ProfileAudio(
+                builtIn = old != "NONE", collection = app.lockdin.audio.AudioCollection.RAIN,
+                volume = o.optDouble("level", 0.6).toFloat().let { if (it.isNaN()) 0.6f else it.coerceIn(0f, 1f) },
+                playOnStart = old != "NONE" && o.optBoolean("autoPlay", true),
+                breaks = if (o.optBoolean("duringBreaks", false)) app.lockdin.audio.BreakAudio.CONTINUE else app.lockdin.audio.BreakAudio.PAUSE,
+            )
+        }
         return ProfileAudio(
-            enumOr(o.optString("ambient"), app.lockdin.audio.Ambient.NONE),
-            o.optDouble("level", 0.6).toFloat().let { if (it.isNaN()) 0.6f else it.coerceIn(0f, 1f) },
-            if (o.isNull("musicLink") || !o.has("musicLink")) null else app.lockdin.audio.Music.clean(o.getString("musicLink")),
-            o.optBoolean("autoPlay", true), o.optBoolean("duringBreaks", false),
+            builtIn = o.optBoolean("builtIn", false),
+            collection = enumOr(o.optString("collection"), app.lockdin.audio.AudioCollection.PIANO),
+            volume = o.optDouble("volume", 0.6).toFloat().let { if (it.isNaN()) 0.6f else it.coerceIn(0f, 1f) },
+            playOnStart = o.optBoolean("playOnStart", false),
+            breaks = enumOr(o.optString("breaks"), app.lockdin.audio.BreakAudio.PAUSE),
+            access = enumOr(o.optString("access"), app.lockdin.audio.MusicAccess.NORMAL),
+            musicApps = o.optJSONArray("musicApps")?.let { arr -> (0 until arr.length()).map { arr.optString(it) }.filter(::validPackage).take(20).toSet() } ?: emptySet(),
+            allowanceMin = o.optInt("allowanceMin", app.lockdin.audio.MusicAllowance.DEFAULT_MIN).coerceIn(1, 60),
         )
     }
 
