@@ -74,7 +74,8 @@ class AudioTest {
     @Test fun audioSettingsRoundTripAndBadLinksDrop() {
         val base = AppState()
         val audio = ProfileAudio(Ambient.WAVES, 0.3f, "https://music.youtube.com/playlist?list=PL1", autoPlay = false, duringBreaks = true)
-        val s = base.copy(profiles = base.profiles.map { if (it.id == "study") it.copy(audio = audio) else it })
+        val s = base.copy(profiles = base.profiles.map { if (it.id == "study") it.copy(audio = audio) else it },
+            playlists = listOf(app.lockdin.state.SavedPlaylist("Lofi", "https://music.youtube.com/playlist?list=PL1")))
         assertEquals(s, StateCodec.decode(StateCodec.encode(s)))
         val raw = StateCodec.encode(s).replace("https://music.youtube.com/playlist?list=PL1", "https://evil.example/x").replace("\"WAVES\"", "\"NOPE\"")
         val d = StateCodec.decode(raw).profiles.first { it.id == "study" }.audio
