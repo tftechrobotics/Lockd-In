@@ -126,7 +126,8 @@ audio_phase() {
   ctl --es cmd finish; sleep 1
   adb shell run-as $T rm -f files/target.jsonl 2>/dev/null
   ctl --es cmd start --ei focus 6 --ei break 1 --ei rounds 1 --es music LIMITED --es musicApps "$T" --ei allowance 1 --el musicUsed 20000
-  sleep 3
+  # Android 15 lets a background start begin the service only with a visible window: open the app.
+  adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 3; home
   launch_target; wait_top "^$T/" 5000 >/dev/null
   tap_text "Start / stop quiet tone" || tap_text "START / STOP QUIET TONE"
   sleep 4; home; sleep 2
