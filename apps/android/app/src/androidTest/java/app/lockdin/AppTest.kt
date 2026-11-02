@@ -11,6 +11,8 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onLast
@@ -353,8 +355,9 @@ class AppTest {
     @Test fun presetIsSavedAndStartsInOneTapFromHome() {
         val store = launch()
         rule.onNode(hasSetTextAction()).performTextInput("Physics review")
+        rule.onNode(hasSetTextAction()).performImeAction() // closes the keyboard, as Done does
         rule.onNodeWithText("Save as preset").performScrollTo().performClick()
-        rule.onNodeWithContentDescription("Preset name").assertExists()
+        rule.waitUntil(5_000) { rule.onAllNodesWithContentDescription("Preset name").fetchSemanticsNodes().isNotEmpty() }
         rule.onAllNodesWithText("Save").onLast().performClick()
         org.junit.Assert.assertEquals("Physics review", store.state.presets.single().name)
         rule.onNodeWithText("Back").performClick()
@@ -412,7 +415,7 @@ class AppTest {
         rule.onNodeWithText("Rain").performClick()
         rule.onNodeWithContentDescription("Playlist link").performTextInput("not a playlist")
         rule.onNodeWithText("Save").performClick()
-        rule.onNodeWithText("Paste a playlist link from Spotify, YouTube Music, Apple Music or SoundCloud").assertIsDisplayed()
+        rule.onNodeWithText("Paste a playlist link from Spotify, YouTube Music, Apple Music or SoundCloud").performScrollTo().assertIsDisplayed()
         rule.onNodeWithContentDescription("Playlist link").performTextClearance()
         rule.onNodeWithContentDescription("Playlist link").performTextInput("https://open.spotify.com/playlist/37i9dQZF1DX8NTLI2TtZa6")
         rule.onNodeWithText("Controls your Spotify app", substring = true).assertIsDisplayed()

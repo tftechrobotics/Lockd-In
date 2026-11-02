@@ -110,7 +110,7 @@ intro_phase() {
   adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2
   tap_text "New session" || record intro-ui FAIL "couldn't find New session"
   sleep 1.5
-  p0=$(intro_count "played session="); c0=$(intro_count "shackle_closed")
+  p0=$(intro_count "played session="); c0=$(intro_count "shackle_closed"); p1=$p0
   if xy=$(find_text "Start focus"); then
     adb shell screenrecord --time-limit 5 --bit-rate 8000000 /sdcard/start-sequence.mp4 & rec=$!
     sleep 1; adb shell input tap $xy
@@ -226,6 +226,9 @@ if [ "${ONLY:-}" = site ]; then
   echo "::notice title=Chrome diagnostics (EMULATOR)::$( (adb shell dumpsys package com.android.chrome | grep -m1 versionName; echo "$ids"; adb logcat -d -s LockdInFocus ActivityTaskManager:W | tail -40) | sed 's/%/%25/g' | tr '\n' '\r' | sed 's/\r/%0A/g' | cut -c1-6000)"
   cat "$RESULTS"; exit $FAILED
 fi
+# The first-run introduction is covered by UI tests; the E2E drives the main screens.
+adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2
+ctl --es cmd onboarded; home
 if [ "${ONLY:-}" = intro ]; then
   adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2; home
   intro_phase
