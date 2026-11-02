@@ -559,6 +559,8 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
     }
     // Closed lock and "blocking" wording only from a fresh, verified report by the service.
     val protected = snap.restricting && EnforcerStatus.protecting(session.id, report)
+    androidx.compose.runtime.SideEffect { BackdropGate.locked = protected }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { BackdropGate.locked = false } }
     val permissionNeeded = report?.sessionId == session.id && report?.protection == Protection.PERMISSION_NEEDED
     val round = if (focusCount > 1) " · round $focusIndex of $focusCount" else ""
     val isBreak = phase.kind == PhaseKind.BREAK

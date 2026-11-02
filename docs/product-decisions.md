@@ -107,5 +107,6 @@ Three kinds of entry, kept apart on purpose:
 ## R46 — Owner-supplied background images (2026-11-02)
 - Library after hours, Quiet ambition and Words to work by now use the owner's own images (owner holds the rights), one dark and one light version each, shown at 80% over the theme ground (words image 50%, owner asked 2026-11-02 for more transparency). They replace the procedural renders from `design/backgrounds/gen.py`, which is kept only for reference.
 - Words to work by: the owner's image is shown for the default line; a custom line is still drawn live, at alpha 0.12 dark / 0.10 light.
+- Backgrounds show only while the lock is closed (blocking confirmed during focus); not on Home, setup, breaks, timer-only sessions or other tabs (owner, 2026-11-02).
 - Your reason (blueprint) stays drawn in code, with stronger lines (alpha 0.24 / 0.20).
 - Per the owner, no emulator run for this image-only change; checked by build only.

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -49,6 +50,9 @@ enum class Backdrop(val label: String) {
     BLUEPRINT("Your reason"),
     PHOTO("Your photo"),
 }
+
+/** True only while a session view shows the lock closed (blocking confirmed). Backgrounds appear only then. */
+object BackdropGate { var locked by androidx.compose.runtime.mutableStateOf(false) }
 
 const val DEFAULT_BACKDROP_WORDS = "One thing at a time"
 
