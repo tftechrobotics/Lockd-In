@@ -90,6 +90,25 @@ The checklist is in `docs/device-test-checklist.md` under "Pending phone checks 
   - Provider limits never block ambient audio or later steps.
 - **Battery** is measured on the phone again after B2.
 
+**Streaming feasibility (checked 2026-11-02; recheck before building)**
+
+| Service | Plays inside Lockd In? | Control an external app | Notes |
+|---|---|---|---|
+| Spotify | No | Yes: App Remote SDK (play a playlist URI, pause/resume, shuffle; Spotify app installed, online) or the generic route | Development Mode (Feb 2026): 5 users per Client ID, Premium required. A public release needs Spotify's extended access. |
+| YouTube Music | No (no public API) | Generic route only: open the playlist link in YouTube Music, then control it via its media session | — |
+| Apple Music | Yes: MusicKit for Android | — | Needs an Apple Music subscription, an Apple developer account ($99/yr) and a signed developer token. |
+| SoundCloud | Yes: API with OAuth 2.1 + PKCE, `/me/playlists`, stream URLs | — | Attribution required (uploader, logo, links). Whether new app registrations are open is unconfirmed. |
+
+**Generic route ("controls your music app").** Store the playlist link per profile. At focus start, open it in its app. Then control it with play/pause, skip and volume through Android's media sessions (`MediaSessionManager.getActiveSessions`, which needs notification-listener access the person grants). This works for all four services without provider agreements.
+
+**Proposed B2 order:**
+1. Ambient sounds.
+2. The generic route for all four services.
+3. Embedded playback for one service at a time (Apple Music or SoundCloud).
+4. Spotify App Remote, only with extended access.
+
+**Owner decisions pending:** notification access for music control; whether to pay Apple's $99/yr for MusicKit.
+
 ### Step 5 (C2): backgrounds and quotes: rules
 
 - Both are optional and off by default. The plain cream/espresso design and the sculpted lock stay the default and stay unchanged.
