@@ -89,6 +89,18 @@ class TestControl : BroadcastReceiver() {
                 )
                 store.update { it.copy(places = listOf(p), placesPaused = false) }
                 app.lockdin.loc.Geofences.sync(context)
+                // Emulators often deliver geofence transitions only while something is asking for
+                // location; keep a request alive for 4 minutes (debug builds only).
+                runCatching {
+                    val client = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+                    val cb = object : com.google.android.gms.location.LocationCallback() {}
+                    @Suppress("MissingPermission")
+                    client.requestLocationUpdates(
+                        com.google.android.gms.location.LocationRequest.Builder(com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 2_000).build(),
+                        cb, android.os.Looper.getMainLooper(),
+                    )
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ client.removeLocationUpdates(cb) }, 240_000)
+                }
             }
             // Marks the first-run introduction as seen (the E2E drives the main screens).
             "onboarded" -> store.update { it.copy(onboarded = true) }

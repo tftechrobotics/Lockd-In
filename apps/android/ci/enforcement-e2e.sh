@@ -166,6 +166,39 @@ intro_phase() {
   ctl --es cmd finish; home
 }
 
+ce_phase() {
+  # Calendar (C): a local calendar with one event; Lockd In reads it through Android's provider.
+  adb shell pm grant $A android.permission.READ_CALENDAR || true
+  # The whole command is quoted for the device shell ('&' in the URI must not reach it unquoted).
+  adb shell "content insert --uri 'content://com.android.calendar/calendars?caller_is_syncadapter=true&account_name=ci&account_type=LOCAL' --bind account_name:s:ci --bind account_type:s:LOCAL --bind name:s:CI --bind calendar_displayName:s:CI --bind calendar_access_level:i:700 --bind ownerAccount:s:ci --bind visible:i:1 --bind sync_events:i:1 --bind calendar_timezone:s:UTC" 2>&1 | head -2
+  cal=$(adb shell "content query --uri content://com.android.calendar/calendars --projection _id --where \"account_name='ci'\"" | grep -oE '_id=[0-9]+' | head -1 | cut -d= -f2)
+  note "  CI calendar id: ${cal:-none}"
+  s0=$(( ($(date +%s) + 7200) * 1000 )); e0=$(( s0 + 3600000 ))
+  adb shell "content insert --uri content://com.android.calendar/events --bind calendar_id:i:${cal:-1} --bind title:s:CIExam --bind dtstart:l:$s0 --bind dtend:l:$e0 --bind eventTimezone:s:UTC" 2>&1 | head -2
+  adb logcat -c; ctl --es cmd calendar; sleep 2
+  line=$(adb logcat -d -s LockdInTest:I | grep "calendar permitted" | tail -1)
+  echo "$line" | grep -q "titles=.*CIExam" && record C-calendar-read pass "device calendar read: ${line#*permitted=}" || record C-calendar-read FAIL "event not read: ${line:-no log}"
+  # Location routines (E): arriving at a saved place (emulator location) gives a reminder.
+  adb shell pm grant $A android.permission.ACCESS_FINE_LOCATION || true
+  adb shell pm grant $A android.permission.ACCESS_COARSE_LOCATION || true
+  adb shell pm grant $A android.permission.ACCESS_BACKGROUND_LOCATION || true
+  adb shell settings put secure location_mode 3 || true
+  ctl --es cmd finish
+  adb emu geo fix -88.30 40.00 >/dev/null 2>&1; sleep 5
+  adb logcat -c
+  ctl --es cmd place --es lat 40.1106 --es lon -88.2073; sleep 5
+  seen=""
+  for _ in $(seq 1 30); do
+    adb emu geo fix -88.2073 40.1106 >/dev/null 2>&1
+    adb logcat -d -s LockdInPlaces:I | grep -q "place_arrive CIPlace" && { seen=1; break; }
+    sleep 5
+  done
+  pl=$(adb logcat -d -s LockdInPlaces:I | tail -5 | tr '\n' ' ')
+  [ -n "$seen" ] && record E-place-arrive pass "arrival noticed: $(adb logcat -d -s LockdInPlaces:I | grep place_arrive | tail -1 | sed 's/.*place_arrive //')" \
+    || record E-place-arrive FAIL "no arrival within 150 s on the emulator ($pl)"
+  notif_has "at CIPlace" && record E-place-remind pass "reminder posted" || record E-place-remind FAIL "no reminder notification"
+}
+
 plan_phase() {
   # ---------------- Milestone A: planned sessions ----------------
   ctl --es cmd finish
@@ -229,6 +262,11 @@ fi
 # The first-run introduction is covered by UI tests; the E2E drives the main screens.
 adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2
 ctl --es cmd onboarded; home
+if [ "${ONLY:-}" = ce ]; then
+  ce_phase
+  cat "$RESULTS"; echo "::notice title=Calendar and places (EMULATOR)::$(tr '\n' ' ' < "$RESULTS")"
+  exit $FAILED
+fi
 if [ "${ONLY:-}" = intro ]; then
   adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2; home
   intro_phase
@@ -409,37 +447,7 @@ adb logcat -d -s LockdInAudio:I | grep -q "ambient_on kind=RAIN" && record B2-am
 ctl --es cmd emergency; sleep 4
 adb logcat -d -s LockdInAudio:I | grep -q "ambient_off" && record B2-ambient-off pass "stopped on emergency recovery" || record B2-ambient-off FAIL "ambient kept playing after emergency recovery"
 plan_phase
-# Calendar (C): a local calendar with one event; Lockd In reads it through Android's provider.
-adb shell pm grant $A android.permission.READ_CALENDAR || true
-adb shell content insert --uri 'content://com.android.calendar/calendars?caller_is_syncadapter=true&account_name=ci&account_type=LOCAL' \
-  --bind account_name:s:ci --bind account_type:s:LOCAL --bind name:s:CI --bind calendar_displayName:s:CI \
-  --bind calendar_access_level:i:700 --bind ownerAccount:s:ci --bind visible:i:1 --bind sync_events:i:1 --bind calendar_timezone:s:UTC >/dev/null 2>&1
-cal=$(adb shell content query --uri content://com.android.calendar/calendars --projection _id --where "account_name='ci'" | grep -oE '_id=[0-9]+' | head -1 | cut -d= -f2)
-s0=$(( ($(date +%s) + 7200) * 1000 )); e0=$(( s0 + 3600000 ))
-adb shell content insert --uri content://com.android.calendar/events --bind calendar_id:i:${cal:-1} --bind title:s:CIExam \
-  --bind dtstart:l:$s0 --bind dtend:l:$e0 --bind eventTimezone:s:UTC >/dev/null 2>&1
-adb logcat -c; ctl --es cmd calendar; sleep 2
-line=$(adb logcat -d -s LockdInTest:I | grep "calendar permitted" | tail -1)
-echo "$line" | grep -q "titles=.*CIExam" && record C-calendar-read pass "device calendar read: ${line#*permitted=}" || record C-calendar-read FAIL "event not read: ${line:-no log}"
-# Location routines (E): arriving at a saved place (emulator location) gives a reminder.
-adb shell pm grant $A android.permission.ACCESS_FINE_LOCATION || true
-adb shell pm grant $A android.permission.ACCESS_COARSE_LOCATION || true
-adb shell pm grant $A android.permission.ACCESS_BACKGROUND_LOCATION || true
-adb shell settings put secure location_mode 3 || true
-ctl --es cmd finish
-adb emu geo fix -88.30 40.00 >/dev/null 2>&1; sleep 5
-adb logcat -c
-ctl --es cmd place --es lat 40.1106 --es lon -88.2073; sleep 5
-seen=""
-for _ in $(seq 1 30); do
-  adb emu geo fix -88.2073 40.1106 >/dev/null 2>&1
-  adb logcat -d -s LockdInPlaces:I | grep -q "place_arrive CIPlace" && { seen=1; break; }
-  sleep 5
-done
-pl=$(adb logcat -d -s LockdInPlaces:I | tail -5 | tr '\n' ' ')
-[ -n "$seen" ] && record E-place-arrive pass "arrival noticed: $(adb logcat -d -s LockdInPlaces:I | grep place_arrive | tail -1 | sed 's/.*place_arrive //')" \
-  || record E-place-arrive FAIL "no arrival within 150 s on the emulator ($pl)"
-notif_has "at CIPlace" && record E-place-remind pass "reminder posted" || record E-place-remind FAIL "no reminder notification"
+ce_phase
 # History (roadmap step 2): sessions left above are saved and survive the process being killed.
 adb shell am force-stop $A; sleep 2
 n=$(adb shell run-as $A cat no_backup/history.v1.json 2>/dev/null | grep -o '"outcome"' | wc -l | tr -d ' ')
