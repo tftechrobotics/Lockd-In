@@ -173,7 +173,29 @@ def mountains():
     d.rectangle([0, H * 0.93, W, H], fill=(12, 11, 9))
     return finish(img, cap=0.13, seed=29)
 
+def light_print(im):
+    """Light-theme version: the same scene as a soft, faded print. Luminance is remapped from the
+    dark range to a high-key cream range so dark text (#2B251F, L≈0.02) keeps ≥ 7:1 over it."""
+    a = np.asarray(im).astype(np.float32) / 255.0
+    L = lum(np.asarray(im).astype(np.float32))
+    t = np.clip(L / 0.13, 0, 1) ** 0.8                     # 0 = darkest, 1 = brightest highlight
+    target = 0.50 + 0.36 * t                                # relative luminance 0.50 … 0.86
+    cream = np.array([243, 236, 225]) / 255.0               # hue of the light theme's ground
+    base = cream * (target / 0.84)[..., None] ** (1 / 2.2)  # approx. gamma for the target luminance
+    # Keep a hint of the original colour (warm lamp, book spines).
+    chroma = a - a.mean(axis=2, keepdims=True)
+    out = np.clip(base + chroma * 0.6, 0, 1)
+    return Image.fromarray((out * 255).astype(np.uint8))
+
+def band_min(img):
+    a = np.asarray(img).astype(np.float32)
+    x0, y0, x1, y1 = int(BAND[0] * W), int(BAND[1] * H), int(BAND[2] * W), int(BAND[3] * H)
+    return float(np.percentile(lum(a)[y0:y1, x0:x1], 0.1))
+
 for name, fn in (("library", library), ("mountains", mountains)):
     im = fn()
     im.save(f"{OUT}/bg_{name}.webp", "WEBP", quality=80, method=6)
+    li = light_print(im)
+    li.save(f"{OUT}/bg_{name}_light.webp", "WEBP", quality=80, method=6)
+    print(name, "light: text-band min L", round(band_min(li), 3), "→ contrast with #2B251F", round((band_min(li) + 0.05) / (0.02 + 0.05), 2))
     print(name, "text-band L (99.9th pct)", round(band_max(im), 3), "→ contrast with #F0E8DB", round((0.81 + 0.05) / (band_max(im) + 0.05), 2))

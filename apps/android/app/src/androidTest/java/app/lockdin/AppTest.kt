@@ -448,7 +448,7 @@ class AppTest {
     @Test fun backgroundsAndQuotesAreOptionalAndSeparate() {
         val store = launch(home = true)
         rule.onNodeWithContentDescription("Settings").performClick()
-        rule.onNodeWithText("Quiet ambition").performScrollTo().performClick()
+        rule.onNodeWithTag("bg-MOUNTAINS").performScrollTo().performClick()
         org.junit.Assert.assertEquals("MOUNTAINS", store.state.backdrop)
         org.junit.Assert.assertFalse(store.state.quotesOn)
         rule.onNodeWithText("Quotes").performScrollTo().performClick()

@@ -104,12 +104,13 @@ fun BackdropLayer(choice: Backdrop, words: String, modifier: Modifier) {
         when (choice) {
             Backdrop.NONE -> Unit
             Backdrop.LIBRARY, Backdrop.MOUNTAINS -> {
-                Image(
-                    painterResource(if (choice == Backdrop.LIBRARY) R.drawable.bg_library else R.drawable.bg_mountains),
-                    contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
-                )
-                // Light theme: a cream veil keeps dark text at full contrast; dark: a light touch.
-                Box(Modifier.fillMaxSize().background(c.ground.copy(alpha = if (dark) 0.12f else 0.64f)))
+                // Each scene has a dark (night) and a light (faded print) version, both checked for
+                // text contrast by design/backgrounds/gen.py.
+                val res = when (choice) {
+                    Backdrop.LIBRARY -> if (dark) R.drawable.bg_library else R.drawable.bg_library_light
+                    else -> if (dark) R.drawable.bg_mountains else R.drawable.bg_mountains_light
+                }
+                Image(painterResource(res), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             }
             Backdrop.PHOTO -> {
                 val bmp by produceState<android.graphics.Bitmap?>(null) {

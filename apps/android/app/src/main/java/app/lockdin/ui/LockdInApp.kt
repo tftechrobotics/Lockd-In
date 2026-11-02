@@ -130,8 +130,11 @@ fun LockdInApp(
             return@LockdInTheme
         }
 
+        // The chosen background (C2) fills the Focus screen edge to edge, behind the header too.
+        val backdrop = if (route == Route.FOCUS) runCatching { Backdrop.valueOf(store.state.backdrop) }.getOrDefault(Backdrop.NONE) else Backdrop.NONE
+        BackdropBox(backdrop, store.state.backdropWords) {
         Scaffold(
-            containerColor = c.ground,
+            containerColor = if (backdrop != Backdrop.NONE) androidx.compose.ui.graphics.Color.Transparent else c.ground,
             contentWindowInsets = WindowInsets.safeDrawing,
             topBar = {
                 Row(
@@ -180,9 +183,7 @@ fun LockdInApp(
             ) {
                 Box(Modifier.widthIn(max = 600.dp).fillMaxSize().semantics { contentDescription = "${route.label} screen" }) {
                     when (route) {
-                        Route.FOCUS -> BackdropBox(runCatching { Backdrop.valueOf(store.state.backdrop) }.getOrDefault(Backdrop.NONE), store.state.backdropWords) {
-                            FocusScreen(store, clock, zone, openDevices = { go(Route.DEVICES) }, openSchedule = { go(Route.SCHEDULE) })
-                        }
+                        Route.FOCUS -> FocusScreen(store, clock, zone, openDevices = { go(Route.DEVICES) }, openSchedule = { go(Route.SCHEDULE) })
                         Route.SCHEDULE -> ScheduleScreen(store, clock.now(), zone, onEdit = { editing = it })
                         Route.PROFILES -> ProfilesScreen(store, onEdit = { editingProfile = it.id }, onEditPreset = { editingPreset = it })
                         Route.DEVICES -> DevicesScreen()
@@ -191,6 +192,7 @@ fun LockdInApp(
                     }
                 }
             }
+        }
         }
     }
 }

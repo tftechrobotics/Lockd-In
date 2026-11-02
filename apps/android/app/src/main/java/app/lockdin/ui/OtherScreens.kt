@@ -1,6 +1,7 @@
 package app.lockdin.ui
 
 import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.testTag
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -424,7 +425,7 @@ private fun LookSettings(store: Store) {
                 val b = Backdrop.values()[i]
                 val on = b == current
                 Column(
-                    Modifier.width(92.dp).selectable(on, role = Role.RadioButton, onClick = {
+                    Modifier.width(92.dp).testTag("bg-${b.name}").selectable(on, role = Role.RadioButton, onClick = {
                         if (b == Backdrop.PHOTO && !photoFile(ctx).exists()) pick.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
                         else store.update { it.copy(backdrop = b.name) }
                     }),
