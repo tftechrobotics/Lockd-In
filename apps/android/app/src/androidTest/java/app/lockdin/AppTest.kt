@@ -17,6 +17,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -67,6 +68,15 @@ class AppTest {
     /** Launches the app. Unless `home`, goes from the idle lock to the session setup, as most tests start there. */
     /** In-memory history for each test (never the app's real file). */
     private var hist = app.lockdin.state.HistoryStore(emptyList()) {}
+
+    /** Waits for text; on timeout the failure includes the screen's semantics tree, so CI logs show what was there. */
+    private fun waitForText(text: String, ms: Long) {
+        try {
+            rule.waitUntil(ms) { rule.onAllNodesWithText(text, substring = true).fetchSemanticsNodes().isNotEmpty() }
+        } catch (e: Throwable) {
+            throw AssertionError("'$text' not shown. Screen:\n" + rule.onAllNodes(androidx.compose.ui.test.isRoot()).onFirst().printToString(maxDepth = 40), e)
+        }
+    }
 
     private fun openSection(title: String) {
         rule.onNodeWithTag("section-$title").performScrollTo().performClick()
@@ -367,7 +377,7 @@ class AppTest {
         rule.onAllNodesWithText("Save").onLast().performClick()
         org.junit.Assert.assertEquals("Physics review", store.state.presets.single().name)
         rule.onNodeWithText("Back").performClick()
-        rule.waitUntil(5_000) { rule.onAllNodesWithText("Start a preset").fetchSemanticsNodes().isNotEmpty() }
+        waitForText("Start a preset", 5_000)
         rule.onNodeWithText("Start a preset").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Physics review", substring = true).performScrollTo().performClick()
         val a = store.state.active
@@ -575,7 +585,7 @@ class AppTest {
     }
 
     @Test fun partnerSessionOffersCodeAndEmergencyWait() {
-        val now = System.currentTimeMillis()
+        val now = clock.now()
         val p = app.lockdin.state.Partner("Sam", "acct_test_0001", "link_test_0001", claimed = true)
         val store = launch(AppState(partner = p, commitment = app.lockdin.enforce.Commitment.PARTNER), home = true)
         rule.onNodeWithText("New session").performClick()
@@ -583,7 +593,7 @@ class AppTest {
         store.update { s -> s.copy(active = app.lockdin.state.ActiveSession(
             "sess_partner_1", now, listOf(app.lockdin.engine.Segment(app.lockdin.engine.PhaseKind.FOCUS, 60)), "Essay",
             s.profiles.first().id, app.lockdin.engine.SessionControls(), commitment = app.lockdin.enforce.Commitment.PARTNER)) }
-        rule.waitUntil(15_000) { rule.onAllNodesWithText("Partner session", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        waitForText("Partner session", 15_000)
         rule.onNodeWithText("Partner session", substring = true).performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("End early").performScrollTo().performClick()
         rule.onNodeWithText("Ask Sam for the code").assertIsDisplayed()
@@ -593,7 +603,7 @@ class AppTest {
         rule.onNodeWithText("Emergency end without a code").performScrollTo().performClick()
         rule.onNodeWithText("Start the wait").performClick()
         val at = store.state.active!!.controls.emergencyRecoveryAt!!
-        org.junit.Assert.assertTrue(at > now + 40 * 60_000L && at <= System.currentTimeMillis() + 45 * 60_000L)
+        org.junit.Assert.assertTrue("wait ends at ${at - now} ms", at > now + 40 * 60_000L && at <= clock.now() + 45 * 60_000L)
         rule.onNodeWithText("Calls and messages are unlocked", substring = true).performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Cancel and keep focusing").performScrollTo().performClick()
         org.junit.Assert.assertNull(store.state.active!!.controls.emergencyRecoveryAt)

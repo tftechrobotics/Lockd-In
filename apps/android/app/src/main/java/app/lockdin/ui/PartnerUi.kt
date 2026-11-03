@@ -243,7 +243,7 @@ private fun EndEarlyDialog(store: Store, session: ActiveSession, now: Long, onMe
             when {
                 key == null -> error = "This phone doesn’t have the partner key any more. Use an emergency end or message admin."
                 PartnerCode.check(key, code, System.currentTimeMillis()) -> {
-                    store.setControls(session.id) { it.copy(emergencyRecoveryAt = System.currentTimeMillis()) }
+                    store.setControls(session.id) { it.copy(emergencyRecoveryAt = store.clock()) }
                     onClose()
                 }
                 else -> error = "That code isn’t right. Codes change every 30 seconds, so ask for the one shown now."
@@ -262,7 +262,7 @@ private fun EndEarlyDialog(store: Store, session: ActiveSession, now: Long, onMe
         text = { Text("The session ends in $waitMin minutes. Calls and messages unlock now. You can cancel the wait, and $partnerName’s code still ends it at once.", style = UiType.body) },
         confirmButton = {
             TextButton(onClick = {
-                val t = System.currentTimeMillis()
+                val t = store.clock()
                 store.setControls(session.id) { it.copy(emergencyRecoveryAt = t + PartnerRules.emergencyWaitMs(occEnd, t)) }
                 confirmEmergency = false; onClose()
             }) { Text("Start the wait", style = UiType.label, color = c.danger) }
@@ -328,7 +328,7 @@ fun AdminChatDialog(store: Store, session: ActiveSession?, onClose: () -> Unit) 
                             Text("Unlock received", style = UiType.label, color = c.ink)
                             Text("For “${session.intention ?: "this session"}”", style = UiType.caption, color = c.inkMuted)
                         }
-                        MainButton("End now", { store.setControls(session.id) { it.copy(emergencyRecoveryAt = System.currentTimeMillis()) }; onClose() })
+                        MainButton("End now", { store.setControls(session.id) { it.copy(emergencyRecoveryAt = store.clock()) }; onClose() })
                     }
                 }
                 error?.let { Text(it, style = UiType.caption, color = c.danger, modifier = Modifier.padding(horizontal = Dim.gutter)) }
