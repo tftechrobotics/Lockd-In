@@ -381,7 +381,7 @@ class AppTest {
         rule.waitUntil(5_000) { rule.onAllNodesWithContentDescription("Preset name").fetchSemanticsNodes().isNotEmpty() }
         rule.onAllNodesWithText("Save").onLast().performClick()
         org.junit.Assert.assertEquals("Physics review", store.state.presets.single().name)
-        rule.onNodeWithText("Back").performClick()
+        rule.onNodeWithText("Back").performScrollTo().performClick()
         waitForText("Start a preset", 5_000)
         rule.onNodeWithText("Start a preset").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Physics review", substring = true).performScrollTo().performClick()
