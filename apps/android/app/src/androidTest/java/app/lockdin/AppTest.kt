@@ -427,7 +427,8 @@ class AppTest {
         rule.onNodeWithContentDescription("New step").performTextInput("Outline")
         // The keyboard's Done adds the step (a tap on Add can land on the keyboard in the test activity).
         rule.onNodeWithContentDescription("New step").performImeAction()
-        rule.waitUntil(5_000) { rule.onAllNodesWithText("Outline").fetchSemanticsNodes().isNotEmpty() }
+        rule.waitForIdle()
+        waitForText("Remove", 5_000)
         rule.onNodeWithText("Save").performClick()
         org.junit.Assert.assertEquals(listOf("Outline"), store.state.presets.single().steps)
         rule.onNodeWithText("Essay").performScrollTo().performClick()
