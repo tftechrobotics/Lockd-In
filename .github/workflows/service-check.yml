@@ -17,7 +17,9 @@ jobs:
           set -u
           [ -n "$CF_TOKEN" ] && echo "token secret: present" || { echo "::error::CLOUDFLARE_API_TOKEN is missing"; exit 1; }
           [ -n "$CF_ACCOUNT" ] && echo "account secret: present" || { echo "::error::CLOUDFLARE_ACCOUNT_ID is missing"; exit 1; }
+          # User tokens verify at /user/tokens/verify, account tokens at /accounts/<id>/tokens/verify.
           v=$(curl -s -H "Authorization: Bearer $CF_TOKEN" https://api.cloudflare.com/client/v4/user/tokens/verify | jq -r '.success and (.result.status == "active")')
+          [ "$v" = true ] || v=$(curl -s -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/tokens/verify" | jq -r '.success and (.result.status == "active")')
           echo "token valid and active: $v"
           a=$(curl -s -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts" | jq -r '.success')
           echo "can read Workers in this account: $a"
