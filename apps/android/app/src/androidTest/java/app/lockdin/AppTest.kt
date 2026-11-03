@@ -17,7 +17,6 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onFirst
-import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -74,7 +73,12 @@ class AppTest {
         try {
             rule.waitUntil(ms) { rule.onAllNodesWithText(text, substring = true).fetchSemanticsNodes().isNotEmpty() }
         } catch (e: Throwable) {
-            throw AssertionError("'$text' not shown. Screen:\n" + rule.onAllNodes(androidx.compose.ui.test.isRoot()).onFirst().printToString(maxDepth = 40), e)
+            val shown = rule.onAllNodes(androidx.compose.ui.test.SemanticsMatcher("any") { true }, useUnmergedTree = true).fetchSemanticsNodes()
+                .mapNotNull { n ->
+                    n.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Text)?.joinToString(" ")
+                        ?: n.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription)?.joinToString(" ")
+                }.joinToString(" | ")
+            throw AssertionError("'$text' not shown. Screen: $shown", e)
         }
     }
 
@@ -593,6 +597,8 @@ class AppTest {
         store.update { s -> s.copy(active = app.lockdin.state.ActiveSession(
             "sess_partner_1", now, listOf(app.lockdin.engine.Segment(app.lockdin.engine.PhaseKind.FOCUS, 60)), "Essay",
             s.profiles.first().id, app.lockdin.engine.SessionControls(), commitment = app.lockdin.enforce.Commitment.PARTNER)) }
+        waitForText("Details and options", 15_000)
+        openDetails()
         waitForText("Partner session", 15_000)
         rule.onNodeWithText("Partner session", substring = true).performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("End early").performScrollTo().performClick()
