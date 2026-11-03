@@ -1,1 +1,1 @@
-Manual-start sequence recorded on the CI emulator (API 35) from commit 34638d7. EMULATOR ONLY.
+Manual-start sequence recorded on the CI emulator (API 35) from commit 368cbb4. EMULATOR ONLY.
