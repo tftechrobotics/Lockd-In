@@ -23,6 +23,9 @@ import app.lockdin.state.Store
  * detected and reported.
  */
 class FocusAccessibilityService : AccessibilityService() {
+    /** Calling and texting apps, unlocked while an emergency end waits (R49). */
+    private val messaging: Set<String> by lazy { Capabilities.messaging(this) }
+
     private var essentials: Set<String> = emptySet()
     private var essentialsAt = 0L
     private var lastCover: Pair<String, Long>? = null
@@ -65,7 +68,7 @@ class FocusAccessibilityService : AccessibilityService() {
         if (pkg == null || pkg == packageName) return
         val now = System.currentTimeMillis()
         when {
-            Store.get(this).state.active?.let { BlockPolicy.isRestrictedIn(pkg, it, essentials(now)) } ?: false -> { Log.i(TAG, "${source}_cover"); cover(pkg, null, null) }
+            Store.get(this).state.active?.let { BlockPolicy.isRestrictedIn(pkg, it, essentials(now), messaging, now) } ?: false -> { Log.i(TAG, "${source}_cover"); cover(pkg, null, null) }
             unsupportedBrowserBlocked(pkg, rules) -> { Log.i(TAG, "${source}_cover"); cover(pkg, null, null) }
             else -> checkAddress(pkg, rules, force = true)
         }
@@ -124,7 +127,7 @@ class FocusAccessibilityService : AccessibilityService() {
                     return
                 }
                 when {
-                    BlockPolicy.isRestrictedIn(pkg, session, essentials(now)) ->
+                    BlockPolicy.isRestrictedIn(pkg, session, essentials(now), messaging, now) ->
                         // Event time is on the uptime clock; report the delay to our request.
                         cover(pkg, null, SystemClock.uptimeMillis() - e.eventTime)
                     unsupportedBrowserBlocked(pkg, rules) -> cover(pkg, null, null)

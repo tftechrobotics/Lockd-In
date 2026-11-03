@@ -67,6 +67,8 @@ class FocusService : Service() {
     private var lastInteraction = System.currentTimeMillis()
 
     private val tick = Runnable { runTick() }
+    /** Calling and texting apps, unlocked while an emergency end waits (R49). */
+    private val messaging: Set<String> by lazy { Capabilities.messaging(this) }
     private val musicTick = Runnable { runMusicTick() }
     private var musicLastElapsed = 0L
     private var musicUsed = -1L
@@ -215,7 +217,7 @@ class FocusService : Service() {
             if (interactive && session.rules.restrictsApps && !FocusAccessibilityService.connected) {
                 pollForeground(now)
                 currentTop?.let { top ->
-                    if (BlockPolicy.isRestrictedIn(top, session, essentials(now))) cover(top)
+                    if (BlockPolicy.isRestrictedIn(top, session, essentials(now), messaging, now)) cover(top)
                 }
             }
         }

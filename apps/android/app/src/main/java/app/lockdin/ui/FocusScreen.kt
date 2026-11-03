@@ -914,7 +914,7 @@ private fun QuestionTimer(store: Store, session: ActiveSession, now: Long) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FlowRowCompat(content: @Composable () -> Unit) =
+internal fun FlowRowCompat(content: @Composable () -> Unit) =
     FlowRow(horizontalArrangement = Arrangement.spacedBy(Dim.s1)) { content() }
 
 /** The preset's steps, ticked off during this session only (not saved). */
@@ -1023,6 +1023,8 @@ private fun OutPanel(store: Store, session: ActiveSession, snap: Snapshot, now: 
                     TextAction("End now", { confirmEmergency = true }, danger = true)
                 }
             }
+            // Partner code (R49): code, admin, or an emergency end that waits 3/4 of the time left.
+            session.commitment == app.lockdin.enforce.Commitment.PARTNER -> PartnerSessionOptions(store, session, now)
             // Locked: no unlock; emergency recovery stays one deliberate step away.
             unlockDelay == null -> {
                 Text("Locked session: it ends early only with emergency recovery.", style = UiType.caption, color = c.inkMuted)

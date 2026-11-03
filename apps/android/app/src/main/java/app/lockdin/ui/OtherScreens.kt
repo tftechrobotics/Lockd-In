@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.lockdin.enforce.Commitment
@@ -217,6 +218,11 @@ fun EndingEarlySettings(store: Store) {
         }
     }
     Text(endingEarlyNote(store.state.commitment), style = UiType.caption, color = c.inkMuted)
+    Spacer(Modifier.height(Dim.s3))
+    Text("Partner code", style = UiType.label, color = c.ink, modifier = Modifier.semantics { heading() })
+    Text("Someone you trust holds a code that changes every 30 seconds. Sessions set to Partner code end early only with it, or after an emergency wait.",
+        style = UiType.caption, color = c.inkMuted)
+    PartnerSetup(store)
 }
 
 fun commitmentChoices(s: app.lockdin.state.AppState): List<Pair<Commitment, String>> = buildList {
@@ -695,7 +701,7 @@ private fun PrivacySettings() {
         }
         Spacer(Modifier.height(Dim.s2))
         Text(
-            "Everything Lockd In knows stays on this phone and is excluded from backups: your settings, schedule, profiles, presets, history and saved places. It has no account and sends nothing anywhere. Tap a permission to change it in Android.",
+            "Everything Lockd In knows stays on this phone and is excluded from backups: your settings, schedule, profiles, presets, history and saved places. Nothing is sent anywhere unless you set up a partner code: then the Lockd In service keeps your partner’s first name, an encrypted copy of the code key, and messages you send to admin. Tap a permission to change it in Android.",
             style = UiType.caption, color = c.inkMuted,
         )
     }

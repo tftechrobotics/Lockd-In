@@ -45,6 +45,13 @@ object Capabilities {
     /** What is missing for app blocking (empty when either detection method is ready). */
     fun missing(ctx: Context): Set<Capability> = detection(ctx).second
 
+    /** Calling and texting apps (default dialer and SMS app), unlocked during an emergency wait (R49). */
+    fun messaging(ctx: Context): Set<String> = buildSet {
+        runCatching { ctx.getSystemService(TelecomManager::class.java)?.defaultDialerPackage }.getOrNull()?.let(::add)
+        runCatching { android.provider.Telephony.Sms.getDefaultSmsPackage(ctx) }.getOrNull()?.let(::add)
+        addAll(listOf("com.google.android.apps.messaging", "com.samsung.android.messaging", "com.android.mms", "com.google.android.contacts", "com.samsung.android.app.contacts"))
+    }
+
     /** Device-specific apps that are never covered: home screen, keyboard, dialer, Settings, Lockd In. */
     fun essentials(ctx: Context): Set<String> = buildSet {
         add(ctx.packageName)

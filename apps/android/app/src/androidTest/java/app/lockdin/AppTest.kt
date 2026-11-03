@@ -68,6 +68,11 @@ class AppTest {
     /** In-memory history for each test (never the app's real file). */
     private var hist = app.lockdin.state.HistoryStore(emptyList()) {}
 
+    private fun openSection(title: String) {
+        rule.onNodeWithTag("section-$title").performScrollTo().performClick()
+        rule.waitForIdle()
+    }
+
     private fun launch(state: AppState = AppState(), dark: Boolean = false, fontScale: Float = 1f, home: Boolean = false): Store {
         val store = Store(state) {}
         hist = app.lockdin.state.HistoryStore(emptyList()) {}
@@ -321,6 +326,7 @@ class AppTest {
     @Test fun startFeedbackSettingsDefaultHapticsOnSoundOff() {
         launch(home = true)
         rule.onNodeWithContentDescription("Settings").performClick()
+        openSection("Starting a session")
         rule.onNodeWithText("Haptic clicks").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Click sound").performScrollTo().assertIsDisplayed()
         val s = AppState()
@@ -399,6 +405,7 @@ class AppTest {
         hist.add(app.lockdin.engine.HistoryEntry("e1", clock.now() - 3_600_000, clock.now() - 1_800_000, clock.now() - 1_800_000,
             1_800_000, 1_800_000, 1, 1, "Read", "study", "Study", app.lockdin.engine.Outcome.COMPLETED), 365, clock.now())
         rule.onNodeWithContentDescription("Settings").performClick()
+        openSection("History and data")
         rule.onNodeWithText("Keep history").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("1 session. Opens Android’s share sheet.", substring = true).performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Delete all history").performScrollTo().performClick()
@@ -450,12 +457,14 @@ class AppTest {
         rule.onNodeWithText("Find free time in your calendar").assertIsDisplayed()
         rule.onNodeWithText("never changes your calendar", substring = true).assertIsDisplayed()
         rule.onNodeWithContentDescription("Settings").performClick()
+        openSection("Calendar")
         rule.onNodeWithText("Suggest times from my calendar").performScrollTo().assertIsDisplayed()
     }
 
     @Test fun backgroundsAndQuotesAreOptionalAndSeparate() {
         val store = launch(home = true)
         rule.onNodeWithContentDescription("Settings").performClick()
+        openSection("Look and background")
         // Bring the picker on screen first (the page scrolls vertically, the picker sideways).
         rule.onNodeWithText("Quotes").performScrollTo()
         rule.onNodeWithTag("bg-MOUNTAINS").performScrollTo().performClick()
@@ -476,6 +485,7 @@ class AppTest {
     @Test fun ownMessagesShowDuringTheSession() {
         val store = launch(home = true)
         rule.onNodeWithContentDescription("Settings").performClick()
+        openSection("Messages")
         rule.onNodeWithText("My own words").performScrollTo().performClick()
         rule.onNodeWithContentDescription("New message").performScrollTo().performTextInput("Problem set first, then rest.")
         rule.onAllNodesWithText("Add").onFirst().performClick()
@@ -507,6 +517,7 @@ class AppTest {
         val store = launch(home = true)
         org.junit.Assert.assertEquals(0, store.state.checkInMinutes)
         rule.onNodeWithContentDescription("Settings").performClick()
+        openSection("Check-ins and coaching")
         rule.onNodeWithText("Still working? check-in").performScrollTo().performClick()
         rule.onNodeWithText("After 15 min idle").performClick()
         org.junit.Assert.assertEquals(15, store.state.checkInMinutes)
@@ -516,6 +527,7 @@ class AppTest {
         val lib = app.lockdin.engine.Place("p1", "Library", 40.1, -88.2, profileId = "study")
         val store = launch(AppState(places = listOf(lib)), home = true)
         rule.onNodeWithContentDescription("Settings").performClick()
+        openSection("Places")
         rule.onNodeWithText("Library").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Pause location routines").performScrollTo().performClick()
         org.junit.Assert.assertTrue(store.state.placesPaused)
@@ -530,23 +542,69 @@ class AppTest {
         org.junit.Assert.assertEquals(1, store.state.places.size)
     }
 
-    @Test fun firstRunIntroIsShortAndSkippable() {
-        val store = launch(AppState(onboarded = false), home = true)
+    @Test fun setupMakesTheFirstProfileThenToursTheApp() {
+        val store = launch(AppState(onboarded = false, profiles = emptyList()), home = true)
         rule.onNodeWithText("Start focus. Keep distractions closed.").assertIsDisplayed()
         rule.onNodeWithText("never closes your apps", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Get started").performClick()
+        rule.onNodeWithText("Block these apps during focus").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Continue").performClick()
-        rule.onNodeWithText("Blocking needs one permission").assertIsDisplayed()
-        rule.onNodeWithText("Skip").performClick()
+        org.junit.Assert.assertEquals(listOf("Study"), store.state.profiles.map { it.name })
+        rule.onNodeWithText("Turn on blocking").assertIsDisplayed()
+        rule.onNodeWithText("Continue").performClick()
+        rule.onNodeWithText("Add a partner (optional)").assertIsDisplayed()
+        rule.onNodeWithText("Continue").performClick()
+        rule.onNodeWithText("Show me around").performClick()
         org.junit.Assert.assertTrue(store.state.onboarded)
+        rule.onNodeWithText("Tour · 1 of 4").assertIsDisplayed()
+        rule.onNodeWithText("Next").performClick()
+        rule.onNodeWithText("Plan ahead").assertIsDisplayed()
+        rule.onNodeWithText("End tutorial").performClick()
+        rule.onNodeWithText("Plan ahead").assertDoesNotExist()
+        org.junit.Assert.assertEquals(-1, store.state.tourStep)
+    }
+
+    @Test fun setupCanBeEndedFromAnyStep() {
+        val store = launch(AppState(onboarded = false, profiles = emptyList()), home = true)
+        rule.onNodeWithText("Get started").performClick()
+        rule.onNodeWithText("End tutorial").performClick()
+        org.junit.Assert.assertTrue(store.state.onboarded)
+        org.junit.Assert.assertEquals(-1, store.state.tourStep)
         rule.onNodeWithText("New session").assertIsDisplayed()
+    }
+
+    @Test fun partnerSessionOffersCodeAndEmergencyWait() {
+        val now = System.currentTimeMillis()
+        val p = app.lockdin.state.Partner("Sam", "acct_test_0001", "link_test_0001", claimed = true)
+        val store = launch(AppState(partner = p, commitment = app.lockdin.enforce.Commitment.PARTNER), home = true)
+        rule.onNodeWithText("New session").performClick()
+        rule.onNodeWithText("Ending early:", substring = true).performScrollTo().assertIsDisplayed()
+        store.update { s -> s.copy(active = app.lockdin.state.ActiveSession(
+            "sess_partner_1", now, listOf(app.lockdin.engine.Segment(app.lockdin.engine.PhaseKind.FOCUS, 60)), "Essay",
+            s.profiles.first().id, app.lockdin.engine.SessionControls(), commitment = app.lockdin.enforce.Commitment.PARTNER)) }
+        rule.onNodeWithText("Partner session", substring = true).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("End early").performScrollTo().performClick()
+        rule.onNodeWithText("Ask Sam for the code").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Partner’s code").performTextInput("000000")
+        rule.onNodeWithText("End session").performClick()
+        rule.onNodeWithText("This phone doesn’t have the partner key", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Emergency end without a code").performScrollTo().performClick()
+        rule.onNodeWithText("Start the wait").performClick()
+        val at = store.state.active!!.controls.emergencyRecoveryAt!!
+        org.junit.Assert.assertTrue(at > now + 40 * 60_000L && at <= System.currentTimeMillis() + 45 * 60_000L)
+        rule.onNodeWithText("Calls and messages are unlocked", substring = true).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Cancel and keep focusing").performScrollTo().performClick()
+        org.junit.Assert.assertNull(store.state.active!!.controls.emergencyRecoveryAt)
     }
 
     @Test fun privacyListsPermissionsAndDefaultsAreEditable() {
         val store = launch(home = true)
         rule.onNodeWithContentDescription("Settings").performClick()
+        openSection("History and data")
         rule.onNodeWithText("Privacy").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("sends nothing anywhere", substring = true).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("unless you set up a partner code", substring = true).performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Read-only, for free-time suggestions").performScrollTo().assertIsDisplayed()
+        openSection("New session defaults")
         rule.onNodeWithText("Focus length").performScrollTo().performClick()
         rule.onNodeWithText("25 min").performClick()
         org.junit.Assert.assertEquals(25, store.state.last.focusMinutes)
@@ -554,7 +612,7 @@ class AppTest {
 
     @Test fun screenshotBackgroundScenes() {
         // One running session per background, dark (as designed) and the words scene in light.
-        val scenes = listOf("LIBRARY" to true, "MOUNTAINS" to true, "WORDS" to true, "BLUEPRINT" to true, "LIBRARY" to false, "WORDS" to false)
+        val scenes = listOf("LIBRARY" to true, "MOUNTAINS" to true, "WORDS" to true, "LIBRARY" to false, "WORDS" to false)
         val dark = androidx.compose.runtime.mutableStateOf(true)
         val store = Store(AppState(last = app.lockdin.state.LastChoice(25, 5, 1, "study"), quotesOn = true)) {}
         rule.setContent { LockdInApp(store, clock, zone, dark.value, history = hist) }
@@ -696,6 +754,7 @@ class AppTest {
     @Test fun allNotificationsCanBeTurnedOffAndOn() {
         val store = launch()
         rule.onNodeWithContentDescription("Settings").performClick()
+        openSection("Notifications")
         rule.onNodeWithText("Allow notifications").performScrollTo().performClick()
         org.junit.Assert.assertFalse(store.state.reminders.notificationsOn)
         rule.onNodeWithText("Reminders before sessions").assertDoesNotExist()
@@ -709,6 +768,7 @@ class AppTest {
     @Test fun reminderSettingsAndQuietHours() {
         val store = launch()
         rule.onNodeWithContentDescription("Settings").performClick()
+        openSection("Notifications")
         rule.onNodeWithText("Quiet hours").performScrollTo().performClick()
         rule.onNodeWithText("Quiet from").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Follow-up after a missed session").performScrollTo().performClick()

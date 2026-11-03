@@ -9,6 +9,8 @@ android {
     compileSdk = 36
 
     defaultConfig {
+        // Partner service (R49). Only partner setup, partner status and messages to admin use it.
+        buildConfigField("String", "PARTNER_URL", "\"https://lockdin-partner.lockdin-tf.workers.dev\"")
         applicationId = "app.lockdin"
         minSdk = 29
         targetSdk = 36
@@ -38,7 +40,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     sourceSets {
         // One source of truth for cross-implementation timing tests: the vectors
         // generated from the Rust core (core/examples/parity_vectors.rs).
