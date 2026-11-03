@@ -585,7 +585,7 @@ private fun LookSettings(store: Store) {
             }
         }
         Spacer(Modifier.height(Dim.s2))
-        Text(photoError ?: "Shown behind the Focus screen only. The lock and text stay the same; photos are dimmed so text stays readable. Your photo stays on this phone.",
+        Text(photoError ?: "Shown behind the Focus screen, locked or not. The lock and text stay the same; photos are dimmed so text stays readable. Your photo stays on this phone.",
             style = UiType.caption, color = if (photoError != null) c.danger else c.inkMuted)
     }
 }

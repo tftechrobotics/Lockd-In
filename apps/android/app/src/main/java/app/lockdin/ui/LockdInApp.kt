@@ -142,7 +142,8 @@ fun LockdInApp(
 
         // The chosen background (C2) fills the Focus screen edge to edge, behind the header too.
         Box(Modifier.fillMaxSize()) {
-        val backdrop = if (route == Route.FOCUS && BackdropGate.locked) runCatching { Backdrop.valueOf(store.state.backdrop) }.getOrDefault(Backdrop.NONE) else Backdrop.NONE
+        // Owner 2026-11-03: the chosen background shows on the Focus screen all the time, not only while locked.
+        val backdrop = if (route == Route.FOCUS) runCatching { Backdrop.valueOf(store.state.backdrop) }.getOrDefault(Backdrop.NONE) else Backdrop.NONE
         BackdropBox(backdrop, store.state.backdropWords) {
         Scaffold(
             containerColor = if (backdrop != Backdrop.NONE) androidx.compose.ui.graphics.Color.Transparent else c.ground,
