@@ -99,3 +99,13 @@ Report the three Lockd In percentages and total drops. Targets: blocking alone �
       - Change the clock: the allowance doesn't refill.
       - Reboot: it keeps the remaining time.
     - **Always allow:** the chosen apps are never covered during focus.
+
+28. **Partner code (R49), two phones.**
+    - In Settings › Ending early › Partner code, enter a name and send the link to a second phone. Open it there, choose a PIN: the app shows "has the code" after Check again.
+    - Open the link a second time on another browser: it asks for the PIN; five wrong PINs lock it for 15 minutes.
+    - Start a session with Ending early: Partner code. End early with the code read from the partner page: it ends at once. An old code (over a minute) is refused.
+    - Start an emergency end: the wait is ¾ of the time left. Phone, Messages and Contacts open without the block screen; other blocked apps stay covered. Cancel restores blocking. Let it run out: the session ends.
+    - Message admin from the end-early screen; reply and send an unlock from the admin console: "End now" appears for that session only.
+    - Remove partner: the link page says it's no longer active.
+29. **Setup and tour:** fresh install walks Welcome → first profile → blocking → partner → tour; End tutorial works on every step and on the tour card; Settings › Help and tour replays it.
+30. **Widget:** add the home-screen widget; it shows the mini lock (shut during focus, open in breaks). Check whether the S24+ lock screen offers it.

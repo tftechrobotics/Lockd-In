@@ -144,7 +144,7 @@ Three kinds of entry, kept apart on purpose:
 - **Session screen:** one collapsible line under the timer, with remaining browsing time shown only for limited access.
 - **Recordings:** development recordings synthesised by `design/audio/gen.py`, owned by the project and labelled in the app. See `docs/audio-assets.md` for the content needed before release.
 
-## R49: Partner code, emergency end, admin messaging, setup tour (2026-11-02, owner; design only, not built)
+## R49: Partner code, emergency end, admin messaging, setup tour (2026-11-02, owner; implemented 2026-11-03, see status below)
 - **Partner code:** set up in onboarding, which needs internet once.
   - Lockd In creates a secret key on the phone and stores it in Android Keystore. The person never sees it.
   - An encrypted copy goes to the Lockd In service, which returns a private partner link that the person sends from the share sheet.
@@ -172,4 +172,10 @@ Three kinds of entry, kept apart on purpose:
   - The real wordmark is used everywhere.
   - The focus session fits one screen.
   - The home-screen widget is redesigned as a mini lock. A lock-screen widget is to be checked on the S24+.
-- **Pending owner input:** more music collections (which kinds; licensed recordings needed); whether "Locked" moves into session setup.
+- **Owner answers (2026-11-02):** more study music and more quiet, chill options (added: Lo-fi, Ambient, Quiet piano, Ocean, Forest, Brown noise); "Locked" (and Partner code) are chosen in session setup under "Ending early".
+- **Code delivery (owner, supersedes the QR idea):** a link, not an authenticator app. Partner PIN is 4 digits; the page then shows the code.
+- **Status 2026-11-03:**
+  - Implemented: service `services/partner` (Cloudflare Worker + D1, on the temporary address https://lockdin-partner.lockdin-tf.workers.dev), deployed by `.github/workflows/partner-service.yml`; app side in `partner/` and `ui/PartnerUi.kt`; messaging apps (default dialer, default SMS, Google/Samsung messages and contacts) are not blocked while an emergency end is waiting.
+  - Tested: service crypto unit tests incl. RFC 6238 vectors (Node 22, CI); app PartnerCode against the same vectors and a grant computed by the service code (JVM unit tests); emulator UI test for the end-early screen and emergency wait.
+  - Not yet tested: the full link → PIN → code → unlock flow with two real phones; admin console (off until the `LOCKDIN_ADMIN_PASSWORD` repo secret is set).
+  - Privacy: the app now has the INTERNET permission, used only for the partner service. Play Data safety and a privacy policy must say so before release.

@@ -1,6 +1,6 @@
 # Handoff — read this first
 
-**Last session:** 2026-11-01 (functional development, R37) · **Milestone:** M1 reliable single-device focus — **IN PROGRESS**
+**Last session:** 2026-11-03 (canvas changes, partner lock R49) · **Milestone:** M1 reliable single-device focus — **IN PROGRESS**
 **Read first:** `docs/audit-2026-11.md` (inventory, Freedom, platform limits, architecture) and `docs/milestones.md` (new M1–M5 criteria + evidence table).
 **Repository:** github.com/tftechrobotics/Lockd-In (public since 2026-11-01).
 
@@ -11,6 +11,18 @@ work: `engine/History.kt`, `state/HistoryStore.kt`, `ui/HistoryScreen.kt`, `ui/P
 `engine/CalendarPlan.kt`, `cal/`, `ui/CalendarUi.kt`, `widget/` (C); `ui/Backdrop.kt` (C2); `engine/Coaching.kt`,
 `sched/CheckInNotice.kt` (D); `engine/Places.kt`, `loc/`, `ui/PlacesUi.kt` (E); `ui/Onboarding.kt` (release).
 Next: Apple Music embedded playback (MusicKit; owner pays $99/yr) when the owner decides; Play listing needs the account.
+
+**Latest (2026-11-03): canvas changes, more music, partner lock (R48, R49 in `docs/product-decisions.md`)**
+- Design canvas with the owner's comments: https://claude.ai/artifact/6Jg6nbWbszuvh5jGNknNP1 (all comments built).
+- App: collapsible Settings, calendars by account, guided setup + tour (`ui/Onboarding.kt`), no built-in profiles on new
+  installs, "Ending early" chosen in session setup (Flexible / Delayed / Locked / Partner code), completion unlock
+  animation (`ClockLock outroFor`), mini-lock widget, 9 new generated audio files in Study / Quiet-and-chill groups.
+- Partner lock: app `partner/` + `ui/PartnerUi.kt`; service `services/partner` (Cloudflare Worker + D1) on the temporary
+  address https://lockdin-partner.lockdin-tf.workers.dev, deployed by `partner-service.yml` using repo secrets
+  CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID. MASTER_KEY is a Worker secret created once by the workflow — never
+  rotate it without re-encrypting keys. Admin console at `/admin` is off until the owner adds repo secret
+  LOCKDIN_ADMIN_PASSWORD and reruns the workflow. Domain switch later (change `PARTNER_URL` in app/build.gradle.kts).
+- Not yet done: two-phone partner test (checklist 28), Play Data safety + privacy policy for the INTERNET permission.
 
 **Where things stand (2026-11-01, Android-only — R40)**
 - Owner paused Windows and web; the Android backlog map is in `docs/android-backlog.md`.
