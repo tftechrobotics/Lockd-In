@@ -1,0 +1,11 @@
+# Lockd In partner service (R49). database_id is filled in by the deploy workflow.
+name = "lockdin-partner"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lockdin-partner"
+database_id = "__DATABASE_ID__"
+migrations_dir = "migrations"

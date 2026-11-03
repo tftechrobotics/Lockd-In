@@ -27,8 +27,11 @@ class AudioTest {
     private val limited = ProfileAudio(access = MusicAccess.LIMITED, musicApps = setOf(spotify, ytm), allowanceMin = 5)
 
     @Test fun collectionsAreSmallCuratedAndInstrumental() {
-        assertEquals(listOf("Piano", "Strings", "Rain"), AudioCollection.values().map { it.label })
+        // Study music and quieter, chill sounds (owner 2026-11-02); each one small and curated.
+        assertTrue(AudioCollection.values().map { it.label }.containsAll(listOf("Piano", "Strings", "Lo-fi", "Ambient", "Quiet piano", "Rain", "Ocean", "Forest", "Brown noise")))
+        assertTrue(AudioCollection.values().any { it.group == app.lockdin.audio.AudioGroup.STUDY } && AudioCollection.values().any { it.group == app.lockdin.audio.AudioGroup.CHILL })
         AudioCollection.values().forEach { assertTrue(it.tracks.isNotEmpty() && it.tracks.size <= 5) }
+        AudioCollection.values().filter { it.loop }.forEach { assertEquals(1, it.tracks.size) }
         assertTrue(AudioCollection.RAIN.loop)
         assertFalse(AudioCollection.PIANO.loop)
     }

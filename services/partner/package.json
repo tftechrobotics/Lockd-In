@@ -1,0 +1,7 @@
+{
+  "name": "lockdin-partner-service",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test test/*.test.js" },
+  "devDependencies": { "wrangler": "4.151.2" }
+}

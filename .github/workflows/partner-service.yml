@@ -1,0 +1,73 @@
+# Deploys the Lockd In partner service (R49) to Cloudflare Workers + D1, then checks it live.
+# Uses repository secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID; LOCKDIN_ADMIN_PASSWORD
+# (optional) turns the admin console on. Secrets are never printed.
+name: Partner service
+on:
+  push:
+    branches: [main]
+    paths: ["services/partner/**", ".github/workflows/partner-service.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency: partner-service
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: services/partner
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER: npx --yes wrangler@4.151.2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Unit tests
+        run: node --test test/*.test.js
+      - name: workers.dev address
+        id: sub
+        run: |
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain"
+          sub=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$api" | jq -r '.result.subdomain // empty')
+          if [ -z "$sub" ]; then
+            for name in lockdin-tf "lockdin-$(openssl rand -hex 3)"; do
+              r=$(curl -s -X PUT -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "content-type: application/json" "$api" -d "{\"subdomain\":\"$name\"}")
+              if [ "$(echo "$r" | jq -r .success)" = true ]; then sub=$name; break; fi
+              echo "subdomain $name not available: $(echo "$r" | jq -c .errors)"
+            done
+          fi
+          [ -n "$sub" ] || { echo "::error::Couldn't get a workers.dev subdomain. Open Workers & Pages once in the Cloudflare dashboard to pick one."; exit 1; }
+          echo "url=https://lockdin-partner.$sub.workers.dev" >> "$GITHUB_OUTPUT"
+      - name: Database
+        run: |
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database"
+          id=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$api?name=lockdin-partner" | jq -r '.result[] | select(.name=="lockdin-partner") | .uuid' | head -1)
+          if [ -z "$id" ]; then
+            id=$(curl -s -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "content-type: application/json" "$api" -d '{"name":"lockdin-partner"}' | jq -r '.result.uuid // empty')
+            echo "created database"
+          fi
+          [ -n "$id" ] || { echo "::error::Couldn't create the D1 database"; exit 1; }
+          sed -i "s/__DATABASE_ID__/$id/" wrangler.toml
+          $WRANGLER d1 migrations apply lockdin-partner --remote
+      - name: Deploy
+        run: $WRANGLER deploy
+      - name: Secrets
+        env:
+          ADMIN_PASSWORD: ${{ secrets.LOCKDIN_ADMIN_PASSWORD }}
+        run: |
+          have=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/lockdin-partner/secrets" | jq -r '.result[].name')
+          # MASTER_KEY is made once and never replaced: it encrypts every stored key.
+          if ! echo "$have" | grep -qx MASTER_KEY; then
+            openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n' | $WRANGLER secret put MASTER_KEY
+            echo "MASTER_KEY created"
+          else echo "MASTER_KEY kept"; fi
+          if [ -n "$ADMIN_PASSWORD" ]; then printf '%s' "$ADMIN_PASSWORD" | $WRANGLER secret put ADMIN_TOKEN; echo "admin password set"
+          else echo "::warning::LOCKDIN_ADMIN_PASSWORD isn't set, so the admin console is off."; fi
+      - name: Live check
+        run: |
+          sleep 10
+          node test/smoke.mjs "${{ steps.sub.outputs.url }}"
+          echo "::notice title=Partner service URL::${{ steps.sub.outputs.url }}"

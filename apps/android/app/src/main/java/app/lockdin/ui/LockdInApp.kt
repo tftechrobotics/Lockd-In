@@ -74,6 +74,11 @@ fun LockdInApp(
         var editingPreset by remember { mutableStateOf<String?>(null) }
         var editingPlace by remember { mutableStateOf<app.lockdin.engine.Place?>(null) }
         fun go(r: Route) { if (r.tab) lastTab = r; route = r }
+        // The tour shows each tip on its own screen.
+        val tour = store.state.tourStep
+        androidx.compose.runtime.LaunchedEffect(tour) {
+            when (TOUR.getOrNull(tour)?.tab) { "focus" -> go(Route.FOCUS); "schedule" -> go(Route.SCHEDULE); "profiles" -> go(Route.PROFILES); "history" -> go(Route.HISTORY) }
+        }
         // A notification asked for a screen (e.g. Reschedule → Schedule).
         val asked = Resumes.route
         androidx.compose.runtime.LaunchedEffect(asked) {
@@ -156,6 +161,8 @@ fun LockdInApp(
             },
             bottomBar = {
                 Column {
+                    // Tour tips (setup walkthrough) sit just above the tabs they talk about.
+                    if (store.state.tourStep >= 0) { TourCard(store, Modifier.padding(bottom = Dim.s2)) }
                     HorizontalDivider(color = c.line)
                     NavigationBar(containerColor = c.ground, contentColor = c.ink, tonalElevation = 0.dp) {
                         Route.entries.filter { it.tab }.forEach { r ->
