@@ -56,7 +56,8 @@ object ReadyMoment { var showing by mutableStateOf(false) }
 @Composable
 fun LockBurst(id: String, width: Dp, haptics: Boolean = false) {
     val c = LocalColors.current
-    val reduced = remember { animationsOff(LocalContext.current.applicationContext) }
+    val ctx = LocalContext.current
+    val reduced = remember { animationsOff(ctx.applicationContext) }
     val pop = remember { Animatable(1f) }
     val ring = remember { Animatable(0f) }
     LaunchedEffect(id) {
@@ -117,7 +118,8 @@ object Splash { var played = false }
 @Composable
 fun SplashScreen(onDone: () -> Unit) {
     val c = LocalColors.current
-    val reduced = remember { animationsOff(LocalContext.current.applicationContext) }
+    val ctx = LocalContext.current
+    val reduced = remember { animationsOff(ctx.applicationContext) }
     val rise = remember { Animatable(0f) }
     val fade = remember { Animatable(1f) }
     LaunchedEffect(Unit) {
