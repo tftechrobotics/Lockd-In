@@ -4,7 +4,17 @@
 **Read first:** `docs/audit-2026-11.md` (inventory, Freedom, platform limits, architecture) and `docs/milestones.md` (new M1–M5 criteria + evidence table).
 **Repository:** github.com/tftechrobotics/Lockd-In (public since 2026-11-01).
 
-**Latest (2026-11-03 ~10:30 CT): owner feedback on build 34638d7 shipped (R50, R51, R52 in `docs/product-decisions.md`)**
+**Newest (2026-11-03 ~11:20 CT), build bb52cc6 sent to owner, compile-only (owner asked: no test run):**
+- `enforce/ShareWindow.kt`: after Ask / invite, messaging apps plus the app picked in the share sheet (chooser callback
+  `ShareChosenReceiver`) aren't covered for 5 min (checked in `BlockPolicy.isRestrictedIn`). Owner report: the Ask
+  message was blocked. A small race is possible if a non-messaging app is picked (it may be covered before the
+  callback arrives); reopening it works.
+- First slide text: "Start Lockd In. Keep distractions locked." / apps "locked until you're done".
+- `ui/Intro.kt`: `ReadyScreen` after the tour's Done (the lock turns, shuts with a burst, "You're ready. Time to lock in
+  and take control."); `SplashScreen` on a fresh launch only (`MainActivity`: not with a route or a running session;
+  `LockdInApp(splash=)` is off in tests). Not yet run on the emulator: the next session should run the full suite.
+
+**Earlier (2026-11-03 ~10:30 CT): owner feedback on build 34638d7 shipped (R50, R51, R52 in `docs/product-decisions.md`)**
 - Merged to **main** (fast-forward from branch `owner-feedback-1103`) with the owner's OK. That deployed the partner
   service (migration 0002 applied to the live D1) and built test APK **95e569e**, which was sent to the owner.
   The live smoke test passed on https://lockdin-partner.lockdin-tf.workers.dev, including the new approval and
