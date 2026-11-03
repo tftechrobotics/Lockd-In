@@ -38,13 +38,10 @@
      vault file format unchanged), `ui/AccountUi.kt`, `AppState.account` (+codec, unit test `AccountStateTest`).
      Service: `migrations/0002_users_requests.sql`, sign up/in/me in `src/index.js`. First run: 4 why-slides → account →
      profile → blocking → partner → tour.
-- **Tested so far:** service end to end on a local `wrangler dev` (workerd + local D1): full `test/smoke.mjs` incl. new
-  approval and account checks passed; partner request page exercised in Chromium (PIN → Allow → grant matched).
-  Android: CI compile, JVM unit tests, lint passed. **Not yet:** emulator UI tests (running), any phone check.
-- **Owner phone checks wanted after the new APK:** add-apps prompt; blocking screen copy; two-phone partner request →
-  Allow ends the session; Settings pages; tour bubbles positions on the S24+; create account / sign in / sign out.
-- **Open owner questions:** OK to keep "Not now, use on this phone only" on the account step (offline requirement)?
-  Email provider for verification/password reset (none yet — forgotten password = new account).
+- **Also tested:** the service end to end on a local `wrangler dev` (full `test/smoke.mjs`), and the partner request
+  page in Chromium (PIN, then Allow; the grant matched). Not yet checked on any phone.
+- Next work after the owner's phone checks: the planned independent security review of the partner lock (now also
+  covering accounts), privacy policy + Play Data safety, email provider for account recovery.
 
 **Roadmap (R44/R45, 2026-11-02):** see `docs/android-backlog.md` › Roadmap and › Known limitations. B, B2, C,
 C2, D, E and release-readiness basics are implemented (commits 6b2a9ab … 0a601cf); none phone-checked yet. Step 1 (owner's
