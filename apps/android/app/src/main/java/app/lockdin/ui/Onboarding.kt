@@ -44,6 +44,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.lockdin.enforce.AppRules
@@ -223,7 +225,7 @@ fun TourCard(store: Store, modifier: Modifier = Modifier) {
     val tip = TOUR.getOrNull(step) ?: return
     val c = LocalColors.current
     Surface(color = c.ink, contentColor = c.onInk, shape = RoundedCornerShape(16.dp), modifier = modifier.fillMaxWidth().padding(horizontal = Dim.gutter)
-        .semantics { androidx.compose.ui.semantics.liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite }) {
+        .semantics { liveRegion = LiveRegionMode.Polite }) {
         Column(Modifier.padding(horizontal = Dim.s4, vertical = Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
             Text("Tour · ${step + 1} of ${TOUR.size}", style = UiType.caption, color = c.onInk)
             Text(tip.title, style = UiType.title, color = c.onInk, modifier = Modifier.semantics { heading() })
