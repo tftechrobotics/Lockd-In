@@ -425,8 +425,8 @@ class AppTest {
         rule.onNodeWithTag("tab-profiles").performClick()
         rule.onNodeWithText("Essay").performScrollTo().performClick()
         rule.onNodeWithContentDescription("New step").performTextInput("Outline")
-        rule.waitForIdle()
-        rule.onNodeWithText("Add").performScrollTo().performClick()
+        // The keyboard's Done adds the step (a tap on Add can land on the keyboard in the test activity).
+        rule.onNodeWithContentDescription("New step").performImeAction()
         rule.waitUntil(5_000) { rule.onAllNodesWithText("Outline").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Save").performClick()
         org.junit.Assert.assertEquals(listOf("Outline"), store.state.presets.single().steps)

@@ -113,14 +113,15 @@ fun PresetEditor(store: Store, preset: Preset, now: Long, zone: ZoneId, onClose:
                     }
                 }
                 if (p.steps.size < 20) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s2)) {
+                    val addStep = { newStep.trim().takeIf { it.isNotEmpty() }?.let { p = p.copy(steps = p.steps + it); newStep = "" }; Unit }
                     OutlinedTextField(
                         newStep, { newStep = it.take(120) }, singleLine = true, placeholder = { Text("e.g. Outline chapter 3") },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { addStep() }),
                         shape = RoundedCornerShape(Dim.radius), colors = fieldColors(),
                         modifier = Modifier.weight(1f).semantics { contentDescription = "New step" },
                     )
-                    SecondaryButton("Add", {
-                        newStep.trim().takeIf { it.isNotEmpty() }?.let { p = p.copy(steps = p.steps + it); newStep = "" }
-                    })
+                    SecondaryButton("Add", addStep)
                 }
             }
         }
