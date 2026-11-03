@@ -425,7 +425,9 @@ class AppTest {
         rule.onNodeWithTag("tab-profiles").performClick()
         rule.onNodeWithText("Essay").performScrollTo().performClick()
         rule.onNodeWithContentDescription("New step").performTextInput("Outline")
-        rule.onNodeWithText("Add").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("Add").performScrollTo().performClick()
+        rule.waitUntil(5_000) { rule.onAllNodesWithText("Outline").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Save").performClick()
         org.junit.Assert.assertEquals(listOf("Outline"), store.state.presets.single().steps)
         rule.onNodeWithText("Essay").performScrollTo().performClick()
