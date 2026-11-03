@@ -156,5 +156,6 @@
         <receiver android:name=".sched.CheckInReceiver" android:exported="false" />
         <receiver android:name=".loc.GeofenceReceiver" android:exported="false" />
         <receiver android:name=".loc.PlaceActionReceiver" android:exported="false" />
-</application>
+        <receiver android:name=".enforce.ShareChosenReceiver" android:exported="false" />
+    </application>
 </manifest>

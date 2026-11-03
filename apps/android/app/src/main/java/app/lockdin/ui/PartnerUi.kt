@@ -65,10 +65,7 @@ import kotlinx.coroutines.withContext
 
 private fun linkUrl(p: Partner) = "${BuildConfig.PARTNER_URL}/p/${p.linkId}"
 
-private fun share(ctx: android.content.Context, text: String, title: String) {
-    val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
-    runCatching { ctx.startActivity(Intent.createChooser(send, title).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-}
+private fun share(ctx: android.content.Context, text: String, title: String) = app.lockdin.enforce.ShareWindow.share(ctx, text, title)
 
 /** Setting up (or managing) the partner: in setup step 4 and Settings › Ending early. */
 @Composable

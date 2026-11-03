@@ -582,7 +582,7 @@ class AppTest {
     @Test fun setupMakesTheFirstProfileThenToursTheApp() {
         val store = launch(AppState(onboarded = false, profiles = emptyList()), home = true)
         // Why-slides, then "let's get started" with the account.
-        rule.onNodeWithText("Start focus. Keep distractions closed.").assertIsDisplayed()
+        rule.onNodeWithText("Start Lockd In. Keep distractions locked.").assertIsDisplayed()
         rule.onNodeWithText("Next").performClick()
         rule.onNodeWithText("Plan it, then just show up.").assertIsDisplayed()
         rule.onNodeWithText("Next").performClick()

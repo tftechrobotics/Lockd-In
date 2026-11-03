@@ -179,6 +179,7 @@ object BlockPolicy {
     ): Boolean {
         if (pkg.isBlank() || pkg in ALWAYS_ALLOWED || pkg in essentials) return false
         if (pkg in messaging && app.lockdin.partner.PartnerRules.emergencyPending(session.controls, now)) return false
+        if (ShareWindow.allows(pkg, now)) return false
         app.lockdin.audio.MusicAllowance.decide(pkg, session.audio, session.musicUsedMs)?.let { return it }
         return isRestricted(pkg, session.rules, essentials)
     }

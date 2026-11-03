@@ -16,7 +16,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val store = Store.get(this)
-        intent?.getStringExtra(EXTRA_ROUTE)?.let { Resumes.openRoute(it) }
+        val routed = intent?.getStringExtra(EXTRA_ROUTE)?.also { Resumes.openRoute(it) } != null
+        // The opening animation plays on a fresh launch only, not when returning to a running session.
+        val splash = savedInstanceState == null && !routed && store.state.active == null
         setContent {
             val dark = isDark(store.state.theme)
             // System bar icons follow the app's own theme choice, not only the system's.
@@ -25,7 +27,7 @@ class MainActivity : ComponentActivity() {
                 else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
                 enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
             }
-            LockdInApp(store, dark = dark)
+            LockdInApp(store, dark = dark, splash = splash)
         }
     }
 

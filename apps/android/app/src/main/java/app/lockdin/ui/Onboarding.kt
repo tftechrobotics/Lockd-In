@@ -75,7 +75,7 @@ private val SUGGESTED = listOf(
 private data class Slide(val title: String, val text: String, val icon: LIcon?)
 
 private val SLIDES = listOf(
-    Slide("Start focus. Keep distractions closed.", "Pick a task and a time. During focus, the apps that pull you away are covered until you’re done.", null),
+    Slide("Start Lockd In. Keep distractions locked.", "Pick a task and a time. During focus, the apps that pull you away are locked until you’re done.", null),
     Slide("Plan it, then just show up.", "Schedule study sessions with breaks built in. Lockd In reminds you, or starts them for you.", LIcon.Calendar),
     Slide("Someone in your corner.", "Add a partner who approves early exits, so stopping early takes a real reason. Emergencies always have a way out.", LIcon.Person),
     Slide("So let’s get started.", "First, make your account. Then choose what to block and turn blocking on. It takes about two minutes.", LIcon.Focus),
@@ -301,7 +301,10 @@ fun TourOverlay(store: Store) {
     val pad = with(density) { 6.dp.toPx() }
     val hole = target?.let { androidx.compose.ui.geometry.Rect(it.left - pad, it.top - pad, it.right + pad, it.bottom + pad) }
     val scrim = c.ink.copy(alpha = 0.55f)
-    val next = { store.update { it.copy(tourStep = if (step + 1 < TOUR.size) step + 1 else -1) } }
+    val next = {
+        if (step + 1 >= TOUR.size) ReadyMoment.showing = true
+        store.update { it.copy(tourStep = if (step + 1 < TOUR.size) step + 1 else -1) }
+    }
     val end = { store.update { it.copy(tourStep = -1) } }
 
     Box(

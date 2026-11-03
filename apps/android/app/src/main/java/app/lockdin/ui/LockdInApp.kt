@@ -62,11 +62,18 @@ enum class Route(val label: String, val icon: LIcon, val tab: Boolean) {
 fun LockdInApp(
     store: Store, clock: AppClock = AppClock.System, zone: ZoneId = ZoneId.systemDefault(), dark: Boolean = isDark(store.state.theme),
     history: app.lockdin.state.HistoryStore? = null,
+    /** Play the opening splash (the app's own launch only; tests leave it off). */
+    splash: Boolean = false,
 ) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val hist = history ?: remember { app.lockdin.state.HistoryStore.get(ctx) }
     LockdInTheme(dark) {
         val c = LocalColors.current
+        var showSplash by remember { mutableStateOf(splash && !Splash.played) }
+        if (showSplash) {
+            Box(Modifier.fillMaxSize().background(c.ground)) { SplashScreen { Splash.played = true; showSplash = false } }
+            return@LockdInTheme
+        }
         var route by rememberSaveable { mutableStateOf(Route.FOCUS) }
         var lastTab by rememberSaveable { mutableStateOf(Route.FOCUS) }
         var editing by remember { mutableStateOf<ScheduledSession?>(null) }
@@ -199,6 +206,7 @@ fun LockdInApp(
         }
         }
         if (touring) TourOverlay(store)
+        if (ReadyMoment.showing) ReadyScreen(store.state.startHaptics) { ReadyMoment.showing = false }
         }
     }
 }
