@@ -24,6 +24,8 @@ Next: Apple Music embedded playback (MusicKit; owner pays $99/yr) when the owner
   LOCKDIN_ADMIN_PASSWORD and reruns the workflow. Domain switch later (change `PARTNER_URL` in app/build.gradle.kts).
 - Build 34638d7 (sent to owner): CI run 41594500342 passed build/unit/lint, 67/67 UI tests and the full blocking E2E on the
   API 35 emulator. E2E harness now seeds the "study" profile itself (new installs have none).
+- Planned (owner, after the weekly usage reset): an independent security review of the partner lock (service + app) by a
+  separate agent before release.
 - Not yet done: two-phone partner test (checklist 28), Play Data safety + privacy policy for the INTERNET permission.
 
 **Where things stand (2026-11-01, Android-only — R40)**
