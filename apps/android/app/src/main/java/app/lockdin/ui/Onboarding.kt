@@ -284,7 +284,7 @@ val TOUR = listOf(
 object TourTargets { val rects = androidx.compose.runtime.mutableStateMapOf<String, androidx.compose.ui.geometry.Rect>() }
 
 fun Modifier.tourTarget(key: String): Modifier = this.then(
-    Modifier.onGloballyPositioned { TourTargets.rects[key] = it.boundsInWindow() },
+    Modifier.onGloballyPositioned { val r = it.boundsInWindow(); if (TourTargets.rects[key] != r) TourTargets.rects[key] = r },
 )
 
 /** Dims the screen except the current target, with a small bubble next to it. */
@@ -326,7 +326,10 @@ fun TourOverlay(store: Store) {
             else -> hole.bottom + gap
         }.coerceIn(0f, (size.height - bubbleH).coerceAtLeast(0).toFloat())
         val sidePx = with(density) { Dim.gutter.toPx() }
-        val arrowX = (hole?.center?.x ?: (size.width / 2f)).coerceIn(sidePx + 24f, size.width - sidePx - 24f)
+        // Before the first measure the width is 0; keep the arrow range valid.
+        val lo = sidePx + 24f
+        val hi = maxOf(lo, size.width - sidePx - 24f)
+        val arrowX = (hole?.center?.x ?: (size.width / 2f)).coerceIn(lo, hi)
         Column(
             Modifier.fillMaxWidth().padding(horizontal = Dim.gutter)
                 .offset { androidx.compose.ui.unit.IntOffset(0, y.toInt()) }

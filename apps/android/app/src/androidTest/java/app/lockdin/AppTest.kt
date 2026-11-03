@@ -92,7 +92,8 @@ class AppTest {
 
     private fun openSection(title: String) {
         if (rule.onAllNodesWithContentDescription("Back to Settings").fetchSemanticsNodes().isNotEmpty()) {
-            rule.onNodeWithContentDescription("Back to Settings").performClick()
+            rule.onNodeWithContentDescription("Back to Settings").performScrollTo().performClick()
+            rule.waitForIdle()
         }
         rule.onNodeWithTag("settings-${sectionPage[title] ?: title}").performScrollTo().performClick()
         rule.waitForIdle()
