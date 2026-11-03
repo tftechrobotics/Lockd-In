@@ -7,8 +7,12 @@
 **PAUSED HERE (2026-11-03 ~09:00 CT): owner feedback on build 34638d7 (R50, R51, R52 in `docs/product-decisions.md`)**
 - All work is on branch **`owner-feedback-1103`** (commit "Owner feedback 2026-11-03 …"), **not merged to main**. Main is
   still 34638d7-era code, so the test APK on `test-apk` and the live partner service are the OLD versions.
-- CI run **41658391824** (android-app, emulator=true, ref owner-feedback-1103): build + unit + lint **passed**; UI tests and
-  blocking E2E were still running when paused. Check: `gh run view 41658391824 -R tftechrobotics/Lockd-In`.
+- CI on the branch: run 41658391824 found 3 UI failures (tour arrow crash before first measure, Settings test helper not
+  scrolling to "Back to Settings", plus a flaky session-flow assert) → fixed in afec095. Run 41660783098: 69/70 UI tests
+  passed; the one failure (preset step "Add" tap) is a timing flake in a screen not changed here — hardened in af82dfb.
+  Blocking E2E: every check passed except `a11y-site-block` (the known emulator Chrome full-screen issue, see below).
+  **Merge to main is waiting for the owner's OK**, because pushing to main deploys the service and runs migration 0002 on
+  the live D1 database (the session's guard flagged it as a production deploy). Earlier check command: Check: `gh run view 41658391824 -R tftechrobotics/Lockd-In`.
   If it expired or failed, re-dispatch: `gh api -X POST repos/tftechrobotics/Lockd-In/actions/workflows/android-app.yml/dispatches
   -f ref=owner-feedback-1103 -f 'inputs[emulator]=true'`. UI test failures are most likely text/flow assertions in
   `AppTest.kt` updated for the new onboarding, tour, Settings pages and partner dialog — fix those first.
