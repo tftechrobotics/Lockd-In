@@ -1,6 +1,6 @@
-// First-run setup and walkthrough (owner 2026-11-02). Five steps: welcome, the first profile (no
-// ready-made ones), the blocking permission, an optional accountability partner, then a short
-// tour of the real screens. "End tutorial" is on every step; nothing is required to start a timer.
+// First run (owner 2026-11-03): a short slideshow on why Lockd In helps, then "let's get started"
+// with the account, the first profile (no ready-made ones), blocking, an optional partner, and a
+// tour of the real screen. Skipping is always possible; nothing is required to start a timer.
 package app.lockdin.ui
 
 import android.Manifest
@@ -48,6 +48,12 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import app.lockdin.enforce.AppRules
 import app.lockdin.enforce.InstalledApps
 import app.lockdin.enforce.LaunchableApp
@@ -55,6 +61,7 @@ import app.lockdin.enforce.RuleMode
 import app.lockdin.state.Profile
 import app.lockdin.state.Store
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Apps people most often want out of the way while working, offered first in setup when installed. */
@@ -64,15 +71,31 @@ private val SUGGESTED = listOf(
     "com.netflix.mediaclient", "tv.twitch.android.app", "com.pinterest", "com.instagram.barcelona",
 )
 
-private const val STEPS = 5
+/** Why-slides before setup. */
+private data class Slide(val title: String, val text: String, val icon: LIcon?)
 
+private val SLIDES = listOf(
+    Slide("Start focus. Keep distractions closed.", "Pick a task and a time. During focus, the apps that pull you away are covered until you’re done.", null),
+    Slide("Plan it, then just show up.", "Schedule study sessions with breaks built in. Lockd In reminds you, or starts them for you.", LIcon.Calendar),
+    Slide("Someone in your corner.", "Add a partner who approves early exits, so stopping early takes a real reason. Emergencies always have a way out.", LIcon.Person),
+    Slide("So let’s get started.", "First, make your account. Then choose what to block and turn blocking on. It takes about two minutes.", LIcon.Focus),
+)
+
+/** Setup steps after the slides: account, profile, blocking, partner, done. */
+private const val SETUP_STEPS = 4
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun Onboarding(store: Store) {
     val c = LocalColors.current
-    var page by rememberSaveable { mutableIntStateOf(0) }
-    // The first profile, created when leaving step 2 (kept if the person goes back and forth).
+    // -1 = slides; 0 account, 1 profile, 2 blocking, 3 partner, 4 done.
+    var step by rememberSaveable { mutableIntStateOf(-1) }
+    val pager = androidx.compose.foundation.pager.rememberPagerState { SLIDES.size }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    // The first profile, created when leaving the profile step (kept if the person goes back and forth).
     var name by rememberSaveable { mutableStateOf("Study") }
     var picked by rememberSaveable { mutableStateOf(setOf<String>()) }
+    var startSignIn by rememberSaveable { mutableStateOf(false) }
     val endTutorial = { store.update { it.copy(onboarded = true, tourStep = -1) } }
     fun saveProfile() {
         val n = name.trim().take(40)
@@ -80,59 +103,96 @@ fun Onboarding(store: Store) {
         val p = Profile(Store.newId(), n, "Made during setup", false, AppRules(RuleMode.BLOCK_LIST, picked))
         store.update { it.copy(profiles = it.profiles + p, last = it.last.copy(profileId = p.id)) }
     }
-    val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { Resumes.bump() }
+    androidx.activity.compose.BackHandler(enabled = step >= 0 || pager.currentPage > 0) {
+        if (step > 0) step-- else if (step == 0) step = -1 else scope.launch { pager.animateScrollToPage(pager.currentPage - 1) }
+    }
+
+    if (step < 0) {
+        val last = pager.currentPage == SLIDES.lastIndex
+        Column(Modifier.fillMaxSize()) {
+            Row(Modifier.fillMaxWidth().padding(start = Dim.gutter, end = Dim.s2, top = Dim.s2), verticalAlignment = Alignment.CenterVertically) {
+                Dots(pager.currentPage, SLIDES.size, "Slide", Modifier.weight(1f))
+                if (!last) TextAction("Skip", { scope.launch { pager.animateScrollToPage(SLIDES.lastIndex) } })
+            }
+            androidx.compose.foundation.pager.HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { i ->
+                val sl = SLIDES[i]
+                Column(
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Dim.gutter),
+                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Dim.s4, Alignment.CenterVertically),
+                ) {
+                    if (sl.icon == null) ClockLock(TimerState.READY, 0, 1, locked = false, label = "Lockd In", caption = "lockd in", text = "", width = 180.dp)
+                    else Surface(color = c.taupeSoft, shape = androidx.compose.foundation.shape.CircleShape, modifier = Modifier.size(120.dp)) {
+                        Box(contentAlignment = Alignment.Center) { LockdIcon(sl.icon, size = 52.dp, tint = c.ink) }
+                    }
+                    Heading(sl.title, center = true)
+                    Body(sl.text, center = true)
+                }
+            }
+            ActionBar {
+                if (last) MainButton("Make my account", { step = 0 })
+                else MainButton("Next", { scope.launch { pager.animateScrollToPage(pager.currentPage + 1) } })
+                if (last) TextAction("I already have an account", { step = 0; startSignIn = true }, modifier = Modifier.align(Alignment.CenterHorizontally))
+            }
+        }
+        return
+    }
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(start = Dim.gutter, end = Dim.s2, top = Dim.s2), verticalAlignment = Alignment.CenterVertically) {
-            StepDots(page, Modifier.weight(1f))
-            TextAction("End tutorial", { saveProfileIfNamed(page, ::saveProfile); endTutorial() })
+            if (step < SETUP_STEPS) Dots(step, SETUP_STEPS, "Step", Modifier.weight(1f)) else Spacer(Modifier.weight(1f))
+            TextAction("End tutorial", { saveProfileIfNamed(step, ::saveProfile); endTutorial() })
         }
         Column(
             Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = Dim.gutter),
             verticalArrangement = Arrangement.spacedBy(Dim.s4),
         ) {
             Spacer(Modifier.height(Dim.s2))
-            when (page) {
-                0 -> Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Dim.s4)) {
-                    Spacer(Modifier.height(Dim.s4))
-                    ClockLock(TimerState.READY, 0, 1, locked = false, label = "Lockd In", caption = "lockd in", text = "", width = 180.dp)
-                    Heading("Start focus. Keep distractions closed.", center = true)
-                    Body("We’ll set up your first profile, blocking and an optional partner, then show you around. It takes about two minutes.", center = true)
-                    Body("Lockd In never closes your apps or deletes anything.", center = true)
+            when (step) {
+                0 -> {
+                    val acct = store.state.account
+                    Heading(if (acct == null) "Make your account" else "You’re signed in")
+                    if (acct == null) {
+                        Body("So this phone connects to Lockd In online, and to your computer once that’s ready.")
+                        AccountForm(store, startWithSignIn = startSignIn, onSignedIn = { step = 1 })
+                    } else Body("${acct.email}. You can manage it in Settings › Account.")
                 }
                 1 -> FirstProfileStep(name, { name = it.take(40) }, picked, { picked = it })
                 2 -> {
                     Heading("Turn on blocking")
-                    Body("Android only lets an app see which app is open with your permission. Without it, sessions run as a timer. You can do this later in Devices.")
+                    Body("Android only lets an app see which app is open with your permission. Without it, sessions run as a timer. You can do this later in Settings › Blocking.")
                     BlockingSetup()
-                    if (Build.VERSION.SDK_INT >= 33) SecondaryButton("Allow notifications", { askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS) }, modifier = Modifier.fillMaxWidth())
                 }
                 3 -> {
                     Heading("Add a partner (optional)")
-                    Body("Someone you trust holds the code that ends a session early. You never see it unless they give it to you. You can also do this later in Settings › Ending early.")
+                    Body("Someone you trust approves it when you want to end a session early. You can also do this later in Settings › Ending early.")
                     PartnerSetup(store)
                 }
                 else -> Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Dim.s4)) {
                     Spacer(Modifier.height(Dim.s4))
                     Heading("You’re set", center = true)
-                    Body("Next, a few tips on the real screens. Tap Next to move on, or End tutorial any time. You can replay them from Settings › Help and tour.", center = true)
+                    Body("Next, a quick look at each part of the main screen. Tap Next to move on, or Skip any time. You can replay it from Settings › Help and tour.", center = true)
                 }
             }
             Spacer(Modifier.height(Dim.s4))
         }
         ActionBar {
-            when (page) {
-                0 -> MainButton("Get started", { page = 1 })
-                1 -> MainButton("Continue", { if (name.isNotBlank()) { saveProfile(); page = 2 } })
-                2, 3 -> MainButton("Continue", { page++ })
+            when (step) {
+                0 -> if (store.state.account != null) MainButton("Continue", { step = 1 })
+                    else TextAction("Not now, use Lockd In on this phone only", { step = 1 }, modifier = Modifier.align(Alignment.CenterHorizontally))
+                1 -> MainButton("Continue", { if (name.isNotBlank()) { saveProfile(); step = 2 } })
+                2 -> MainButton("Continue", { step = 3 })
+                3 -> MainButton(if (store.state.partner != null) "Continue" else "Skip for now", {
+                    if (store.state.partner?.claimed == true) store.update { it.copy(commitment = app.lockdin.enforce.Commitment.PARTNER) }
+                    step = 4
+                })
                 else -> MainButton("Show me around", { store.update { it.copy(onboarded = true, tourStep = 0) } })
             }
-            if (page > 0) TextAction("Back", { page-- }, modifier = Modifier.align(Alignment.CenterHorizontally))
+            if (step > 0) TextAction("Back", { step-- }, modifier = Modifier.align(Alignment.CenterHorizontally))
         }
     }
 }
 
-private fun saveProfileIfNamed(page: Int, save: () -> Unit) { if (page >= 1) save() }
+private fun saveProfileIfNamed(step: Int, save: () -> Unit) { if (step >= 1) save() }
 
 @Composable
 private fun FirstProfileStep(name: String, onName: (String) -> Unit, picked: Set<String>, onPicked: (Set<String>) -> Unit) {
@@ -191,11 +251,11 @@ private fun ProfileNameChips(names: List<String>, current: String, onPick: (Stri
 }
 
 @Composable
-private fun StepDots(page: Int, modifier: Modifier) {
+private fun Dots(at: Int, count: Int, what: String, modifier: Modifier) {
     val c = LocalColors.current
-    Row(modifier.semantics { contentDescription = "Step ${page + 1} of $STEPS" }, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        repeat(STEPS) { i ->
-            Box(Modifier.height(8.dp).width(if (i == page) 20.dp else 8.dp).background(if (i == page) c.ink else c.line, RoundedCornerShape(4.dp)))
+    Row(modifier.semantics { contentDescription = "$what ${at + 1} of $count" }, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        repeat(count) { i ->
+            Box(Modifier.height(8.dp).width(if (i == at) 20.dp else 8.dp).background(if (i == at) c.ink else c.line, RoundedCornerShape(4.dp)))
         }
     }
 }
@@ -208,39 +268,104 @@ private fun Heading(t: String, center: Boolean = false) = Text(t, style = UiType
 private fun Body(t: String, center: Boolean = false) = Text(t, style = UiType.body, color = LocalColors.current.inkMuted,
     textAlign = if (center) TextAlign.Center else TextAlign.Start)
 
-/** Tour tips over the real screens (after setup, or replayed from Settings). */
-data class TourTip(val title: String, val text: String, val tab: String)
+/** Tour tips (owner 2026-11-03): small callouts pointing at each part of the Focus home screen. */
+data class TourTip(val target: String, val title: String, val text: String)
 
 val TOUR = listOf(
-    TourTip("Start here", "Pick what you’re working on, how long, and a profile. The lock closes once blocking is on.", "focus"),
-    TourTip("Plan ahead", "Schedule sessions and weekly routines. Lockd In reminds you, or starts them for you.", "schedule"),
-    TourTip("Profiles", "Each profile decides which apps and websites are blocked, and its study audio.", "profiles"),
-    TourTip("Your history", "Finished sessions stay here, on this phone only. Settings are behind the gear at the top.", "history"),
+    TourTip("new", "Start a session", "Pick what you’re working on, how long, and which profile to block with."),
+    TourTip("next", "What’s next", "Your next planned session. Tap it to open your schedule."),
+    TourTip("tab-schedule", "Schedule", "Plan sessions and weekly routines. Lockd In reminds you, or starts them."),
+    TourTip("tab-profiles", "Profiles", "Each profile decides which apps and websites are blocked."),
+    TourTip("tab-history", "History", "Finished sessions, kept on this phone."),
+    TourTip("settings", "Settings", "Blocking, ending early, your account and more."),
 )
 
-/** The current tour tip as a card above the bottom navigation. */
+/** Where each tour target is on screen, reported by [tourTarget]. */
+object TourTargets { val rects = androidx.compose.runtime.mutableStateMapOf<String, androidx.compose.ui.geometry.Rect>() }
+
+fun Modifier.tourTarget(key: String): Modifier = this.then(
+    Modifier.onGloballyPositioned { TourTargets.rects[key] = it.boundsInWindow() },
+)
+
+/** Dims the screen except the current target, with a small bubble next to it. */
 @Composable
-fun TourCard(store: Store, modifier: Modifier = Modifier) {
+fun TourOverlay(store: Store) {
     val step = store.state.tourStep
     val tip = TOUR.getOrNull(step) ?: return
     val c = LocalColors.current
-    Surface(color = c.ink, contentColor = c.onInk, shape = RoundedCornerShape(16.dp), modifier = modifier.fillMaxWidth().padding(horizontal = Dim.gutter)
-        .semantics { liveRegion = LiveRegionMode.Polite }) {
-        Column(Modifier.padding(horizontal = Dim.s4, vertical = Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
-            Text("Tour · ${step + 1} of ${TOUR.size}", style = UiType.caption, color = c.onInk)
-            Text(tip.title, style = UiType.title, color = c.onInk, modifier = Modifier.semantics { heading() })
-            Text(tip.text, style = UiType.body, color = c.onInk)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.material3.TextButton(onClick = { store.update { it.copy(tourStep = -1) } }, modifier = Modifier.heightIn(min = Dim.control)) {
-                    Text("End tutorial", style = UiType.label, color = c.onInk)
-                }
-                Spacer(Modifier.weight(1f))
-                androidx.compose.material3.Button(
-                    onClick = { store.update { it.copy(tourStep = if (step + 1 < TOUR.size) step + 1 else -1) } },
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = c.onInk, contentColor = c.ink),
-                    shape = RoundedCornerShape(10.dp), modifier = Modifier.heightIn(min = Dim.control),
-                ) { Text(if (step + 1 < TOUR.size) "Next" else "Done", style = UiType.label) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var origin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    var size by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
+    var bubbleH by remember { mutableIntStateOf(0) }
+    val target = TourTargets.rects[tip.target]?.translate(-origin)
+    val pad = with(density) { 6.dp.toPx() }
+    val hole = target?.let { androidx.compose.ui.geometry.Rect(it.left - pad, it.top - pad, it.right + pad, it.bottom + pad) }
+    val scrim = c.ink.copy(alpha = 0.55f)
+    val next = { store.update { it.copy(tourStep = if (step + 1 < TOUR.size) step + 1 else -1) } }
+    val end = { store.update { it.copy(tourStep = -1) } }
+
+    Box(
+        Modifier.fillMaxSize()
+            .onGloballyPositioned { origin = it.boundsInWindow().topLeft; size = it.size }
+            .pointerInput(Unit) { awaitPointerEventScope { while (true) { awaitPointerEvent().changes.forEach { it.consume() } } } },
+    ) {
+        androidx.compose.foundation.Canvas(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }) {
+            drawRect(scrim)
+            hole?.let {
+                val r = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())
+                drawRoundRect(androidx.compose.ui.graphics.Color.Black, it.topLeft, it.size, r, blendMode = androidx.compose.ui.graphics.BlendMode.Clear)
+                drawRoundRect(c.ground, it.topLeft, it.size, r, style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
             }
         }
+        // Below the target when it's in the top half of the screen, otherwise above it.
+        val gap = with(density) { 12.dp.toPx() }
+        val above = hole != null && hole.center.y > size.height / 2f
+        val y = when {
+            hole == null -> (size.height - bubbleH) / 2f
+            above -> hole.top - gap - bubbleH
+            else -> hole.bottom + gap
+        }.coerceIn(0f, (size.height - bubbleH).coerceAtLeast(0).toFloat())
+        val sidePx = with(density) { Dim.gutter.toPx() }
+        val arrowX = (hole?.center?.x ?: (size.width / 2f)).coerceIn(sidePx + 24f, size.width - sidePx - 24f)
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = Dim.gutter)
+                .offset { androidx.compose.ui.unit.IntOffset(0, y.toInt()) }
+                .onGloballyPositioned { bubbleH = it.size.height }
+                .semantics { liveRegion = LiveRegionMode.Polite },
+        ) {
+            if (hole != null && !above) Arrow(up = true, x = arrowX - sidePx, color = c.surface)
+            Surface(color = c.surface, contentColor = c.ink, shape = RoundedCornerShape(14.dp), shadowElevation = 6.dp, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(horizontal = Dim.s4, vertical = Dim.s3), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("${step + 1} of ${TOUR.size}", style = UiType.caption, color = c.inkMuted)
+                    Text(tip.title, style = UiType.label, color = c.ink, modifier = Modifier.semantics { heading() })
+                    Text(tip.text, style = UiType.caption, color = c.ink)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.TextButton(onClick = end, modifier = Modifier.heightIn(min = Dim.control)) {
+                            Text("Skip tour", style = UiType.label, color = c.inkMuted)
+                        }
+                        Spacer(Modifier.weight(1f))
+                        androidx.compose.material3.Button(
+                            onClick = next,
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = c.ink, contentColor = c.onInk),
+                            shape = RoundedCornerShape(10.dp), modifier = Modifier.heightIn(min = Dim.control),
+                        ) { Text(if (step + 1 < TOUR.size) "Next" else "Done", style = UiType.label) }
+                    }
+                }
+            }
+            if (hole != null && above) Arrow(up = false, x = arrowX - sidePx, color = c.surface)
+        }
+    }
+}
+
+@Composable
+private fun Arrow(up: Boolean, x: Float, color: androidx.compose.ui.graphics.Color) {
+    androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(10.dp)) {
+        val w = 10.dp.toPx()
+        val p = androidx.compose.ui.graphics.Path().apply {
+            if (up) { moveTo(x - w, size.height); lineTo(x, 0f); lineTo(x + w, size.height) }
+            else { moveTo(x - w, 0f); lineTo(x, size.height); lineTo(x + w, 0f) }
+            close()
+        }
+        drawPath(p, color)
     }
 }

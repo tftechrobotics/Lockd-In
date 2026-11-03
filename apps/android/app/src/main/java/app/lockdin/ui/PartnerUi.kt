@@ -83,7 +83,7 @@ fun PartnerSetup(store: Store) {
     var confirmRemove by remember { mutableStateOf(false) }
 
     fun invite(p: Partner) = share(ctx,
-        "I’m using Lockd In to stay focused. Please open this link and choose a 4-digit PIN. You’ll hold the code that lets me end a focus session early, so only give it to me if I really need it: ${linkUrl(p)}",
+        "I’m using Lockd In to stay focused. Can you be my partner? Open this link and choose a 4-digit PIN. If I ever need to end a focus session early, I’ll send you a request and you can allow it or not: ${linkUrl(p)}",
         "Send the link to ${p.name}")
 
     fun checkClaimed() {
@@ -105,9 +105,9 @@ fun PartnerSetup(store: Store) {
                 shape = RoundedCornerShape(Dim.radius), colors = fieldColors(), modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Partner’s first name" })
             SettingsGroup {
                 Column(Modifier.padding(Dim.s4), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
-                    Step(1, "Send them a private link. This needs an internet connection once.")
-                    Step(2, "They open it and choose a 4-digit PIN. The link is then theirs alone.")
-                    Step(3, "When you need out, they open the link and read you the current code.")
+                    Step(1, "Send them a private link.")
+                    Step(2, "They open it and choose a 4-digit PIN.")
+                    Step(3, "When you need out, you send a request. They enter their PIN and tap Allow.")
                 }
             }
             error?.let { Text(it, style = UiType.caption, color = c.danger, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
@@ -120,7 +120,7 @@ fun PartnerSetup(store: Store) {
                     val r = withContext(Dispatchers.IO) {
                         runCatching {
                             val key = PartnerVault.newKey()
-                            val acct = PartnerService.createAccount(key, n)
+                            val acct = PartnerService.createAccount(key, n, app.lockdin.account.AccountVault.token(ctx))
                             PartnerVault.save(ctx, key, acct.token)
                             Partner(n, acct.accountId, acct.linkId)
                         }
@@ -129,17 +129,17 @@ fun PartnerSetup(store: Store) {
                     r.onSuccess { p -> store.update { it.copy(partner = p) }; invite(p) }.onFailure { error = it.message ?: "Couldn’t set this up. Try again." }
                 }
             })
-            Text("Lockd In stores your partner’s first name and an encrypted copy of the code key, so their page and admin can work. No phone numbers or emails.",
+            Text("Lockd In stores your partner’s first name and an encrypted key, so their page can work. No phone numbers or emails.",
                 style = UiType.caption, color = c.inkMuted)
         }
     } else {
         Column(verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s2)) {
                 Box(Modifier.padding(top = 2.dp)) { StatusDot(partner.claimed) }
-                Text(if (partner.claimed) "${partner.name} has the code." else "Waiting for ${partner.name} to open the link.",
+                Text(if (partner.claimed) "${partner.name} is your partner." else "Waiting for ${partner.name} to open the link.",
                     style = UiType.body, color = c.ink, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
             }
-            if (partner.claimed) Text("Delete the message with the link from your phone, so only ${partner.name} can open it. Partner code is now a choice under Ending early.",
+            if (partner.claimed) Text("Delete the message with their link from your phone, so only ${partner.name} can use it.",
                 style = UiType.caption, color = c.inkMuted)
             error?.let { Text(it, style = UiType.caption, color = c.inkMuted) }
             FlowRowCompat {
@@ -203,11 +203,12 @@ fun PartnerSessionOptions(store: Store, session: ActiveSession, now: Long) {
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
             Text("Calls and messages are unlocked. Everything else stays blocked until then.", style = UiType.caption, color = c.inkMuted)
             FlowRowCompat {
-                TextAction("Enter $partnerName’s code", { endEarly = true })
+                TextAction("Ask $partnerName", { endEarly = true })
                 TextAction("Cancel and keep focusing", { store.setControls(session.id) { it.copy(emergencyRecoveryAt = null) } })
             }
         } else {
-            Text("Partner session: it ends early with $partnerName’s code.", style = UiType.caption, color = c.inkMuted)
+            Text(if (PartnerAsk.pending(session.id) != null) "Partner session: waiting for $partnerName to answer."
+                else "Partner session: it ends early when $partnerName allows it.", style = UiType.caption, color = c.inkMuted)
             SecondaryButton("End early", { endEarly = true }, modifier = Modifier.fillMaxWidth())
         }
     }
@@ -215,51 +216,116 @@ fun PartnerSessionOptions(store: Store, session: ActiveSession, now: Long) {
     if (chat) AdminChatDialog(store, session, onClose = { chat = false })
 }
 
+/** The request sent for each session (kept while the app runs; a new one can always be sent). */
+object PartnerAsk {
+    private val sent = androidx.compose.runtime.mutableStateMapOf<String, app.lockdin.partner.PartnerRequest>()
+    fun pending(sessionId: String) = sent[sessionId]
+    fun set(sessionId: String, r: app.lockdin.partner.PartnerRequest?) { if (r == null) sent.remove(sessionId) else sent[sessionId] = r }
+}
+
 @Composable
 private fun EndEarlyDialog(store: Store, session: ActiveSession, now: Long, onMessageAdmin: () -> Unit, onClose: () -> Unit) {
     val c = LocalColors.current
     val ctx = LocalContext.current
-    val partnerName = store.state.partner?.name ?: "your partner"
+    val scope = rememberCoroutineScope()
+    val partner = store.state.partner
+    val partnerName = partner?.name ?: "your partner"
     var code by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var askError by remember { mutableStateOf<String?>(null) }
+    var status by remember { mutableStateOf<String?>(null) }
+    var asking by remember { mutableStateOf(false) }
+    var withCode by rememberSaveable { mutableStateOf(false) }
     var confirmEmergency by remember { mutableStateOf(false) }
     val occEnd = app.lockdin.engine.Session.occurrenceFrom(session.start, session.segments).end
     val waitMin = ((PartnerRules.emergencyWaitMs(occEnd, now) + 59_999) / 60_000).toInt()
     val leftMin = (((occEnd - now).coerceAtLeast(0) + 59_999) / 60_000).toInt()
+    val request = PartnerAsk.pending(session.id)
+    fun endNow() { store.setControls(session.id) { it.copy(emergencyRecoveryAt = store.clock()) }; PartnerAsk.set(session.id, null); onClose() }
+    fun sendLink(r: app.lockdin.partner.PartnerRequest) = share(ctx,
+        "Can I end my focus session early? Open this, enter your Lockd In PIN and tap Allow if it’s okay: ${r.url}", "Ask $partnerName")
+
+    // Owner 2026-11-03: the partner just opens the request and taps Allow; the phone checks for the answer.
+    LaunchedEffect(request?.id) {
+        val r = request ?: return@LaunchedEffect
+        val key = withContext(Dispatchers.IO) { PartnerVault.key(ctx) }
+        while (true) {
+            val token = withContext(Dispatchers.IO) { PartnerVault.token(ctx) }
+            if (partner == null || token == null || key == null) { askError = "This phone doesn’t have the partner key any more. Use an emergency end or message admin."; return@LaunchedEffect }
+            val got = withContext(Dispatchers.IO) { runCatching { PartnerService.answer(partner.accountId, token, r.id) } }
+            got.onSuccess { (st, grant) ->
+                status = st; askError = null
+                if (st == "allowed" && grant != null && PartnerCode.checkGrant(key, session.id, grant)) { endNow(); return@LaunchedEffect }
+                if (st != "pending") { PartnerAsk.set(session.id, null); return@LaunchedEffect }
+            }.onFailure { askError = it.message }
+            delay(4_000)
+        }
+    }
+
     FullScreenDialog(onClose, "End this session early") {
-        Text("This session needs $partnerName’s code. Ask them to open their Lockd In link and read you the code shown now.", style = UiType.body, color = c.inkMuted)
-        SecondaryButton("Ask $partnerName for the code", {
-            share(ctx, "Can you open your Lockd In link and read me the code? I need to stop my focus session early.", "Ask $partnerName")
-        }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(
-            code, { code = it.filter { ch -> ch.isDigit() }.take(6); error = null }, singleLine = true, label = { Text("6-digit code") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), isError = error != null,
-            shape = RoundedCornerShape(Dim.radius), colors = fieldColors(),
-            modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Partner’s code" },
-        )
-        error?.let { Text(it, style = UiType.caption, color = c.danger, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive }) }
-        MainButton("End session", {
-            val key = PartnerVault.key(ctx)
-            when {
-                key == null -> error = "This phone doesn’t have the partner key any more. Use an emergency end or message admin."
-                PartnerCode.check(key, code, System.currentTimeMillis()) -> {
-                    store.setControls(session.id) { it.copy(emergencyRecoveryAt = store.clock()) }
-                    onClose()
+        Text("This session ends early when $partnerName allows it. Send a request; they enter their PIN and tap Allow.", style = UiType.body, color = c.inkMuted)
+        when {
+            request != null -> {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s3),
+                    modifier = Modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }) {
+                    CircularProgressIndicator(color = c.ink, strokeWidth = 2.dp, modifier = Modifier.height(20.dp).widthIn(max = 20.dp))
+                    Text("Waiting for $partnerName to answer…", style = UiType.label, color = c.ink)
                 }
-                else -> error = "That code isn’t right. Codes change every 30 seconds, so ask for the one shown now."
+                Text("This screen ends the session as soon as they allow it. You can close it and come back.", style = UiType.caption, color = c.inkMuted)
+                SecondaryButton("Send the request again", { sendLink(request) }, modifier = Modifier.fillMaxWidth())
             }
-        })
+            asking -> CircularProgressIndicator(color = c.ink, modifier = Modifier.semantics { contentDescription = "Sending" })
+            else -> {
+                status?.let {
+                    Text(when (it) { "denied" -> "$partnerName didn’t allow it. Your session keeps going."; "expired" -> "That request expired. You can ask again."; else -> "" },
+                        style = UiType.label, color = c.ink, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                }
+                MainButton("Ask $partnerName", {
+                    val p = partner ?: return@MainButton
+                    asking = true; askError = null
+                    scope.launch {
+                        val r = withContext(Dispatchers.IO) {
+                            runCatching { PartnerService.ask(p.accountId, PartnerVault.token(ctx) ?: error("no token"), session.id, occEnd) }
+                        }
+                        asking = false
+                        r.onSuccess { req -> status = null; PartnerAsk.set(session.id, req); sendLink(req) }
+                            .onFailure { askError = if (it is IllegalStateException) "This phone doesn’t have the partner key any more." else it.message }
+                    }
+                })
+            }
+        }
+        askError?.let { Text(it, style = UiType.caption, color = c.danger, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive }) }
+
+        if (!withCode) TextAction("$partnerName is with you? Use their code", { withCode = true })
+        else {
+            Text("They can open their Lockd In link and read you the code shown there.", style = UiType.caption, color = c.inkMuted)
+            OutlinedTextField(
+                code, { code = it.filter { ch -> ch.isDigit() }.take(6); error = null }, singleLine = true, label = { Text("6-digit code") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), isError = error != null,
+                shape = RoundedCornerShape(Dim.radius), colors = fieldColors(),
+                modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Partner’s code" },
+            )
+            error?.let { Text(it, style = UiType.caption, color = c.danger, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive }) }
+            SecondaryButton("End with the code", {
+                val key = PartnerVault.key(ctx)
+                when {
+                    key == null -> error = "This phone doesn’t have the partner key any more. Use an emergency end or message admin."
+                    PartnerCode.check(key, code, System.currentTimeMillis()) -> endNow()
+                    else -> error = "That code isn’t right. Codes change every 30 seconds, so ask for the one shown now."
+                }
+            }, modifier = Modifier.fillMaxWidth())
+        }
         Spacer(Modifier.height(Dim.s2))
         Text("Can’t reach $partnerName?", style = UiType.label, color = c.ink, modifier = Modifier.semantics { heading() })
         SecondaryButton("Message admin", onMessageAdmin, modifier = Modifier.fillMaxWidth())
-        SecondaryButton("Emergency end without a code", { confirmEmergency = true }, modifier = Modifier.fillMaxWidth())
+        SecondaryButton("Emergency end without $partnerName", { confirmEmergency = true }, modifier = Modifier.fillMaxWidth())
         Text("Ends after a $waitMin-minute wait (¾ of the $leftMin minutes left). Calls and messages unlock straight away.", style = UiType.caption, color = c.inkMuted)
     }
     if (confirmEmergency) AlertDialog(
         onDismissRequest = { confirmEmergency = false },
         containerColor = c.surface,
         title = { Text("Start an emergency end?", style = Type.title) },
-        text = { Text("The session ends in $waitMin minutes. Calls and messages unlock now. You can cancel the wait, and $partnerName’s code still ends it at once.", style = UiType.body) },
+        text = { Text("The session ends in $waitMin minutes. Calls and messages unlock now. You can cancel the wait, and if $partnerName allows it, it ends at once.", style = UiType.body) },
         confirmButton = {
             TextButton(onClick = {
                 val t = store.clock()

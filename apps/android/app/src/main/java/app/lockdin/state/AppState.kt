@@ -31,6 +31,12 @@ data class Profile(val id: String, val name: String, val description: String, va
  */
 data class Partner(val name: String, val accountId: String, val linkId: String, val claimed: Boolean = false)
 
+/**
+ * The Lockd In account this phone is signed in to (R50). The device token is not here: it's in
+ * Android Keystore-wrapped storage (app.lockdin.account.AccountVault).
+ */
+data class Account(val userId: String, val email: String, val name: String)
+
 /** A profile's study audio and music-app access (R48); defined in app.lockdin.audio. */
 typealias ProfileAudio = app.lockdin.audio.ProfileAudio
 
@@ -109,6 +115,8 @@ data class AppState(
     val tourStep: Int = -1,
     /** Accountability partner (R49). The code key itself is never here: it's in Android Keystore. */
     val partner: Partner? = null,
+    /** Signed-in Lockd In account (R50), or null when used without one. */
+    val account: Account? = null,
     /** Location routines (E): places, and a switch that pauses all of them. */
     val places: List<app.lockdin.engine.Place> = emptyList(),
     val placesPaused: Boolean = false,
@@ -173,6 +181,7 @@ object StateCodec {
         put("historyDays", s.historyDays)
         put("onboarded", s.onboarded)
         put("tourStep", s.tourStep)
+        s.account?.let { a -> put("account", JSONObject().put("userId", a.userId).put("email", a.email).put("name", a.name)) }
         s.partner?.let { p -> put("partner", JSONObject().put("name", p.name).put("accountId", p.accountId).put("linkId", p.linkId).put("claimed", p.claimed)) }
         put("places", JSONArray(s.places.map { p ->
             JSONObject().put("id", p.id).put("name", p.name).put("lat", p.lat).put("lon", p.lon).put("radiusM", p.radiusM)
@@ -250,6 +259,12 @@ object StateCodec {
                     val acc = p.optString("accountId"); val link = p.optString("linkId")
                     if (acc.matches(Regex("[A-Za-z0-9_-]{8,64}")) && link.matches(Regex("[A-Za-z0-9_-]{8,64}")))
                         Partner(p.optString("name").trim().take(40).ifEmpty { "Partner" }, acc, link, p.optBoolean("claimed", false))
+                    else null
+                },
+                account = o.optJSONObject("account")?.let { a ->
+                    val id = a.optString("userId"); val email = a.optString("email").trim()
+                    if (id.matches(Regex("[A-Za-z0-9_-]{8,64}")) && email.contains('@') && email.length <= 254)
+                        Account(id, email, a.optString("name").trim().take(40))
                     else null
                 },
                 places = o.optJSONArray("places")?.objects()?.mapNotNull(::placeOf)?.take(20) ?: emptyList(),

@@ -45,3 +45,23 @@ class PartnerTest {
         assertFalse(PartnerRules.emergencyPending(SessionControls(), now = 1_000))
     }
 }
+
+/** Accounts (R50): the signed-in account survives a save and load; bad saved values are dropped. */
+class AccountStateTest {
+    @org.junit.Test fun accountRoundTripsAndJunkIsDropped() {
+        val s = app.lockdin.state.AppState(account = app.lockdin.state.Account("user_test_0001", "tray@example.com", "Tray"))
+        val back = app.lockdin.state.StateCodec.decode(app.lockdin.state.StateCodec.encode(s))
+        org.junit.Assert.assertEquals(s.account, back.account)
+        val junk = app.lockdin.state.StateCodec.encode(s).replace("user_test_0001", "bad id!")
+        org.junit.Assert.assertNull(app.lockdin.state.StateCodec.decode(junk).account)
+        org.junit.Assert.assertNull(app.lockdin.state.StateCodec.decode(app.lockdin.state.StateCodec.encode(app.lockdin.state.AppState())).account)
+    }
+
+    @org.junit.Test fun localAccountChecks() {
+        org.junit.Assert.assertNull(app.lockdin.account.AccountRules.emailProblem("tray@example.com"))
+        org.junit.Assert.assertNotNull(app.lockdin.account.AccountRules.emailProblem("tray@example"))
+        org.junit.Assert.assertNotNull(app.lockdin.account.AccountRules.emailProblem("no at sign"))
+        org.junit.Assert.assertNotNull(app.lockdin.account.AccountRules.passwordProblem("short"))
+        org.junit.Assert.assertNull(app.lockdin.account.AccountRules.passwordProblem("long enough"))
+    }
+}

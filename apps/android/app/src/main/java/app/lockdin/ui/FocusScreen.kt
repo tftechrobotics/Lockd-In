@@ -104,17 +104,22 @@ fun rememberNow(clock: AppClock, ticking: Boolean): Long {
     return if (ticking) now else clock.now()
 }
 
+/** Setup left open to add apps to a profile: reopened with the same choices when the editor closes. */
+private object SetupReturn {
+    var pending: Triple<String, String, Int>? = null // profile id, task, focus minutes
+}
+
 @Composable
-fun FocusScreen(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -> Unit, openSchedule: () -> Unit) {
+fun FocusScreen(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -> Unit, openSchedule: () -> Unit, openProfile: (String) -> Unit = {}) {
     val active = store.state.active
     // Approved idle view (R36): the lock shows the time and the next session; setup opens on demand.
-    var composing by rememberSaveable { mutableStateOf(false) }
+    var composing by rememberSaveable { mutableStateOf(SetupReturn.pending != null) }
     var viewingLast by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(active?.id) { if (active != null) composing = false }
     BackHandler(enabled = active == null && composing) { composing = false }
     when {
         active != null -> SessionView(store, active, clock, zone, openDevices)
-        composing -> Setup(store, clock, zone, openDevices, openSchedule, onBack = { composing = false })
+        composing -> Setup(store, clock, zone, openDevices, openSchedule, openProfile, onBack = { composing = false })
         viewingLast && store.state.lastSession != null -> {
             val last = store.state.lastSession!!
             BackHandler { viewingLast = false }
@@ -145,7 +150,7 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
                 )
                 androidx.compose.material3.Surface(
                     shape = RoundedCornerShape(Dim.radius), color = c.surface, border = BorderStroke(1.dp, c.line),
-                    modifier = Modifier.fillMaxWidth().clickable(role = Role.Button, onClickLabel = "Open schedule", onClick = openSchedule),
+                    modifier = Modifier.fillMaxWidth().tourTarget("next").clickable(role = Role.Button, onClickLabel = "Open schedule", onClick = openSchedule),
                 ) {
                     Column(Modifier.padding(horizontal = Dim.s4, vertical = Dim.s3)) {
                         Text(if (inProgress) "Scheduled now" else "Next session", style = UiType.caption, color = c.inkMuted)
@@ -205,7 +210,7 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
                 }
             }
         },
-        actions = { MainButton("New session", onNew) },
+        actions = { MainButton("New session", onNew, modifier = Modifier.tourTarget("new")) },
     )
 }
 
@@ -337,14 +342,15 @@ private fun Question(text: String) =
     Text(text, style = TimerType.question, color = LocalColors.current.ink, modifier = Modifier.semantics { heading() })
 
 @Composable
-private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -> Unit, openSchedule: () -> Unit, onBack: (() -> Unit)? = null) {
+private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -> Unit, openSchedule: () -> Unit, openProfile: (String) -> Unit, onBack: (() -> Unit)? = null) {
     val c = LocalColors.current
     val s = store.state
-    var intention by rememberSaveable { mutableStateOf("") }
-    var focus by rememberSaveable { mutableStateOf(s.last.focusMinutes) }
+    val back = remember { SetupReturn.pending.also { SetupReturn.pending = null } }
+    var intention by rememberSaveable { mutableStateOf(back?.second ?: "") }
+    var focus by rememberSaveable { mutableStateOf(back?.third ?: s.last.focusMinutes) }
     var breakMin by rememberSaveable { mutableStateOf(if (s.last.rounds > 1) s.last.breakMinutes else 0) }
     var rounds by rememberSaveable { mutableStateOf(maxOf(2, s.last.rounds)) }
-    var profileId by rememberSaveable { mutableStateOf(s.last.profileId.takeIf { id -> s.profiles.any { it.id == id } } ?: s.profiles.firstOrNull()?.id ?: "") }
+    var profileId by rememberSaveable { mutableStateOf(back?.first?.takeIf { id -> s.profiles.any { it.id == id } } ?: s.last.profileId.takeIf { id -> s.profiles.any { it.id == id } } ?: s.profiles.firstOrNull()?.id ?: "") }
     var namingProfile by remember { mutableStateOf(false) }
     var commitment by remember { mutableStateOf(s.commitment.takeIf { it != app.lockdin.enforce.Commitment.PARTNER || s.partner?.claimed == true } ?: app.lockdin.enforce.Commitment.LOCKED) }
     var pickingCommitment by remember { mutableStateOf(false) }
@@ -476,6 +482,12 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
         },
         note = {
             when {
+                // Owner 2026-11-03: once blocking is set up, an empty profile needs apps, not setup again.
+                profile == null && appMissing.isEmpty() -> ProtectionLine("Timer only. Make a profile to choose what’s blocked.", false, "New profile") { namingProfile = true }
+                profile != null && !rules.restrictsAnything && appMissing.isEmpty() ->
+                    ProtectionLine("Timer only. $profileName doesn’t block any apps yet.", false, "Add apps") {
+                        SetupReturn.pending = Triple(profile.id, intention, focus); openProfile(profile.id)
+                    }
                 !rules.restrictsAnything -> ProtectionLine("Timer only. Apps stay available on this phone.", false, "Set up blocking", openDevices)
                 missing.isNotEmpty() -> ProtectionLine("Blocking needs ${FocusService.describe(missing)}. Until then, it’s a timer only.", false, "Set up blocking", openDevices)
                 else -> ProtectionLine("${profileName}: ${rulesSummary(rules)}", true, null) {}
@@ -729,8 +741,10 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
         else -> "Blocking isn’t running on this phone right now"
     }
 
+    val setUpAlready = rememberMissing().isEmpty()
     val note: @Composable () -> Unit = {
-        ProtectionLine(protection, protected, if (protected || (blocks && (isBreak || lifted))) null else "Set up blocking", openDevices)
+        // A timer-only session on a phone that's already set up has nothing to fix mid-session.
+        ProtectionLine(protection, protected, if (protected || (blocks && (isBreak || lifted)) || (!blocks && setUpAlready)) null else "Set up blocking", openDevices)
     }
     // Phone (approved R36): the task, the lock and what's next; everything else is one tap away.
     var more by rememberSaveable { mutableStateOf(false) }

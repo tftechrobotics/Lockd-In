@@ -4,7 +4,7 @@
 const STYLE = `
 :root{--ground:#F5F0E6;--surface:#FBF8F2;--line:#D3C5B1;--ink:#302A25;--muted:#5C5249;--onink:#FBF8F2;--soft:#EBE2D4;--danger:#8E2F25}
 @media (prefers-color-scheme: dark){:root{--ground:#1C1814;--surface:#25201B;--line:#4B4137;--ink:#F0E8DB;--muted:#C3B6A4;--onink:#221C17;--soft:#322B24;--danger:#EBA597}}
-*{box-sizing:border-box}
+*{box-sizing:border-box}[hidden]{display:none!important}
 body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 main{max-width:440px;margin:0 auto;padding:40px 20px;display:flex;flex-direction:column;gap:14px}
 h1{font-size:24px;margin:8px 0 0}
@@ -28,12 +28,21 @@ ${LOGO}
 <div id="pinBox" hidden><label for="pin" class="muted" id="pinLabel">PIN</label><input id="pin" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-describedby="err"></div>
 <button id="go" hidden></button>
 <p id="err" class="err" role="alert"></p>
+<div id="ask" hidden style="border:1px solid var(--line);border-radius:14px;padding:16px;background:var(--surface);display:flex;flex-direction:column;gap:10px"><p><strong>They’re asking to end a session early.</strong></p><p class="muted" id="askLeft"></p><div style="display:flex;gap:10px"><button id="allow">Allow</button><button id="deny" class="ghost">Don’t allow</button></div></div>
 <div id="codeBox" hidden><p class="code" id="code" aria-live="polite"></p><div class="bar"><div id="fill"></div></div><p class="muted" id="left" style="text-align:center;margin-top:8px"></p></div>
 <p class="muted" style="margin-top:24px">This page is locked with your PIN. Lockd In doesn’t ask for your name, number or email.</p>
 </main><script>
 const link = ${JSON.stringify(linkId)};
 const $ = (id) => document.getElementById(id);
-let pin = "", timer = null, state = null;
+let pin = "", timer = null, state = null, pending = null;
+async function decide(d) {
+  if (!pending) return;
+  const r = await fetch("/api/r/" + pending.id, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pin, decision: d }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { $("err").textContent = j.error || "Something went wrong."; return; }
+  $("ask").hidden = true; pending = null;
+  $("err").textContent = d === "allow" ? "Done. Their session ends now." : "Okay. Their session keeps going.";
+}
 async function api(path, data) {
   const r = await fetch("/api/p/" + link + "/" + path, data ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data) } : {});
   const j = await r.json().catch(() => ({}));
@@ -63,6 +72,9 @@ async function refresh() {
   try {
     const r = await api("code", { pin });
     $("code").textContent = r.code.slice(0, 3) + " " + r.code.slice(3);
+    pending = r.request;
+    $("ask").hidden = !pending;
+    if (pending) $("askLeft").textContent = pending.minutesLeft + " min left in the session. Allowing ends it now.";
     let left = r.secondsLeft;
     const tick = () => { $("left").textContent = "New code in " + left + " s"; $("fill").style.width = (left / 30 * 100) + "%"; if (left-- <= 0) { clearInterval(timer); refresh(); } };
     clearInterval(timer); tick(); timer = setInterval(tick, 1000);
@@ -77,7 +89,57 @@ $("go").onclick = async () => {
     show("code"); refresh();
   } catch (e) { $("err").textContent = e.message; }
 };
+$("allow").onclick = () => decide("allow");
+$("deny").onclick = () => decide("deny");
 start();
+</script></body></html>`;
+}
+
+/** The page a partner opens from a "can I end my session early?" message (R51). */
+export function requestPage(requestId) {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lockd In request</title><style>${STYLE}</style></head><body><main>
+${LOGO}
+<h1 id="title">End a focus session early?</h1>
+<p id="intro" class="muted">Enter your Lockd In PIN to answer. It’s the 4 digits you chose when you agreed to be their partner.</p>
+<div id="pinBox"><label for="pin" class="muted">Your PIN</label><input id="pin" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-describedby="err"></div>
+<button id="go">Continue</button>
+<div id="choice" hidden style="display:flex;flex-direction:column;gap:10px"><button id="allow">Allow: end it now</button><button id="deny" class="ghost">Don’t allow</button></div>
+<p id="err" class="err" role="alert"></p>
+<p class="muted" style="margin-top:24px">Only allow it if they really need to stop. Lockd In doesn’t ask for your name, number or email.</p>
+</main><script>
+const id = ${JSON.stringify(requestId)};
+const $ = (x) => document.getElementById(x);
+let pin = "";
+async function api(data) {
+  const r = await fetch("/api/r/" + id, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || "Something went wrong. Try again.");
+  return j;
+}
+function done(status, person) {
+  $("pinBox").hidden = true; $("go").hidden = true; $("choice").hidden = true;
+  const who = person || "They";
+  if (status === "allowed") { $("title").textContent = "Allowed"; $("intro").textContent = who + "’s session ends now. You can close this page."; }
+  else if (status === "denied") { $("title").textContent = "Not allowed"; $("intro").textContent = who + "’s session keeps going. You can close this page."; }
+  else { $("title").textContent = "This request has expired"; $("intro").textContent = "If they still need out, they can send you a new one."; }
+}
+$("go").onclick = async () => {
+  pin = $("pin").value.trim(); $("err").textContent = "";
+  if (!/^\\d{4}$/.test(pin)) { $("err").textContent = "Enter 4 digits."; return; }
+  try {
+    const r = await api({ pin });
+    if (r.status !== "pending") return done(r.status, r.person);
+    $("title").textContent = (r.person || "Your friend") + " wants to end a focus session early";
+    $("intro").textContent = r.minutesLeft + " min left. If you allow it, their apps unlock straight away.";
+    $("pinBox").hidden = true; $("go").hidden = true; $("choice").hidden = false;
+  } catch (e) { $("err").textContent = e.message; }
+};
+async function decide(d) {
+  try { const r = await api({ pin, decision: d }); done(r.status, r.person); } catch (e) { $("err").textContent = e.message; }
+}
+$("allow").onclick = () => decide("allow");
+$("deny").onclick = () => decide("deny");
 </script></body></html>`;
 }
 

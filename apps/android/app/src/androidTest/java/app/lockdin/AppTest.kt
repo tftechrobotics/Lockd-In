@@ -83,13 +83,24 @@ class AppTest {
         }
     }
 
+    /** Settings pages (owner 2026-11-03): the old section names map to the page that holds them. */
+    private val sectionPage = mapOf(
+        "Starting a session" to "Sessions", "New session defaults" to "Sessions", "Check-ins and coaching" to "Sessions",
+        "Appearance" to "Look and messages", "Look and background" to "Look and messages", "Messages" to "Look and messages",
+        "Calendar" to "Calendar and places", "Places" to "Calendar and places",
+    )
+
     private fun openSection(title: String) {
-        rule.onNodeWithTag("section-$title").performScrollTo().performClick()
+        if (rule.onAllNodesWithContentDescription("Back to Settings").fetchSemanticsNodes().isNotEmpty()) {
+            rule.onNodeWithContentDescription("Back to Settings").performClick()
+        }
+        rule.onNodeWithTag("settings-${sectionPage[title] ?: title}").performScrollTo().performClick()
         rule.waitForIdle()
     }
 
     private fun launch(state: AppState = AppState(), dark: Boolean = false, fontScale: Float = 1f, home: Boolean = false): Store {
         val store = Store(state) {}
+        app.lockdin.ui.SettingsNav.page = null
         hist = app.lockdin.state.HistoryStore(emptyList()) {}
         store.clock = { clock.now() }
         store.onLeft = { a, st, now -> hist.record(a, st, now) }
@@ -199,6 +210,8 @@ class AppTest {
         launch()
         rule.onNodeWithText("Timer only. Apps stay available on this phone.").assertIsDisplayed()
         rule.onNodeWithText("Set up blocking").performClick()
+        rule.onNodeWithText("Usage access").assertDoesNotExist()
+        rule.onNodeWithText("Can’t use Accessibility?").performScrollTo().performClick()
         rule.onNodeWithText("Usage access").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Display over other apps").performScrollTo().assertIsDisplayed()
         rule.onNodeWithContentDescription("Back").performClick()
@@ -207,7 +220,11 @@ class AppTest {
         rule.onNodeWithTag("tab-profiles").performClick()
         rule.onNodeWithText("Study").assertIsDisplayed()
         rule.onNodeWithContentDescription("Settings").performClick()
+        rule.onNodeWithText("Look and messages").assertIsDisplayed()
+        rule.onNodeWithTag("settings-Look and messages").performClick()
         rule.onNodeWithText("Appearance").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Back to Settings").performClick()
+        rule.onNodeWithText("Account").assertIsDisplayed()
         rule.onNodeWithContentDescription("Back").performClick()
         rule.onNodeWithText("Study").assertIsDisplayed()
     }
@@ -244,7 +261,7 @@ class AppTest {
     @Test fun accessibilityIsExplainedBeforeSettingsOpen() {
         launch()
         rule.onNodeWithText("Set up blocking").performClick()
-        rule.onNodeWithText("Accessibility (recommended)").performScrollTo().performClick()
+        rule.onNodeWithText("Turn on Accessibility", substring = true).performScrollTo().performClick()
         rule.onNodeWithText("Use Accessibility for blocking?").assertIsDisplayed()
         rule.onNodeWithText("doesn’t read what you type", substring = true).assertIsDisplayed()
         rule.onNodeWithText("Not now").performClick()
@@ -560,33 +577,75 @@ class AppTest {
 
     @Test fun setupMakesTheFirstProfileThenToursTheApp() {
         val store = launch(AppState(onboarded = false, profiles = emptyList()), home = true)
+        // Why-slides, then "let's get started" with the account.
         rule.onNodeWithText("Start focus. Keep distractions closed.").assertIsDisplayed()
-        rule.onNodeWithText("never closes your apps", substring = true).assertIsDisplayed()
-        rule.onNodeWithText("Get started").performClick()
+        rule.onNodeWithText("Next").performClick()
+        rule.onNodeWithText("Plan it, then just show up.").assertIsDisplayed()
+        rule.onNodeWithText("Next").performClick()
+        rule.onNodeWithText("Next").performClick()
+        rule.onNodeWithText("So let’s get started.").assertIsDisplayed()
+        rule.onNodeWithText("Make my account").performClick()
+        rule.onNodeWithText("Make your account").assertIsDisplayed()
+        // Local checks run before anything is sent.
+        rule.onAllNodesWithText("Create account").onLast().performScrollTo().performClick()
+        rule.onNodeWithText("Add your first name.").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Not now, use Lockd In on this phone only").performClick()
         rule.onNodeWithText("Block these apps during focus").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Continue").performClick()
         org.junit.Assert.assertEquals(listOf("Study"), store.state.profiles.map { it.name })
         rule.onNodeWithText("Turn on blocking").assertIsDisplayed()
         rule.onNodeWithText("Continue").performClick()
         rule.onNodeWithText("Add a partner (optional)").assertIsDisplayed()
-        rule.onNodeWithText("Continue").performClick()
+        rule.onNodeWithText("Skip for now").performClick()
         rule.onNodeWithText("Show me around").performClick()
         org.junit.Assert.assertTrue(store.state.onboarded)
-        rule.onNodeWithText("Tour · 1 of 4").assertIsDisplayed()
+        // The tour points at parts of the home screen, one small bubble at a time.
+        rule.onNodeWithText("1 of 6").assertIsDisplayed()
+        rule.onNodeWithText("Start a session").assertIsDisplayed()
         rule.onNodeWithText("Next").performClick()
-        rule.onNodeWithText("Plan ahead").assertIsDisplayed()
-        rule.onNodeWithText("End tutorial").performClick()
-        rule.onNodeWithText("Plan ahead").assertDoesNotExist()
+        rule.onNodeWithText("What’s next").assertIsDisplayed()
+        rule.onNodeWithText("Skip tour").performClick()
+        rule.onNodeWithText("What’s next").assertDoesNotExist()
         org.junit.Assert.assertEquals(-1, store.state.tourStep)
     }
 
     @Test fun setupCanBeEndedFromAnyStep() {
         val store = launch(AppState(onboarded = false, profiles = emptyList()), home = true)
-        rule.onNodeWithText("Get started").performClick()
+        rule.onNodeWithText("Skip").performClick()
+        rule.onNodeWithText("Make my account").performClick()
         rule.onNodeWithText("End tutorial").performClick()
         org.junit.Assert.assertTrue(store.state.onboarded)
         org.junit.Assert.assertEquals(-1, store.state.tourStep)
         rule.onNodeWithText("New session").assertIsDisplayed()
+    }
+
+    @Test fun signInFormChecksEmailAndPassword() {
+        launch(home = true)
+        rule.onNodeWithContentDescription("Settings").performClick()
+        openSection("Account")
+        rule.onNodeWithText("Sign in").performClick()
+        rule.onAllNodesWithText("Sign in").onLast().performScrollTo().performClick()
+        rule.onNodeWithText("That email doesn’t look right.").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test fun signedInAccountShowsInSettings() {
+        launch(AppState(account = app.lockdin.state.Account("user_test_0001", "tray@example.com", "Tray")), home = true)
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.onNodeWithText("tray@example.com").assertIsDisplayed()
+        openSection("Account")
+        rule.onNodeWithText("Sign out").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Delete account").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test fun partnerDetailsShowOnlyWhenPartnerIsChosen() {
+        val store = launch(AppState(commitment = app.lockdin.enforce.Commitment.LOCKED), home = true)
+        rule.onNodeWithContentDescription("Settings").performClick()
+        openSection("Ending early")
+        rule.onNodeWithText("Your partner").assertDoesNotExist()
+        rule.onNodeWithText("Partner’s first name").assertDoesNotExist()
+        rule.onNodeWithText("Partner: someone you trust approves").performScrollTo().performClick()
+        org.junit.Assert.assertEquals(app.lockdin.enforce.Commitment.PARTNER, store.state.commitment)
+        rule.onNodeWithText("Your partner").performScrollTo().assertIsDisplayed()
     }
 
     @Test fun partnerSessionOffersCodeAndEmergencyWait() {
@@ -603,11 +662,12 @@ class AppTest {
         waitForText("Partner session", 15_000)
         rule.onNodeWithText("Partner session", substring = true).performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("End early").performScrollTo().performClick()
-        rule.onNodeWithText("Ask Sam for the code").assertIsDisplayed()
+        rule.onNodeWithText("Ask Sam").assertIsDisplayed()
+        rule.onNodeWithText("Sam is with you? Use their code").performScrollTo().performClick()
         rule.onNodeWithContentDescription("Partner’s code").performTextInput("000000")
-        rule.onNodeWithText("End session").performClick()
+        rule.onNodeWithText("End with the code").performScrollTo().performClick()
         rule.onNodeWithText("This phone doesn’t have the partner key", substring = true).assertIsDisplayed()
-        rule.onNodeWithText("Emergency end without a code").performScrollTo().performClick()
+        rule.onNodeWithText("Emergency end without Sam").performScrollTo().performClick()
         rule.onNodeWithText("Start the wait").performClick()
         val at = store.state.active!!.controls.emergencyRecoveryAt!!
         org.junit.Assert.assertTrue("wait ends at ${at - now} ms", at > now + 40 * 60_000L && at <= clock.now() + 45 * 60_000L)
@@ -621,7 +681,7 @@ class AppTest {
         rule.onNodeWithContentDescription("Settings").performClick()
         openSection("History and data")
         rule.onNodeWithText("Privacy").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("unless you set up a partner code", substring = true).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Only two things use the internet", substring = true).performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Read-only, for free-time suggestions").performScrollTo().assertIsDisplayed()
         openSection("New session defaults")
         rule.onNodeWithText("Focus length").performScrollTo().performClick()

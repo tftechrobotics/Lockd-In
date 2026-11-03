@@ -129,10 +129,18 @@ private fun Context.open(cap: Capability) = Capabilities.open(
     },
 )
 
+/** True when this copy came from somewhere other than Google Play (a test APK, say). */
+private fun Context.sideloaded(): Boolean = runCatching {
+    val from = if (Build.VERSION.SDK_INT >= 30) packageManager.getInstallSourceInfo(packageName).installingPackageName
+    else @Suppress("DEPRECATION") packageManager.getInstallerPackageName(packageName)
+    from != "com.android.vending"
+}.getOrDefault(true)
+
 /**
- * Permission checklist for blocking on this phone. Accessibility is offered first (instant, and
- * the only way to block websites); usage access + display over other apps is the alternative.
- * Accessibility is opened only after a plain-language disclosure of exactly what it reads.
+ * Blocking setup (owner 2026-11-03: shorter). Shows only what's still needed: Accessibility first
+ * (instant, and the only way to block websites), notifications and battery. Usage access + display
+ * over other apps is tucked behind "Can't use Accessibility?" and hidden once Accessibility is on.
+ * Accessibility opens only after a plain-language disclosure of exactly what it reads.
  */
 @Composable
 fun BlockingSetup() {
@@ -145,50 +153,50 @@ fun BlockingSetup() {
     val overlay = remember(tick, missing) { Capabilities.displayOverApps(ctx) }
     val notifications = remember(tick) { Capabilities.notifications(ctx) }
     val battery = remember(tick) { Capabilities.batteryUnrestricted(ctx) }
+    val sideloaded = remember { ctx.sideloaded() }
     val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { Resumes.bump() }
     var disclose by remember { mutableStateOf(false) }
+    var other by remember { mutableStateOf(false) }
+    val viaUsage = !a11y && usage && overlay
 
     SettingsGroup {
-        PermissionRow(
-            "Accessibility (recommended)", a11y,
-            "Blocks apps the moment they open, and blocks websites in Chrome, Samsung Internet, Edge, Firefox, Brave and Opera.",
-        ) { disclose = true }
-    }
-    if (!a11y) Text(
-        "If Android says this setting is restricted: open Settings › Apps › Lockd In, tap ⋮ › Allow restricted settings, then try again.",
-        style = UiType.caption, color = c.inkMuted,
-    )
-    SectionLabel(if (a11y) "Without Accessibility (not needed now)" else "Or, without Accessibility")
-    SettingsGroup {
-        PermissionRow(
-            "Usage access", usage || a11y,
-            "Lets Lockd In see which app is in front, about twice a second. App names only. Can’t block websites.",
-            value = if (a11y && !usage) "Not needed" else null,
-        ) { ctx.open(Capability.USAGE_ACCESS) }
+        if (a11y || viaUsage) {
+            SettingRow(if (a11y) "Accessibility" else "Usage access", "On", supporting = if (a11y) "Blocks apps and websites" else "Blocks apps (not websites)", chevron = null)
+        } else {
+            // Android 13+ greys out Accessibility for apps installed outside Google Play until
+            // "Allow restricted settings" is tapped in App info. Play installs skip this step.
+            if (sideloaded && Build.VERSION.SDK_INT >= 33) {
+                SettingRow("1. Allow restricted settings", "Open", supporting = "In App info, tap ⋮ › Allow restricted settings. Only needed for test copies not installed from Google Play.",
+                    onClick = {
+                        Capabilities.open(ctx, android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            android.net.Uri.fromParts("package", ctx.packageName, null)))
+                    })
+                GroupDivider()
+            }
+            SettingRow(if (sideloaded && Build.VERSION.SDK_INT >= 33) "2. Turn on Accessibility" else "Turn on Accessibility", "Turn on",
+                supporting = "Blocks apps the moment they open, and websites in browsers.", onClick = { disclose = true })
+        }
         GroupDivider()
-        PermissionRow(
-            "Display over other apps", overlay || a11y,
-            "Lets the block screen come to the front when a blocked app opens.",
-            value = if (a11y && !overlay) "Not needed" else null,
-        ) { ctx.open(Capability.DISPLAY_OVER_APPS) }
-    }
-    SettingsGroup {
-        PermissionRow("Notifications", notifications, "Shows that a session is running and warns you if blocking stops.") {
+        PermissionRow("Notifications", notifications, if (notifications) null else "Shows a session is running and warns if blocking stops.") {
             if (Build.VERSION.SDK_INT >= 33) askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
             else Capabilities.open(ctx, Capabilities.notificationSettings(ctx))
         }
         GroupDivider()
-        PermissionRow(
-            "Battery: unrestricted", battery,
-            "Recommended. Without it, some phones stop Lockd In in the background and blocking can pause.",
-            optional = true,
-        ) { Capabilities.open(ctx, Capabilities.batterySettings()) }
+        PermissionRow("Battery: unrestricted", battery, if (battery) null else "Some phones pause blocking without it.", optional = true) {
+            Capabilities.open(ctx, Capabilities.batterySettings())
+        }
     }
-    Text(
-        if (missing.isEmpty()) "Ready. During focus, blocked apps and sites are covered by a block screen. Nothing is closed, and Settings, calls and your keyboard always work."
-        else "Until blocking is set up, sessions run as a timer only.",
-        style = UiType.caption, color = c.inkMuted,
-    )
+    if (!a11y) {
+        if (!other && !viaUsage) TextAction("Can’t use Accessibility?", { other = true })
+        if (other || viaUsage) {
+            SectionLabel("Without Accessibility")
+            SettingsGroup {
+                PermissionRow("Usage access", usage, "Sees which app is in front. Can’t block websites.") { ctx.open(Capability.USAGE_ACCESS) }
+                GroupDivider()
+                PermissionRow("Display over other apps", overlay, "Lets the block screen appear.") { ctx.open(Capability.DISPLAY_OVER_APPS) }
+            }
+        }
+    }
 
     if (disclose) {
         androidx.compose.material3.AlertDialog(
@@ -217,7 +225,7 @@ fun BlockingSetup() {
 }
 
 @Composable
-private fun PermissionRow(label: String, granted: Boolean, why: String, optional: Boolean = false, value: String? = null, onGrant: () -> Unit) {
+private fun PermissionRow(label: String, granted: Boolean, why: String?, optional: Boolean = false, value: String? = null, onGrant: () -> Unit) {
     val shown = value ?: when {
         granted -> "On"
         optional -> "Recommended"
@@ -301,7 +309,7 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
                     else "Works in Chrome, Samsung Internet, Edge, Firefox, Brave and Opera. Other browsers are blocked completely during focus, because Lockd In can’t see which site they show.",
                     style = UiType.caption, color = c.inkMuted,
                 )
-                if (!a11y) Text("Website rules need Accessibility. Turn it on in Devices › Set up blocking.", style = UiType.caption, color = c.ink)
+                if (!a11y) Text("Website rules need Accessibility. Turn it on in Settings › Blocking.", style = UiType.caption, color = c.ink)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s2)) {
                     OutlinedTextField(
                         siteText, { siteText = it.take(253); siteError = null }, singleLine = true,

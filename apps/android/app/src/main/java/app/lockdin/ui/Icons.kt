@@ -41,7 +41,11 @@ enum class LIcon(val path: String) {
     Pause("M8.5 5.5v13M15.5 5.5v13"),
     Next("M6 6l8.5 6L6 18zM18 5.5v13"),
     Sound("M4 9.5h3.5l4.5-4v13l-4.5-4H4zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"),
-    Devices("M2 4h10v7H2zM5 14h4M7 11v3M13 6h3v9h-3z");
+    Devices("M2 4h10v7H2zM5 14h4M7 11v3M13 6h3v9h-3z"),
+    Person("M12 4a4 4 0 1 0 0 8 4 4 0 1 0 0-8M4.5 20.5a7.5 7.5 0 0 1 15 0"),
+    Shield("M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"),
+    Bell("M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"),
+    Brush("M12 3.5a8.5 8.5 0 1 0 0 17c1.4 0 2-1 1.6-2.2-.5-1.4.4-2.8 1.9-2.8H18a2.5 2.5 0 0 0 2.5-2.5A8.5 8.5 0 0 0 12 3.5M7.5 11h.01M10 7.5h.01M14.5 7.5h.01");
 
     val vector: ImageVector by lazy {
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)

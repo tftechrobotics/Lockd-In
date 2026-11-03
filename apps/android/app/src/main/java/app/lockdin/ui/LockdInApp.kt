@@ -53,7 +53,7 @@ enum class Route(val label: String, val icon: LIcon, val tab: Boolean) {
     SCHEDULE("Schedule", LIcon.Calendar, true),
     PROFILES("Profiles", LIcon.Book, true),
     HISTORY("History", LIcon.History, true),
-    DEVICES("Devices", LIcon.Devices, false),
+    DEVICES("Blocking", LIcon.Shield, false),
     SETTINGS("Settings", LIcon.Gear, false),
 }
 
@@ -74,11 +74,9 @@ fun LockdInApp(
         var editingPreset by remember { mutableStateOf<String?>(null) }
         var editingPlace by remember { mutableStateOf<app.lockdin.engine.Place?>(null) }
         fun go(r: Route) { if (r.tab) lastTab = r; route = r }
-        // The tour shows each tip on its own screen.
-        val tour = store.state.tourStep
-        androidx.compose.runtime.LaunchedEffect(tour) {
-            when (TOUR.getOrNull(tour)?.tab) { "focus" -> go(Route.FOCUS); "schedule" -> go(Route.SCHEDULE); "profiles" -> go(Route.PROFILES); "history" -> go(Route.HISTORY) }
-        }
+        // The tour points at parts of the Focus home screen (owner 2026-11-03), so it runs there.
+        val touring = store.state.tourStep >= 0
+        androidx.compose.runtime.LaunchedEffect(touring) { if (touring) go(Route.FOCUS) }
         // A notification asked for a screen (e.g. Reschedule → Schedule).
         val asked = Resumes.route
         androidx.compose.runtime.LaunchedEffect(asked) {
@@ -136,6 +134,7 @@ fun LockdInApp(
         }
 
         // The chosen background (C2) fills the Focus screen edge to edge, behind the header too.
+        Box(Modifier.fillMaxSize()) {
         val backdrop = if (route == Route.FOCUS && BackdropGate.locked) runCatching { Backdrop.valueOf(store.state.backdrop) }.getOrDefault(Backdrop.NONE) else Backdrop.NONE
         BackdropBox(backdrop, store.state.backdropWords) {
         Scaffold(
@@ -156,13 +155,11 @@ fun LockdInApp(
                         modifier = Modifier.height(24.dp),
                     )
                     Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { go(Route.SETTINGS) }) { LockdIcon(LIcon.Gear, description = "Settings") }
+                    IconButton(onClick = { go(Route.SETTINGS) }, modifier = Modifier.tourTarget("settings")) { LockdIcon(LIcon.Gear, description = "Settings") }
                 }
             },
             bottomBar = {
                 Column {
-                    // Tour tips (setup walkthrough) sit just above the tabs they talk about.
-                    if (store.state.tourStep >= 0) { TourCard(store, Modifier.padding(bottom = Dim.s2)) }
                     HorizontalDivider(color = c.line)
                     NavigationBar(containerColor = c.ground, contentColor = c.ink, tonalElevation = 0.dp) {
                         Route.entries.filter { it.tab }.forEach { r ->
@@ -172,7 +169,7 @@ fun LockdInApp(
                                 onClick = { go(r) },
                                 icon = { LockdIcon(r.icon) },
                                 label = { Text(r.label, style = UiType.caption.copy(fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)) },
-                                modifier = Modifier.testTag("tab-${r.name.lowercase()}"),
+                                modifier = Modifier.testTag("tab-${r.name.lowercase()}").tourTarget("tab-${r.name.lowercase()}"),
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = c.ink, selectedTextColor = c.ink, indicatorColor = c.taupeSoft,
                                     unselectedIconColor = c.inkMuted, unselectedTextColor = c.inkMuted,
@@ -190,7 +187,7 @@ fun LockdInApp(
             ) {
                 Box(Modifier.widthIn(max = 600.dp).fillMaxSize().semantics { contentDescription = "${route.label} screen" }) {
                     when (route) {
-                        Route.FOCUS -> FocusScreen(store, clock, zone, openDevices = { go(Route.DEVICES) }, openSchedule = { go(Route.SCHEDULE) })
+                        Route.FOCUS -> FocusScreen(store, clock, zone, openDevices = { go(Route.DEVICES) }, openSchedule = { go(Route.SCHEDULE) }, openProfile = { editingProfile = it })
                         Route.SCHEDULE -> ScheduleScreen(store, clock.now(), zone, onEdit = { editing = it })
                         Route.PROFILES -> ProfilesScreen(store, onEdit = { editingProfile = it.id }, onEditPreset = { editingPreset = it })
                         Route.DEVICES -> DevicesScreen()
@@ -200,6 +197,8 @@ fun LockdInApp(
                 }
             }
         }
+        }
+        if (touring) TourOverlay(store)
         }
     }
 }

@@ -151,26 +151,28 @@ fun NewProfileDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
 
 @Composable
 fun DevicesScreen() {
-    val c = LocalColors.current
     ScrollScreen {
-        ScreenTitle("Devices")
-        Column {
-            SectionLabel("This phone")
-            SettingsGroup {
-                SettingRow("Blocking", phoneBlockingValue(), icon = LIcon.Phone, supporting = "Covers blocked apps with a block screen during focus. Apps aren’t closed.", chevron = null)
+        ScreenTitle("Blocking")
+        BlockingStatusCard()
+        BlockingSetup()
+    }
+}
+
+/** One line on whether this phone can block right now. */
+@Composable
+fun BlockingStatusCard() {
+    val c = LocalColors.current
+    val missing = rememberMissing()
+    val ready = missing.isEmpty()
+    SettingsGroup {
+        Row(Modifier.fillMaxWidth().padding(Dim.s4), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s3)) {
+            LockdIcon(LIcon.Phone, size = Dim.icon, tint = c.ink)
+            Column(Modifier.weight(1f)) {
+                Text(if (ready) "This phone is ready" else "Blocking isn’t set up", style = UiType.label, color = c.ink)
+                Text(if (ready) "During focus, blocked apps are covered. Nothing is closed." else "Until then, sessions run as a timer only.",
+                    style = UiType.caption, color = c.inkMuted)
             }
-        }
-        Column {
-            SectionLabel("Set up blocking")
-            BlockingSetup()
-        }
-        Column {
-            SectionLabel("Other devices")
-            SettingsGroup {
-                SettingRow("Windows PC", "Not paired", icon = LIcon.Laptop, supporting = "Pairing arrives in a later update")
-                GroupDivider()
-                SettingRow("Browser", "Not paired", icon = LIcon.Devices, supporting = "Plans and times sessions; can’t restrict apps")
-            }
+            Text(phoneBlockingValue(), style = UiType.value, color = c.ink)
         }
     }
 }
@@ -198,44 +200,61 @@ fun SettingsSection(title: String, value: String?, open: Boolean, onToggle: () -
     }
 }
 
+@Composable
+private fun SubHead(text: String) {
+    Text(text, style = UiType.section, color = LocalColors.current.inkMuted, modifier = Modifier.padding(top = Dim.s2).testTag("section-$text").semantics { heading() })
+}
+
 fun commitmentLabel(c: Commitment): String = when (c) {
     Commitment.FLEXIBLE -> "Flexible"
     Commitment.DELAYED -> "Delayed"
     Commitment.LOCKED -> "Locked"
-    else -> "Partner code"
+    else -> "Partner"
 }
 
-/** Ending early (also offered per session in setup). */
+/** Ending early (also offered per session in setup). Partner details show only when Partner is chosen. */
 @Composable
 fun EndingEarlySettings(store: Store) {
     val c = LocalColors.current
+    val st = store.state
     SettingsGroup {
         Column(Modifier.selectableGroup()) {
-            commitmentChoices(store.state).forEachIndexed { i, (v, l) ->
+            commitmentChoices(st, includeUnsetPartner = true).forEachIndexed { i, (v, l) ->
                 if (i > 0) GroupDivider()
-                RadioRow(l, store.state.commitment == v) { store.update { it.copy(commitment = v) } }
+                RadioRow(l, st.commitment == v) { store.update { it.copy(commitment = v) } }
             }
         }
     }
-    Text(endingEarlyNote(store.state.commitment), style = UiType.caption, color = c.inkMuted)
-    Spacer(Modifier.height(Dim.s3))
-    Text("Partner code", style = UiType.label, color = c.ink, modifier = Modifier.semantics { heading() })
-    Text("Someone you trust holds a code that changes every 30 seconds. Sessions set to Partner code end early only with it, or after an emergency wait.",
-        style = UiType.caption, color = c.inkMuted)
-    PartnerSetup(store)
+    Text(endingEarlyNote(st.commitment), style = UiType.caption, color = c.inkMuted)
+    if (st.commitment == Commitment.PARTNER) {
+        Spacer(Modifier.height(Dim.s2))
+        Text("Your partner", style = UiType.label, color = c.ink, modifier = Modifier.semantics { heading() })
+        PartnerSetup(store)
+    }
 }
 
-fun commitmentChoices(s: app.lockdin.state.AppState): List<Pair<Commitment, String>> = buildList {
+fun commitmentChoices(s: app.lockdin.state.AppState, includeUnsetPartner: Boolean = false): List<Pair<Commitment, String>> = buildList {
     add(Commitment.FLEXIBLE to "Flexible: unlock right away")
     add(Commitment.DELAYED to "Delayed: a ${Commitment.DELAYED.overrideDelaySeconds}-second countdown first")
     add(Commitment.LOCKED to "Locked: no unlocking")
-    if (s.partner?.claimed == true) add(Commitment.PARTNER to "Partner code: ${s.partner.name} holds the code")
+    if (s.partner?.claimed == true) add(Commitment.PARTNER to "Partner: ${s.partner.name} approves")
+    else if (includeUnsetPartner) add(Commitment.PARTNER to "Partner: someone you trust approves")
 }
 
 fun endingEarlyNote(c: Commitment): String = when (c) {
-    Commitment.PARTNER -> "Your partner’s code ends a session at once. Without it, an emergency end waits ¾ of the time left, and calls and messages unlock straight away."
+    Commitment.PARTNER -> "To end early, you send your partner a request and they tap Allow. Without them, an emergency end waits ¾ of the time left; calls and messages unlock straight away."
     else -> "Applies to new sessions. Emergency recovery always ends a session immediately."
 }
+
+/** Settings categories (owner 2026-11-03: a home list opening to pages, like the Freedom reference). */
+enum class SettingsPage(val title: String, val icon: LIcon) {
+    ACCOUNT("Account", LIcon.Person), BLOCKING("Blocking", LIcon.Shield), ENDING("Ending early", LIcon.Focus),
+    NOTIFICATIONS("Notifications", LIcon.Bell), SESSIONS("Sessions", LIcon.Clock), LOOK("Look and messages", LIcon.Brush),
+    CALENDAR("Calendar and places", LIcon.Calendar), DATA("History and data", LIcon.History), HELP("Help and tour", LIcon.Info),
+}
+
+/** The open settings page, kept while a full-screen editor (a place, say) is on top. */
+object SettingsNav { var page by mutableStateOf<SettingsPage?>(null) }
 
 @Composable
 fun SettingsScreen(
@@ -247,21 +266,71 @@ fun SettingsScreen(
     var confirm by remember { mutableStateOf(false) }
     var confirmHistory by remember { mutableStateOf(false) }
     var exportError by remember { mutableStateOf<String?>(null) }
-    // Owner 2026-11-02: one collapsible section per category, so the page isn't a wall of text.
-    var open by rememberSaveable { mutableStateOf("") }
-    fun toggle(k: String) { open = if (open == k) "" else k }
     val st = store.state
-    ScrollScreen {
-        ScreenTitle("Settings")
-        SettingsGroup {
-            SettingsSection("Appearance", when (st.theme) { ThemeChoice.SYSTEM -> "System"; ThemeChoice.LIGHT -> "Light"; ThemeChoice.DARK -> "Dark" }, open == "appearance", { toggle("appearance") }) {
+    val page = SettingsNav.page
+    androidx.activity.compose.BackHandler(enabled = page != null) { SettingsNav.page = null }
+
+    fun summary(p: SettingsPage): String? = when (p) {
+        SettingsPage.ACCOUNT -> st.account?.email ?: "Not signed in"
+        SettingsPage.BLOCKING -> null
+        SettingsPage.ENDING -> commitmentLabel(st.commitment)
+        SettingsPage.NOTIFICATIONS -> if (st.reminders.notificationsOn) "On" else "Off"
+        SettingsPage.SESSIONS -> "${st.last.focusMinutes} min"
+        SettingsPage.LOOK -> when (st.theme) { ThemeChoice.SYSTEM -> "System"; ThemeChoice.LIGHT -> "Light"; ThemeChoice.DARK -> "Dark" }
+        SettingsPage.CALENDAR -> if (st.calendarOn) "Calendar on" else null
+        SettingsPage.DATA, SettingsPage.HELP -> null
+    }
+
+    if (page == null) {
+        ScrollScreen {
+            ScreenTitle("Settings")
+            val groups = listOf(
+                listOf(SettingsPage.ACCOUNT, SettingsPage.BLOCKING, SettingsPage.ENDING, SettingsPage.NOTIFICATIONS),
+                listOf(SettingsPage.SESSIONS, SettingsPage.LOOK, SettingsPage.CALENDAR),
+                listOf(SettingsPage.DATA, SettingsPage.HELP),
+            )
+            groups.forEach { g ->
+                SettingsGroup {
+                    g.forEachIndexed { i, p ->
+                        if (i > 0) GroupDivider()
+                        Box(Modifier.testTag("settings-${p.title}")) {
+                            SettingRow(p.title, if (p == SettingsPage.BLOCKING) phoneBlockingValue() else summary(p) ?: "", icon = p.icon, onClick = { SettingsNav.page = p })
+                        }
+                    }
+                }
+            }
+        }
+    } else ScrollScreen {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = Dim.s1)) {
+            androidx.compose.material3.IconButton(onClick = { SettingsNav.page = null }) { LockdIcon(LIcon.Back, description = "Back to Settings") }
+            ScreenTitle(page.title)
+        }
+        when (page) {
+            SettingsPage.ACCOUNT -> AccountSettings(store)
+            SettingsPage.BLOCKING -> { BlockingStatusCard(); BlockingSetup() }
+            SettingsPage.ENDING -> EndingEarlySettings(store)
+            SettingsPage.NOTIFICATIONS -> RemindersSettings(store)
+            SettingsPage.SESSIONS -> {
+                SubHead("Starting a session")
+                SettingsGroup {
+                    SwitchRow("Haptic clicks", "The dial clicks as it turns when you start focus. Follows your phone’s touch vibration setting.",
+                        st.startHaptics) { v -> store.update { it.copy(startHaptics = v) } }
+                    GroupDivider()
+                    SwitchRow("Click sound", "A quiet mechanical click. Follows your phone’s touch sounds and silent mode.",
+                        st.startSound) { v -> store.update { it.copy(startSound = v) } }
+                }
+                SubHead("New session defaults")
+                DefaultsSettings(store)
+                SubHead("Check-ins and coaching")
+                CoachingSettings(store)
+            }
+            SettingsPage.LOOK -> {
+                SubHead("Appearance")
                 SegmentedChoice(listOf(ThemeChoice.SYSTEM to "System", ThemeChoice.LIGHT to "Light", ThemeChoice.DARK to "Dark"), st.theme,
                     { v -> store.update { it.copy(theme = v) } }, label = "Appearance")
-            }
-            GroupDivider()
-            SettingsSection("Look and background", runCatching { Backdrop.valueOf(st.backdrop).label }.getOrDefault("None"), open == "look", { toggle("look") }) { LookSettings(store) }
-            GroupDivider()
-            SettingsSection("Messages", when (st.tone) { Tone.CALM -> "Calm"; Tone.DIRECT -> "Direct"; Tone.PLAYFUL -> "Playful"; Tone.CUSTOM -> "My own words"; Tone.QUIET -> "Off" }, open == "messages", { toggle("messages") }) {
+                SubHead("Look and background")
+                LookSettings(store)
+                SubHead("Messages")
                 SettingsGroup {
                     Column(Modifier.selectableGroup()) {
                         listOf(Tone.CALM to "Calm", Tone.DIRECT to "Direct", Tone.PLAYFUL to "Playful", Tone.CUSTOM to "My own words", Tone.QUIET to "Off").forEachIndexed { i, (v, l) ->
@@ -275,30 +344,13 @@ fun SettingsScreen(
                 if (st.tone == Tone.CUSTOM) MessageListEditor(store)
                 if (st.tone != Tone.QUIET) AppMessagesEditor(store)
             }
-            GroupDivider()
-            SettingsSection("Notifications", if (st.reminders.notificationsOn) "On" else "Off", open == "notifications", { toggle("notifications") }) { RemindersSettings(store) }
-            GroupDivider()
-            SettingsSection("Ending early", commitmentLabel(st.commitment), open == "ending", { toggle("ending") }) { EndingEarlySettings(store) }
-            GroupDivider()
-            SettingsSection("Starting a session", if (st.startHaptics) "Haptics on" else "Haptics off", open == "starting", { toggle("starting") }) {
-                SettingsGroup {
-                    SwitchRow("Haptic clicks", "The dial clicks as it turns when you start focus. Follows your phone’s touch vibration setting.",
-                        st.startHaptics) { v -> store.update { it.copy(startHaptics = v) } }
-                    GroupDivider()
-                    SwitchRow("Click sound", "A quiet mechanical click. Follows your phone’s touch sounds and silent mode.",
-                        st.startSound) { v -> store.update { it.copy(startSound = v) } }
-                }
+            SettingsPage.CALENDAR -> {
+                SubHead("Calendar")
+                CalendarSettings(store)
+                SubHead("Places")
+                PlacesSettings(store, onEditPlace)
             }
-            GroupDivider()
-            SettingsSection("New session defaults", "${st.last.focusMinutes} min", open == "defaults", { toggle("defaults") }) { DefaultsSettings(store) }
-            GroupDivider()
-            SettingsSection("Check-ins and coaching", if (st.checkInMinutes > 0) "Every ${st.checkInMinutes} min" else "Off", open == "coaching", { toggle("coaching") }) { CoachingSettings(store) }
-            GroupDivider()
-            SettingsSection("Calendar", if (st.calendarOn) "On" else "Off", open == "calendar", { toggle("calendar") }) { CalendarSettings(store) }
-            GroupDivider()
-            SettingsSection("Places", if (st.places.isEmpty()) "None" else "${st.places.size} place${if (st.places.size == 1) "" else "s"}", open == "places", { toggle("places") }) { PlacesSettings(store, onEditPlace) }
-            GroupDivider()
-            SettingsSection("History and data", null, open == "data", { toggle("data") }) {
+            SettingsPage.DATA -> {
                 SettingsGroup {
                     SettingMenuRow(
                         "Keep history", app.lockdin.engine.History.RETENTION_CHOICES.map { it to if (it == 0) "Forever" else "$it days" },
@@ -318,16 +370,17 @@ fun SettingsScreen(
                 exportError?.let { Text(it, style = UiType.caption, color = c.danger) }
                 PrivacySettings()
                 SettingsGroup {
-                    SettingRow("Stored on this phone", "", supporting = "Excluded from backups. Only a partner code setup uses the internet.", chevron = null)
+                    SettingRow("Stored on this phone", "", supporting = "Excluded from backups. Your account and a partner setup use the internet.", chevron = null)
                     GroupDivider()
                     Row(Modifier.padding(horizontal = Dim.s2)) { TextAction("Delete Lockd In data", { confirm = true }, danger = true) }
                 }
             }
-            GroupDivider()
-            SettingsSection("Help and tour", null, open == "help", { toggle("help") }) {
-                SettingsGroup {
-                    SettingRow("Replay the tour", "", supporting = "A few tips on the main screens. You can end it any time.", onClick = { store.update { it.copy(tourStep = 0) } })
-                }
+            SettingsPage.HELP -> SettingsGroup {
+                SettingRow("Replay the tour", "", supporting = "A few tips on the main screen. You can end it any time.", onClick = {
+                    SettingsNav.page = null
+                    store.update { it.copy(tourStep = 0) }
+                    Resumes.openRoute("focus")
+                })
             }
         }
     }
@@ -701,7 +754,7 @@ private fun PrivacySettings() {
         }
         Spacer(Modifier.height(Dim.s2))
         Text(
-            "Everything Lockd In knows stays on this phone and is excluded from backups: your settings, schedule, profiles, presets, history and saved places. Nothing is sent anywhere unless you set up a partner code: then the Lockd In service keeps your partner’s first name, an encrypted copy of the code key, and messages you send to admin. Tap a permission to change it in Android.",
+            "Everything Lockd In knows stays on this phone and is excluded from backups: your settings, schedule, profiles, presets, history and saved places. Only two things use the internet. With an account, the Lockd In service keeps your email, first name and a scrambled copy of your password. With a partner, it keeps your partner’s first name, an encrypted key, requests to end a session early, and messages you send to admin. Tap a permission to change it in Android.",
             style = UiType.caption, color = c.inkMuted,
         )
     }
