@@ -22,6 +22,8 @@ Next: Apple Music embedded playback (MusicKit; owner pays $99/yr) when the owner
   CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID. MASTER_KEY is a Worker secret created once by the workflow — never
   rotate it without re-encrypting keys. Admin console at `/admin` is off until the owner adds repo secret
   LOCKDIN_ADMIN_PASSWORD and reruns the workflow. Domain switch later (change `PARTNER_URL` in app/build.gradle.kts).
+- Build 34638d7 (sent to owner): CI run 41594500342 passed build/unit/lint, 67/67 UI tests and the full blocking E2E on the
+  API 35 emulator. E2E harness now seeds the "study" profile itself (new installs have none).
 - Not yet done: two-phone partner test (checklist 28), Play Data safety + privacy policy for the INTERNET permission.
 
 **Where things stand (2026-11-01, Android-only — R40)**
