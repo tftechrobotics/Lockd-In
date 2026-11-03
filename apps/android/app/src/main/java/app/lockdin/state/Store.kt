@@ -51,6 +51,8 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
         occurrenceKey: String? = null, presetId: String? = null,
         /** Choices made at setup for this session only (collection, allowance); null = the profile's. */
         audio: ProfileAudio? = null,
+        /** How this session may end early; null = the default from Settings. */
+        commitment: app.lockdin.enforce.Commitment? = null,
     ) = update { s0 ->
         leaving(s0)
         val s = keepQuestionTimes(s0)
@@ -61,7 +63,7 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
                 newId(), now, segments, text, profileId, SessionControls(),
                 rules = sessionRules(s.profiles.firstOrNull { it.id == profileId }, audio),
                 audio = audio ?: s.profiles.firstOrNull { it.id == profileId }?.audio ?: ProfileAudio(),
-                commitment = s.commitment,
+                commitment = commitment ?: s.commitment,
                 occurrenceKey = occurrenceKey,
                 presetId = presetId,
             ),
@@ -157,7 +159,8 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
                 val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 val raw = prefs.getString(KEY_V2, null) ?: prefs.getString(KEY_V1, null)
                 // A new install (nothing saved yet) starts with the short introduction.
-                val initial = if (raw == null) AppState(onboarded = false) else StateCodec.decode(raw)
+                // No ready-made profiles (owner 2026-11-02): the first one is made during setup.
+                val initial = if (raw == null) AppState(onboarded = false, profiles = emptyList(), tourStep = -1) else StateCodec.decode(raw)
                 Store(initial) { prefs.edit().putString(KEY_V2, it).commit() }.also { shared = it }
             }
         }

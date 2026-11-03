@@ -17,10 +17,18 @@ data class Track(val title: String, val res: String)
  * DEVELOPMENT RECORDINGS: synthesised by design/audio/gen.py (owned by the project). See
  * docs/audio-assets.md for each file's source, licence and the content still needed for release.
  */
-enum class AudioCollection(val label: String, val blurb: String, val tracks: List<Track>, val loop: Boolean) {
-    PIANO("Piano", "Slow solo piano", listOf(Track("Piano I", "piano_1"), Track("Piano II", "piano_2"), Track("Piano III", "piano_3")), loop = false),
-    STRINGS("Strings", "Sustained string chords", listOf(Track("Strings I", "strings_1"), Track("Strings II", "strings_2"), Track("Strings III", "strings_3")), loop = false),
-    RAIN("Rain", "Steady rain, no thunder", listOf(Track("Rain", "rain_1")), loop = true),
+enum class AudioGroup(val label: String) { STUDY("Study music"), CHILL("Quiet and chill") }
+
+enum class AudioCollection(val label: String, val blurb: String, val tracks: List<Track>, val loop: Boolean, val group: AudioGroup) {
+    PIANO("Piano", "Slow solo piano", listOf(Track("Piano I", "piano_1"), Track("Piano II", "piano_2"), Track("Piano III", "piano_3")), false, AudioGroup.STUDY),
+    STRINGS("Strings", "Sustained string chords", listOf(Track("Strings I", "strings_1"), Track("Strings II", "strings_2"), Track("Strings III", "strings_3")), false, AudioGroup.STUDY),
+    LOFI("Lo-fi", "Soft chords and a lazy beat", listOf(Track("Lo-fi I", "lofi_1"), Track("Lo-fi II", "lofi_2")), false, AudioGroup.STUDY),
+    AMBIENT("Ambient", "Slow, wide pads with no beat", listOf(Track("Ambient I", "ambient_1"), Track("Ambient II", "ambient_2")), false, AudioGroup.STUDY),
+    QUIET_PIANO("Quiet piano", "Sparse, very soft piano", listOf(Track("Quiet piano I", "quietpiano_1"), Track("Quiet piano II", "quietpiano_2")), false, AudioGroup.CHILL),
+    RAIN("Rain", "Steady rain, no thunder", listOf(Track("Rain", "rain_1")), true, AudioGroup.CHILL),
+    OCEAN("Ocean", "Slow waves", listOf(Track("Ocean", "ocean_1")), true, AudioGroup.CHILL),
+    FOREST("Forest", "Wind in the trees, distant birds", listOf(Track("Forest", "forest_1")), true, AudioGroup.CHILL),
+    BROWN_NOISE("Brown noise", "Low, even noise that masks sound", listOf(Track("Brown noise", "brown_1")), true, AudioGroup.CHILL),
     ;
     /** Shown with the collections until produced recordings replace the generated ones. */
     val development: Boolean get() = true

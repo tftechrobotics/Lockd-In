@@ -23,6 +23,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -156,21 +159,36 @@ fun CalendarSettings(store: Store) {
                 else ask.launch(Manifest.permission.READ_CALENDAR)
             }
             if (store.state.calendarOn && permitted && cals.isNotEmpty()) {
-                cals.forEach { cal ->
+                // One collapsible group per account (owner 2026-11-02), so several accounts don't
+                // turn into one long list.
+                cals.groupBy { it.account.ifBlank { "This phone" } }.forEach { (account, list) ->
                     GroupDivider()
-                    val on = cal.id !in store.state.calendarHidden
+                    val shown = list.count { it.id !in store.state.calendarHidden }
+                    var expanded by rememberSaveable(account) { mutableStateOf(false) }
                     Row(
-                        Modifier.fillMaxWidth().heightIn(min = Dim.control + 4.dp)
-                            .toggleable(on, role = Role.Checkbox) { v ->
-                                store.update { s -> s.copy(calendarHidden = if (v) s.calendarHidden - cal.id else s.calendarHidden + cal.id) }
-                            }.padding(horizontal = Dim.s4),
+                        Modifier.fillMaxWidth().heightIn(min = Dim.control + 8.dp)
+                            .clickable(role = Role.Button, onClickLabel = if (expanded) "Close" else "Open") { expanded = !expanded }
+                            .padding(horizontal = Dim.s4),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text(cal.name, style = UiType.body, color = c.ink)
-                            if (cal.account.isNotBlank()) Text(cal.account, style = UiType.caption, color = c.inkMuted)
+                            Text(account, style = UiType.body, color = c.ink, maxLines = 1)
+                            Text(if (shown == 0) "Not used" else "$shown of ${list.size} calendar${if (list.size == 1) "" else "s"}", style = UiType.caption, color = c.inkMuted)
                         }
-                        Checkbox(on, onCheckedChange = null, colors = CheckboxDefaults.colors(checkedColor = c.ink, uncheckedColor = c.controlLine, checkmarkColor = c.onInk))
+                        LockdIcon(if (expanded) LIcon.ChevronUp else LIcon.ChevronDown, size = 18.dp, tint = c.inkMuted)
+                    }
+                    if (expanded) list.forEach { cal ->
+                        val on = cal.id !in store.state.calendarHidden
+                        Row(
+                            Modifier.fillMaxWidth().heightIn(min = Dim.control + 4.dp)
+                                .toggleable(on, role = Role.Checkbox) { v ->
+                                    store.update { s -> s.copy(calendarHidden = if (v) s.calendarHidden - cal.id else s.calendarHidden + cal.id) }
+                                }.padding(start = Dim.s6, end = Dim.s4),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(cal.name, style = UiType.body, color = c.ink, modifier = Modifier.weight(1f))
+                            Checkbox(on, onCheckedChange = null, colors = CheckboxDefaults.colors(checkedColor = c.ink, uncheckedColor = c.controlLine, checkmarkColor = c.onInk))
+                        }
                     }
                 }
             }

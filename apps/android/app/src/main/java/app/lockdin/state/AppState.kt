@@ -25,6 +25,12 @@ enum class Tone { CALM, DIRECT, PLAYFUL, CUSTOM, QUIET }
 /** `rules` are this phone's own app rules for the profile (each device keeps its own). */
 data class Profile(val id: String, val name: String, val description: String, val builtIn: Boolean, val rules: AppRules = AppRules(), val audio: ProfileAudio = ProfileAudio())
 
+/**
+ * The partner set up for partner-code sessions (R49). `accountId` is this phone's account on the
+ * Lockd In service; `linkId` the partner's private link; `claimed` once the partner set their PIN.
+ */
+data class Partner(val name: String, val accountId: String, val linkId: String, val claimed: Boolean = false)
+
 /** A profile's study audio and music-app access (R48); defined in app.lockdin.audio. */
 typealias ProfileAudio = app.lockdin.audio.ProfileAudio
 
@@ -99,6 +105,10 @@ data class AppState(
     val presets: List<Preset> = emptyList(),
     /** First-run introduction seen (new installs start with false; see Store.get). */
     val onboarded: Boolean = true,
+    /** Tour tips on the main screens: the step showing, or -1 when the tour isn't running. */
+    val tourStep: Int = -1,
+    /** Accountability partner (R49). The code key itself is never here: it's in Android Keystore. */
+    val partner: Partner? = null,
     /** Location routines (E): places, and a switch that pauses all of them. */
     val places: List<app.lockdin.engine.Place> = emptyList(),
     val placesPaused: Boolean = false,
@@ -162,6 +172,8 @@ object StateCodec {
         }))
         put("historyDays", s.historyDays)
         put("onboarded", s.onboarded)
+        put("tourStep", s.tourStep)
+        s.partner?.let { p -> put("partner", JSONObject().put("name", p.name).put("accountId", p.accountId).put("linkId", p.linkId).put("claimed", p.claimed)) }
         put("places", JSONArray(s.places.map { p ->
             JSONObject().put("id", p.id).put("name", p.name).put("lat", p.lat).put("lon", p.lon).put("radiusM", p.radiusM)
                 .put("profileId", p.profileId).put("days", JSONArray(p.days.map { it.value }.sorted()))
@@ -220,7 +232,7 @@ object StateCodec {
                     val id = p.optString("id"); val name = p.optString("name")
                     if (id.isBlank() || name.isBlank()) null
                     else Profile(id, name.take(40), p.optString("description").take(120), p.optBoolean("builtIn"), rulesOf(p.optJSONObject("rules")), audioOf(p.optJSONObject("audio")))
-                }?.takeIf { it.isNotEmpty() } ?: base.profiles,
+                } ?: base.profiles,
                 schedule = o.optJSONArray("schedule")?.objects()?.mapNotNull(::scheduleOf) ?: emptyList(),
                 last = o.optJSONObject("last")?.let {
                     LastChoice(it.optInt("focusMinutes", 40), it.optInt("breakMinutes", 10), it.optInt("rounds", 1), it.optString("profileId", "study"))
@@ -233,6 +245,13 @@ object StateCodec {
                 presets = o.optJSONArray("presets")?.objects()?.mapNotNull(::presetOf)?.take(MAX_PRESETS) ?: emptyList(),
                 historyDays = o.optInt("historyDays", 365).let { if (it in app.lockdin.engine.History.RETENTION_CHOICES) it else 365 },
                 onboarded = o.optBoolean("onboarded", true),
+                tourStep = o.optInt("tourStep", -1).coerceIn(-1, 10),
+                partner = o.optJSONObject("partner")?.let { p ->
+                    val acc = p.optString("accountId"); val link = p.optString("linkId")
+                    if (acc.matches(Regex("[A-Za-z0-9_-]{8,64}")) && link.matches(Regex("[A-Za-z0-9_-]{8,64}")))
+                        Partner(p.optString("name").trim().take(40).ifEmpty { "Partner" }, acc, link, p.optBoolean("claimed", false))
+                    else null
+                },
                 places = o.optJSONArray("places")?.objects()?.mapNotNull(::placeOf)?.take(20) ?: emptyList(),
                 placesPaused = o.optBoolean("placesPaused", false),
                 customMessages = o.optJSONArray("customMessages")?.let { a -> (0 until a.length()).mapNotNull { a.optString(it).trim().take(140).ifEmpty { null } } }?.take(10) ?: emptyList(),
@@ -347,7 +366,7 @@ object StateCodec {
     private const val MAX_STARTS = 40
     private const val MAX_PRESETS = 30
     // Earlier pattern backgrounds (PAPER, LINEN, CONTOURS, HILLS) were replaced by scenes; they read as NONE.
-    private val BACKDROPS = setOf("NONE", "LIBRARY", "MOUNTAINS", "WORDS", "BLUEPRINT", "PHOTO")
+    private val BACKDROPS = setOf("NONE", "LIBRARY", "MOUNTAINS", "WORDS", "PHOTO")
 
     private fun activeJson(a: ActiveSession): JSONObject = JSONObject().put("id", a.id).put("start", a.start)
                 .put("segments", JSONArray(a.segments.map { JSONObject().put("kind", it.kind.name).put("minutes", it.minutes) }))

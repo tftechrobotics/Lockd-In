@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Status-bar icon: the lock mark as a single white silhouette. -->
+<!-- Status-bar icon: the Lockd In lock mark (design/assets/lock-mark.svg) as a white silhouette. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp" android:height="24dp"
-    android:viewportWidth="24" android:viewportHeight="24">
-    <path android:fillColor="#FFFFFFFF"
-        android:fillType="evenOdd"
-        android:pathData="M12,2a5,5 0,0 0,-5,5v3.2a7,7 0,1 0,10,0V7a5,5 0,0 0,-5,-5zM9.2,7a2.8,2.8 0,0 1,5.6,0v1.8a7,7 0,0 0,-5.6,0zM12,12.2a4,4 0,1 1,0,8a4,4 0,1 1,0,-8z" />
+    android:viewportWidth="80" android:viewportHeight="80">
+    <group android:translateX="12" android:translateY="-28">
+        <path android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M9.07,62.65A25.4,25.4 0,1 0,46.73 62.65A4.06,4.06 0,0 1,45.68 59.93V48.36A17.78,17.78 0,0 0,10.12 48.36V59.93A4.06,4.06 0,0 1,9.07 62.65ZM20.28,55.47V48.36A7.62,7.62 0,0 1,35.52 48.36V55.47A25.4,25.4 0,0 0,20.28 55.47ZM47.71,79.7A19.81,19.81 0,1 0,8.09 79.7A19.81,19.81 0,1 0,47.71 79.7ZM42.63,79.7A14.73,14.73 0,1 0,13.17 79.7A14.73,14.73 0,1 0,42.63 79.7Z" />
+    </group>
 </vector>

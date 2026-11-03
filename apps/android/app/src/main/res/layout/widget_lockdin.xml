@@ -1,79 +1,102 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Home-screen widget (roadmap step 4, C). Plain RemoteViews; colours follow light/dark. -->
+<!-- Home-screen widget: a small version of the main screen's lock (owner 2026-11-02), with the
+     countdown (or the time) in its face and the session beside it. Plain RemoteViews. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="14dp">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+    <FrameLayout
+        android:layout_width="92dp"
+        android:layout_height="116dp">
 
         <ImageView
             android:id="@+id/widget_lock"
-            android:layout_width="16dp"
-            android:layout_height="20dp"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:importantForAccessibility="no"
-            android:src="@drawable/lock_mark" />
+            android:scaleType="fitCenter" />
+
+        <Chronometer
+            android:id="@+id/widget_countdown"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="34dp"
+            android:gravity="center"
+            android:textColor="@color/widget_ink"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <TextClock
+            android:id="@+id/widget_clock"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="34dp"
+            android:format12Hour="h:mm"
+            android:format24Hour="H:mm"
+            android:gravity="center"
+            android:textColor="@color/widget_ink"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
 
         <TextView
             android:id="@+id/widget_label"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
             android:maxLines="1"
             android:text="Next session"
             android:textColor="@color/widget_muted"
             android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:text="Nothing planned"
+            android:textColor="@color/widget_ink"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_detail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:maxLines="2"
+            android:textColor="@color/widget_muted"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/widget_action"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/widget_button"
+            android:gravity="center"
+            android:minWidth="48dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:text="New session"
+            android:textColor="@color/widget_bg"
+            android:textSize="14sp"
+            android:textStyle="bold" />
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/widget_title"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:text="Nothing planned"
-        android:textColor="@color/widget_ink"
-        android:textSize="18sp"
-        android:textStyle="bold" />
-
-    <Chronometer
-        android:id="@+id/widget_countdown"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textColor="@color/widget_ink"
-        android:textSize="30sp"
-        android:visibility="gone" />
-
-    <TextView
-        android:id="@+id/widget_detail"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:maxLines="2"
-        android:textColor="@color/widget_muted"
-        android:textSize="13sp" />
-
-    <TextView
-        android:id="@+id/widget_action"
-        android:layout_width="wrap_content"
-        android:layout_height="40dp"
-        android:layout_marginTop="10dp"
-        android:background="@drawable/widget_button"
-        android:gravity="center"
-        android:minWidth="48dp"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:text="New session"
-        android:textColor="@color/widget_bg"
-        android:textSize="14sp"
-        android:textStyle="bold" />
 </LinearLayout>

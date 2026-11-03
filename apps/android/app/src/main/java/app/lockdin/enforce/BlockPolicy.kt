@@ -29,6 +29,11 @@ enum class Commitment(val overrideDelaySeconds: Int?) {
     DELAYED(90),
     /** No unlock or early end; only emergency recovery. */
     LOCKED(null),
+    /**
+     * No unlock without the partner's code (R49). Emergency end waits 3/4 of the remaining focus
+     * time, with calls and messages unlocked during the wait.
+     */
+    PARTNER(null),
 }
 
 /** What this phone reports about restriction right now. Only PROTECTING may close the lock. */

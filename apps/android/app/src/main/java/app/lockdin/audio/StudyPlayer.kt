@@ -71,6 +71,15 @@ object StudyPlayer {
         "strings_1" -> R.raw.strings_1
         "strings_2" -> R.raw.strings_2
         "strings_3" -> R.raw.strings_3
+        "lofi_1" -> R.raw.lofi_1
+        "lofi_2" -> R.raw.lofi_2
+        "ambient_1" -> R.raw.ambient_1
+        "ambient_2" -> R.raw.ambient_2
+        "quietpiano_1" -> R.raw.quietpiano_1
+        "quietpiano_2" -> R.raw.quietpiano_2
+        "ocean_1" -> R.raw.ocean_1
+        "forest_1" -> R.raw.forest_1
+        "brown_1" -> R.raw.brown_1
         else -> R.raw.rain_1
     }
 

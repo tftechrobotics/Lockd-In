@@ -80,6 +80,7 @@ import app.lockdin.state.ActiveSession
 import app.lockdin.state.AppClock
 import app.lockdin.state.LastChoice
 import app.lockdin.state.Store
+import app.lockdin.state.Profile
 import kotlinx.coroutines.delay
 import app.lockdin.enforce.AppRules
 import app.lockdin.enforce.EnforcerStatus
@@ -235,6 +236,16 @@ fun WithActionBar(content: @Composable () -> Unit, actions: @Composable () -> Un
     }
 }
 
+/**
+ * The lock's size on the session screen: as large as before on tall phones, smaller on short ones,
+ * so the session fits one screen without scrolling (owner 2026-11-02). Large text may still scroll.
+ */
+@Composable
+private fun sessionLockWidth(): androidx.compose.ui.unit.Dp {
+    val h = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp
+    return (h * 0.26f).coerceIn(150f, 220f).dp
+}
+
 /** One line about this session's audio, with the way to choose music first (R48). */
 @Composable
 private fun AudioSummary(a: app.lockdin.state.ProfileAudio, onChoose: () -> Unit) {
@@ -272,9 +283,13 @@ private fun ChooseMusicDialog(initial: app.lockdin.state.ProfileAudio, onDismiss
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
                 Text("Nothing starts until you start focus.", style = UiType.caption, color = c.inkMuted)
                 Text("Study audio", style = UiType.label, color = c.ink)
-                ProfileChips(listOf("off" to "Off") + app.lockdin.audio.AudioCollection.values().map { it.name to it.label }, if (a.builtIn) a.collection.name else "off") { k ->
-                    app.lockdin.audio.StudyPlayer.stopPreview()
-                    set(if (k == "off") a.copy(builtIn = false) else a.copy(builtIn = true, collection = app.lockdin.audio.AudioCollection.valueOf(k)))
+                ProfileChips(listOf("off" to "Off"), if (a.builtIn) "" else "off") { app.lockdin.audio.StudyPlayer.stopPreview(); set(a.copy(builtIn = false)) }
+                app.lockdin.audio.AudioGroup.values().forEach { g ->
+                    Text(g.label, style = UiType.caption, color = c.inkMuted)
+                    ProfileChips(app.lockdin.audio.AudioCollection.values().filter { it.group == g }.map { it.name to it.label }, if (a.builtIn) a.collection.name else "") { k ->
+                        app.lockdin.audio.StudyPlayer.stopPreview()
+                        set(a.copy(builtIn = true, collection = app.lockdin.audio.AudioCollection.valueOf(k)))
+                    }
                 }
                 if (a.builtIn) {
                     val previewing = app.lockdin.audio.StudyPlayer.previewing == a.collection
@@ -288,20 +303,27 @@ private fun ChooseMusicDialog(initial: app.lockdin.state.ProfileAudio, onDismiss
                             modifier = Modifier.semantics { contentDescription = "Play when focus starts" })
                     }
                 }
-                if (a.access != app.lockdin.audio.MusicAccess.NORMAL && a.musicApps.isNotEmpty()) {
-                    Text("Music apps", style = UiType.label, color = c.ink)
-                    if (a.access == app.lockdin.audio.MusicAccess.LIMITED) {
+                // Music apps (R48 + owner 2026-11-02): this only turns access on for the session and
+                // sets the browsing time. The music itself is chosen inside the music app.
+                if (initial.musicApps.isNotEmpty() && initial.access != app.lockdin.audio.MusicAccess.NORMAL) {
+                    val on = a.access != app.lockdin.audio.MusicAccess.NORMAL
+                    val names = initial.musicApps.sorted().joinToString(", ") { app.lockdin.enforce.InstalledApps.label(ctx, it) }
+                    androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Music apps during focus", style = UiType.body, color = c.ink)
+                            Text(names, style = UiType.caption, color = c.inkMuted)
+                        }
+                        androidx.compose.material3.Switch(on, { set(a.copy(access = if (it) initial.access else app.lockdin.audio.MusicAccess.NORMAL)) },
+                            colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = c.ink, checkedThumbColor = c.onInk),
+                            modifier = Modifier.semantics { contentDescription = "Music apps during focus" })
+                    }
+                    if (on && a.access == app.lockdin.audio.MusicAccess.LIMITED) {
                         Text("Browsing time this session", style = UiType.caption, color = c.inkMuted)
                         ProfileChips(app.lockdin.audio.MusicAllowance.CHOICES.map { it.toString() to if (it == app.lockdin.audio.MusicAllowance.DEFAULT_MIN) "$it min (suggested)" else "$it min" }, a.allowanceMin.toString()) {
                             set(a.copy(allowanceMin = it.toInt()))
                         }
                     }
-                    Text("Pick your music now; time before focus starts isn’t counted.", style = UiType.caption, color = c.inkMuted)
-                    a.musicApps.sorted().forEach { pkg ->
-                        TextAction("Open ${app.lockdin.enforce.InstalledApps.label(ctx, pkg)}", {
-                            ctx.packageManager.getLaunchIntentForPackage(pkg)?.let { runCatching { ctx.startActivity(it) } }
-                        })
-                    }
+                    if (on) Text("You choose what to play inside the music app.", style = UiType.caption, color = c.inkMuted)
                 }
             }
         },
@@ -322,7 +344,10 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
     var focus by rememberSaveable { mutableStateOf(s.last.focusMinutes) }
     var breakMin by rememberSaveable { mutableStateOf(if (s.last.rounds > 1) s.last.breakMinutes else 0) }
     var rounds by rememberSaveable { mutableStateOf(maxOf(2, s.last.rounds)) }
-    var profileId by rememberSaveable { mutableStateOf(s.last.profileId) }
+    var profileId by rememberSaveable { mutableStateOf(s.last.profileId.takeIf { id -> s.profiles.any { it.id == id } } ?: s.profiles.firstOrNull()?.id ?: "") }
+    var namingProfile by remember { mutableStateOf(false) }
+    var commitment by remember { mutableStateOf(s.commitment.takeIf { it != app.lockdin.enforce.Commitment.PARTNER || s.partner?.claimed == true } ?: app.lockdin.enforce.Commitment.LOCKED) }
+    var pickingCommitment by remember { mutableStateOf(false) }
     var customOpen by rememberSaveable { mutableStateOf(s.last.focusMinutes !in LENGTHS) }
     var roundsOpen by rememberSaveable { mutableStateOf(false) }
     var presetId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -408,8 +433,26 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
 
             Column(verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
                 Question("Which profile?")
-                ProfileChips(s.profiles.map { it.id to it.name }, profileId) { profileId = it; audioOverride = null }
+                ProfileChips(s.profiles.map { it.id to it.name } + ("+new" to "+ New profile"), profileId) {
+                    if (it == "+new") namingProfile = true else { profileId = it; audioOverride = null }
+                }
                 AudioSummary(sessionAudio) { choosingMusic = true }
+                // How this session can end early (owner 2026-11-02: Locked and Partner code here too).
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Ending early: " + commitmentLabel(commitment).lowercase().replaceFirstChar { it.uppercase() },
+                        style = UiType.caption, color = c.inkMuted, modifier = Modifier.weight(1f))
+                    Box {
+                        TextAction("Change", { pickingCommitment = true })
+                        androidx.compose.material3.DropdownMenu(pickingCommitment, { pickingCommitment = false }, containerColor = c.surface) {
+                            commitmentChoices(s).forEach { (v, l) ->
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(l + if (v == commitment) " ✓" else "", style = UiType.body, color = c.ink) },
+                                    onClick = { commitment = v; pickingCommitment = false },
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             TextAction("Save as preset", { savingPreset = true })
@@ -457,7 +500,7 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
                     store.startSession(
                         clock.now(), segments, intention, profileId,
                         LastChoice(focus, if (breakMin > 0) breakMin else s.last.breakMinutes, effectiveRounds, profileId),
-                        presetId = presetId, audio = audioOverride,
+                        presetId = presetId, audio = audioOverride, commitment = commitment,
                     )
                     // The start sequence plays once, for this manual start only.
                     store.state.active?.let { StartIntro.request(it.id) }
@@ -465,6 +508,11 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
             })
         },
     )
+    if (namingProfile) NewProfileDialog(onDismiss = { namingProfile = false }) { n ->
+        val p = Profile(Store.newId(), n, "Only what you add", false)
+        store.update { it.copy(profiles = it.profiles + p) }
+        profileId = p.id; audioOverride = null; namingProfile = false
+    }
     if (choosingMusic) ChooseMusicDialog(sessionAudio, onDismiss = { app.lockdin.audio.StudyPlayer.stopPreview(); choosingMusic = false }) {
         audioOverride = it
     }
@@ -706,7 +754,7 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
         Spacer(Modifier.height(Dim.s4))
         ClockLock(
             state, remaining, phase.end - phase.start, locked = protected, label = label,
-            caption = if (isBreak) "left in break" else "left this round", width = 220.dp,
+            caption = if (isBreak) "left in break" else "left this round", width = sessionLockWidth(),
             introFor = intro, haptics = store.state.startHaptics, sound = store.state.startSound,
         )
         Spacer(Modifier.height(Dim.s4))
@@ -781,12 +829,23 @@ private fun AudioControl(session: ActiveSession, isBreak: Boolean) {
                         colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = c.ink, activeTrackColor = c.ink, inactiveTrackColor = c.line),
                         modifier = Modifier.padding(horizontal = Dim.s2).semantics { contentDescription = "Study audio volume" },
                     )
-                    FlowRowCompat {
-                        app.lockdin.audio.AudioCollection.values().filter { it != player.loaded && it != a.collection }.forEach { k ->
-                            TextAction("Switch to ${k.label}", {
-                                Store.get(ctx).update { s -> s.copy(active = s.active?.takeIf { it.id == session.id }?.let { it.copy(audio = it.audio.copy(collection = k)) } ?: s.active) }
-                                player.switchTo(ctx, a.copy(collection = k))
-                            })
+                    var picking by remember { mutableStateOf(false) }
+                    Box(Modifier.padding(start = Dim.s2)) {
+                        TextAction("Change sound", { picking = true })
+                        androidx.compose.material3.DropdownMenu(picking, { picking = false }, containerColor = c.surface) {
+                            app.lockdin.audio.AudioGroup.values().forEach { g ->
+                                Text(g.label, style = UiType.caption, color = c.inkMuted, modifier = Modifier.padding(horizontal = Dim.s3, vertical = Dim.s1))
+                                app.lockdin.audio.AudioCollection.values().filter { it.group == g }.forEach { k ->
+                                    androidx.compose.material3.DropdownMenuItem(
+                                        text = { Text(k.label + if (k == a.collection) " · playing" else "", style = UiType.body, color = c.ink) },
+                                        onClick = {
+                                            picking = false
+                                            Store.get(ctx).update { s -> s.copy(active = s.active?.takeIf { it.id == session.id }?.let { it.copy(audio = it.audio.copy(collection = k)) } ?: s.active) }
+                                            player.switchTo(ctx, a.copy(collection = k))
+                                        },
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -1052,7 +1111,9 @@ private fun Recap(
                 Spacer(Modifier.height(Dim.s1))
                 Text("Session complete", style = TimerType.status, color = c.inkMuted)
                 Spacer(Modifier.height(Dim.s4))
-                ClockLock(TimerState.DONE, 0, 1, locked = false, label = "Session complete", caption = "complete", width = 150.dp)
+                val outro = remember(session.id) { if (onClose == null && CompleteOutro.consume(session.id)) session.id else null }
+                ClockLock(TimerState.DONE, 0, 1, locked = false, label = "Session complete", caption = "complete", width = 150.dp,
+                    outroFor = outro, haptics = store.state.startHaptics, sound = store.state.startSound)
                 Spacer(Modifier.height(Dim.s3))
                 Text(
                     buildAnnotatedString {

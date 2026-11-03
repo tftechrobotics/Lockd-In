@@ -110,6 +110,16 @@ private fun shacklePath(s: Float): Path {
  * the app, consumed by the first session screen that shows that session. Rotation, reopening,
  * restoring after process death and scheduled starts therefore never play it.
  */
+/**
+ * The completion animation plays once per finished session, the first time its summary is shown
+ * (normally when the app is opened after the session ended). A summary only shows when no other
+ * session is running, so it never plays over a new one.
+ */
+object CompleteOutro {
+    private val played = mutableSetOf<String>()
+    fun consume(sessionId: String): Boolean = played.add(sessionId)
+}
+
 object StartIntro {
     private var pending: String? = null
     /** Sequences started in this process (tests). */
@@ -159,6 +169,8 @@ fun ClockLock(
     haptics: Boolean = false,
     sound: Boolean = false,
     reducedMotion: Boolean? = null, // null = follow the phone's Remove animations setting
+    /** Session id to play the completion animation for (turn back, shackle springs open), once. */
+    outroFor: String? = null,
 ) {
     val c = LocalColors.current
     val dark = c == DarkColors
@@ -171,11 +183,11 @@ fun ClockLock(
 
     // Shackle: 0 open, 1 shut. Without a start sequence it shows the true state directly.
     val dial = remember { Animatable(0f) }
-    val shackleAnim = remember { Animatable(if (introFor == null && locked) 1f else 0f) }
+    val shackleAnim = remember { Animatable(if ((introFor == null && locked) || outroFor != null) 1f else 0f) }
     val face = remember { Animatable(if (introFor == null) 1f else 0f) }
     // Clock hands shown on the dial only while it turns; they fade into the countdown.
     val hands = remember { Animatable(0f) }
-    var turning by remember { mutableStateOf(introFor != null) }
+    var turning by remember { mutableStateOf(introFor != null || outroFor != null) }
     var introClosed by remember { mutableStateOf(false) }
     val startedAt = remember { android.os.SystemClock.uptimeMillis() }
     val reduced = remember { reducedMotion ?: animationsOff(ctx) }
@@ -210,6 +222,29 @@ fun ClockLock(
             launch { hands.animateTo(0f, tween(280)) }
             face.animateTo(1f, tween(320, delayMillis = 60))
         }
+    }
+
+    // Completion (owner 2026-11-02): the dial turns back once and the shackle springs open.
+    LaunchedEffect(outroFor) {
+        if (outroFor == null) return@LaunchedEffect
+        android.util.Log.i("LockdInIntro", "outro session=$outroFor reduced=$reduced")
+        if (reduced) {
+            delay(150)
+            shackleAnim.animateTo(0f, tween(220))
+        } else {
+            hands.snapTo(1f)
+            delay(200)
+            for (i in 1..STEPS) {
+                dial.animateTo(-i * 360f / STEPS, tween(STEP_MS, easing = FastOutSlowInEasing))
+                click()
+                delay(STEP_GAP_MS)
+            }
+            dial.snapTo(0f)
+            launch { hands.animateTo(0f, tween(280)) }
+            thunk()
+            shackleAnim.animateTo(0f, spring(dampingRatio = 0.5f, stiffness = 500f))
+        }
+        turning = false
     }
 
     // After the turn, the shackle follows the verified state. It drops shut with a settle only

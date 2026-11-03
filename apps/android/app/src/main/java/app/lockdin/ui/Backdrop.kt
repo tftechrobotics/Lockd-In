@@ -47,7 +47,6 @@ enum class Backdrop(val label: String) {
     LIBRARY("Library after hours"),
     MOUNTAINS("Quiet ambition"),
     WORDS("Words to work by"),
-    BLUEPRINT("Your reason"),
     PHOTO("Your photo"),
 }
 
@@ -120,7 +119,6 @@ fun BackdropLayer(choice: Backdrop, words: String, modifier: Modifier) {
             // The owner's image for the default line; a person's own line is drawn in the same style.
             Backdrop.WORDS -> if (words.trim().ifEmpty { DEFAULT_BACKDROP_WORDS }.equals(DEFAULT_BACKDROP_WORDS, ignoreCase = true)) Scene(choice, dark)
                 else Words(words, c.ink.copy(alpha = if (dark) 0.12f else 0.1f))
-            Backdrop.BLUEPRINT -> Blueprint(c.ink.copy(alpha = if (dark) 0.24f else 0.2f))
         }
     }
 }
@@ -172,90 +170,4 @@ private fun splitLines(t: String): List<String> {
         if (diff < bestDiff) { bestDiff = diff; best = k }
     }
     return listOf(words.take(best).joinToString(" "), words.drop(best).joinToString(" "))
-}
-
-/** Blueprint-style drawings of things worth building: gears, an arm, a tracked base, a grid. */
-@Composable
-private fun Blueprint(ink: Color) {
-    Canvas(Modifier.fillMaxSize()) {
-        val u = size.width / 100f
-        val thin = Stroke(0.7.dp.toPx())
-        val line = Stroke(1.2.dp.toPx())
-        // Fine grid
-        val grid = ink.copy(alpha = ink.alpha * 0.35f)
-        var x = 0f
-        while (x < size.width) { drawLine(grid, Offset(x, 0f), Offset(x, size.height), 0.5.dp.toPx()); x += 8 * u }
-        var y = 0f
-        while (y < size.height) { drawLine(grid, Offset(0f, y), Offset(size.width, y), 0.5.dp.toPx()); y += 8 * u }
-        // Top left: a robot arm (base, two links, gripper) with joint circles.
-        arm(ink, line, thin, Offset(4 * u, 52 * u), u)
-        // Right: a large gear with a smaller one meshing.
-        gear(ink, line, Offset(92 * u, 70 * u), 22 * u, 18)
-        gear(ink, line, Offset(66 * u, 50 * u), 11 * u, 10)
-        // Bottom: a tracked base.
-        track(ink, line, thin, Offset(8 * u, size.height - 40 * u), 84 * u, u)
-        // Dimension line with arrows and a label.
-        val dy = size.height - 46 * u
-        drawLine(ink, Offset(8 * u, dy), Offset(92 * u, dy), 0.7.dp.toPx())
-        arrow(ink, Offset(8 * u, dy), 1f, u); arrow(ink, Offset(92 * u, dy), -1f, u)
-        drawIntoCanvas {
-            val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = ink.toArgb(); textSize = 2.6f * u; typeface = Typeface.MONOSPACE; textAlign = Paint.Align.CENTER }
-            it.nativeCanvas.drawText("420.0", 50 * u, dy - 1.2f * u, p)
-            p.textAlign = Paint.Align.LEFT
-            it.nativeCanvas.drawText("REV A  ·  SCALE 1:4", 6 * u, size.height - 8 * u, p)
-        }
-    }
-}
-
-private fun DrawScope.gear(ink: Color, s: Stroke, c: Offset, r: Float, teeth: Int) {
-    val p = Path()
-    val n = teeth * 4
-    for (i in 0..n) {
-        val a = 2 * PI * i / n
-        val rr = if ((i / 2) % 2 == 0) r else r * 0.86f
-        val pt = Offset(c.x + (rr * cos(a)).toFloat(), c.y + (rr * sin(a)).toFloat())
-        if (i == 0) p.moveTo(pt.x, pt.y) else p.lineTo(pt.x, pt.y)
-    }
-    p.close()
-    drawPath(p, ink, style = s)
-    drawCircle(ink, r * 0.55f, c, style = s)
-    drawCircle(ink, r * 0.14f, c, style = s)
-    for (k in 0 until 5) {
-        val a = 2 * PI * k / 5
-        drawCircle(ink, r * 0.09f, Offset(c.x + (r * 0.36f * cos(a)).toFloat(), c.y + (r * 0.36f * sin(a)).toFloat()), style = s)
-    }
-}
-
-private fun DrawScope.arm(ink: Color, s: Stroke, thin: Stroke, base: Offset, u: Float) {
-    drawRect(ink, Offset(base.x, base.y), Size(16 * u, 5 * u), style = s)
-    val j0 = Offset(base.x + 8 * u, base.y)
-    val j1 = Offset(j0.x + 10 * u, j0.y - 22 * u)
-    val j2 = Offset(j1.x + 20 * u, j1.y - 8 * u)
-    fun link(a: Offset, b: Offset, w: Float) {
-        val ang = kotlin.math.atan2(b.y - a.y, b.x - a.x) * 180f / PI.toFloat()
-        val len = kotlin.math.hypot(b.x - a.x, b.y - a.y)
-        rotate(ang, pivot = a) { drawRoundRect(ink, Offset(a.x, a.y - w / 2), Size(len, w), androidx.compose.ui.geometry.CornerRadius(w / 2), style = s) }
-    }
-    link(j0, j1, 4 * u); link(j1, j2, 3 * u)
-    listOf(j0, j1, j2).forEach { drawCircle(ink, 2.6f * u, it, style = s); drawCircle(ink, 0.9f * u, it, style = thin) }
-    // Gripper
-    drawLine(ink, j2, Offset(j2.x + 5 * u, j2.y - 3 * u), s.width); drawLine(ink, j2, Offset(j2.x + 5 * u, j2.y + 3 * u), s.width)
-}
-
-private fun DrawScope.track(ink: Color, s: Stroke, thin: Stroke, at: Offset, w: Float, u: Float) {
-    val h = 14 * u
-    drawRoundRect(ink, at, Size(w, h), androidx.compose.ui.geometry.CornerRadius(h / 2), style = s)
-    val wheels = 6
-    for (i in 0 until wheels) {
-        val cx = at.x + h / 2 + i * (w - h) / (wheels - 1)
-        drawCircle(ink, h * 0.36f, Offset(cx, at.y + h / 2), style = s)
-        drawCircle(ink, h * 0.1f, Offset(cx, at.y + h / 2), style = thin)
-    }
-    var x = at.x + h / 2
-    while (x < at.x + w - h / 2) { drawLine(ink, Offset(x, at.y), Offset(x, at.y - 1.2f * u), thin.width); x += 3 * u }
-}
-
-private fun DrawScope.arrow(ink: Color, tip: Offset, dir: Float, u: Float) {
-    drawLine(ink, tip, Offset(tip.x + dir * 2 * u, tip.y - 1.2f * u), 0.7.dp.toPx())
-    drawLine(ink, tip, Offset(tip.x + dir * 2 * u, tip.y + 1.2f * u), 0.7.dp.toPx())
 }

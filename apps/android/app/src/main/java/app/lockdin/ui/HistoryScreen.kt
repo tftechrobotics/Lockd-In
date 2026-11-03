@@ -183,9 +183,10 @@ private fun WeekCard(w: app.lockdin.engine.WeekSummary, isCurrent: Boolean, onPr
             Column(Modifier.semantics(mergeDescendants = true) { contentDescription = "Minutes focused: $spoken" }) {
                 val bar = c.ink; val track = c.line
                 Canvas(Modifier.fillMaxWidth().height(64.dp)) {
-                    val n = 7; val gap = size.width * 0.04f; val bw = (size.width - gap * (n - 1)) / n
+                    // Same columns as the day labels below: each bar is centred in its day's seventh.
+                    val n = 7; val col = size.width / n; val bw = col * 0.62f
                     w.days.forEachIndexed { i, d ->
-                        val x = i * (bw + gap)
+                        val x = i * col + (col - bw) / 2
                         drawRoundRect(track, Offset(x, size.height - 2.dp.toPx()), Size(bw, 2.dp.toPx()), CornerRadius(1.dp.toPx()))
                         if (d.focusedMinutes > 0) {
                             val h = (size.height * d.focusedMinutes / max).coerceAtLeast(3.dp.toPx())

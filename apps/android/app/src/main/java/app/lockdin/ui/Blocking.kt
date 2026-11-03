@@ -439,9 +439,12 @@ private fun AudioTab(audio: app.lockdin.state.ProfileAudio, onAudio: (app.lockdi
                 }
             }
             if (audio.builtIn) {
-                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Dim.s2), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
-                    app.lockdin.audio.AudioCollection.values().forEach { k ->
-                        Chip(k.label, audio.collection == k) { onAudio(audio.copy(collection = k)); app.lockdin.audio.StudyPlayer.stopPreview() }
+                app.lockdin.audio.AudioGroup.values().forEach { g ->
+                    Text(g.label, style = UiType.caption, color = c.inkMuted)
+                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Dim.s2), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+                        app.lockdin.audio.AudioCollection.values().filter { it.group == g }.forEach { k ->
+                            Chip(k.label, audio.collection == k) { onAudio(audio.copy(collection = k)); app.lockdin.audio.StudyPlayer.stopPreview() }
+                        }
                     }
                 }
                 Text(audio.collection.blurb + " · ${audio.collection.tracks.size} " + if (audio.collection.loop) "seamless loop" else "tracks, played in order", style = UiType.caption, color = c.inkMuted)

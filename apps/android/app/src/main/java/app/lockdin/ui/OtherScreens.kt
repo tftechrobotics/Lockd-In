@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -68,7 +69,10 @@ fun ProfilesScreen(store: Store, onEdit: (Profile) -> Unit = {}, onEditPreset: (
             ScreenTitle("Profiles")
             Text("What each profile blocks on this phone.", style = UiType.caption, color = c.inkMuted)
         }
-        SettingsGroup {
+        if (store.state.profiles.isEmpty()) Text(
+            "No profiles yet. A profile is what gets blocked for one kind of work, like Study or Work.",
+            style = UiType.body, color = c.inkMuted,
+        ) else SettingsGroup {
             store.state.profiles.forEachIndexed { i, p ->
                 if (i > 0) GroupDivider()
                 Row(
@@ -121,7 +125,7 @@ fun ProfilesScreen(store: Store, onEdit: (Profile) -> Unit = {}, onEditPreset: (
 }
 
 @Composable
-private fun NewProfileDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
+fun NewProfileDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
     val c = LocalColors.current
     var name by rememberSaveable { mutableStateOf("") }
     AlertDialog(
@@ -172,6 +176,61 @@ fun DevicesScreen() {
 
 // ---------------- Settings ----------------
 
+/** A collapsible settings category: a row with its current value, opening to its controls. */
+@Composable
+fun SettingsSection(title: String, value: String?, open: Boolean, onToggle: () -> Unit, content: @Composable () -> Unit) {
+    val c = LocalColors.current
+    Column {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                .clickable(role = Role.Button, onClickLabel = if (open) "Close $title" else "Open $title", onClick = onToggle)
+                .semantics { stateDescription = if (open) "Open" else "Closed" }
+                .testTag("section-$title")
+                .padding(horizontal = Dim.s3),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s2),
+        ) {
+            Text(title, style = UiType.label, color = c.ink, modifier = Modifier.weight(1f))
+            if (!open && value != null) Text(value, style = UiType.caption, color = c.inkMuted, maxLines = 1)
+            LockdIcon(if (open) LIcon.ChevronUp else LIcon.ChevronDown, size = 18.dp, tint = c.inkMuted)
+        }
+        if (open) Column(Modifier.fillMaxWidth().padding(start = Dim.s3, end = Dim.s3, bottom = Dim.s4), verticalArrangement = Arrangement.spacedBy(Dim.s3)) { content() }
+    }
+}
+
+fun commitmentLabel(c: Commitment): String = when (c) {
+    Commitment.FLEXIBLE -> "Flexible"
+    Commitment.DELAYED -> "Delayed"
+    Commitment.LOCKED -> "Locked"
+    else -> "Partner code"
+}
+
+/** Ending early (also offered per session in setup). */
+@Composable
+fun EndingEarlySettings(store: Store) {
+    val c = LocalColors.current
+    SettingsGroup {
+        Column(Modifier.selectableGroup()) {
+            commitmentChoices(store.state).forEachIndexed { i, (v, l) ->
+                if (i > 0) GroupDivider()
+                RadioRow(l, store.state.commitment == v) { store.update { it.copy(commitment = v) } }
+            }
+        }
+    }
+    Text(endingEarlyNote(store.state.commitment), style = UiType.caption, color = c.inkMuted)
+}
+
+fun commitmentChoices(s: app.lockdin.state.AppState): List<Pair<Commitment, String>> = buildList {
+    add(Commitment.FLEXIBLE to "Flexible: unlock right away")
+    add(Commitment.DELAYED to "Delayed: a ${Commitment.DELAYED.overrideDelaySeconds}-second countdown first")
+    add(Commitment.LOCKED to "Locked: no unlocking")
+    if (s.partner?.claimed == true) add(Commitment.PARTNER to "Partner code: ${s.partner.name} holds the code")
+}
+
+fun endingEarlyNote(c: Commitment): String = when (c) {
+    Commitment.PARTNER -> "Your partner’s code ends a session at once. Without it, an emergency end waits ¾ of the time left, and calls and messages unlock straight away."
+    else -> "Applies to new sessions. Emergency recovery always ends a session immediately."
+}
+
 @Composable
 fun SettingsScreen(
     store: Store, history: app.lockdin.state.HistoryStore, zone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
@@ -182,89 +241,87 @@ fun SettingsScreen(
     var confirm by remember { mutableStateOf(false) }
     var confirmHistory by remember { mutableStateOf(false) }
     var exportError by remember { mutableStateOf<String?>(null) }
+    // Owner 2026-11-02: one collapsible section per category, so the page isn't a wall of text.
+    var open by rememberSaveable { mutableStateOf("") }
+    fun toggle(k: String) { open = if (open == k) "" else k }
+    val st = store.state
     ScrollScreen {
         ScreenTitle("Settings")
-        Column {
-            SectionLabel("Appearance")
-            SegmentedChoice(listOf(ThemeChoice.SYSTEM to "System", ThemeChoice.LIGHT to "Light", ThemeChoice.DARK to "Dark"), store.state.theme,
-                { v -> store.update { it.copy(theme = v) } }, label = "Appearance")
-        }
-        Column {
-            SectionLabel("Messages")
-            SettingsGroup {
-                Column(Modifier.selectableGroup()) {
-                    listOf(Tone.CALM to "Calm", Tone.DIRECT to "Direct", Tone.PLAYFUL to "Playful", Tone.CUSTOM to "My own words", Tone.QUIET to "Off").forEachIndexed { i, (v, l) ->
-                        if (i > 0) GroupDivider()
-                        RadioRow(l, store.state.tone == v) { store.update { it.copy(tone = v) } }
+        SettingsGroup {
+            SettingsSection("Appearance", when (st.theme) { ThemeChoice.SYSTEM -> "System"; ThemeChoice.LIGHT -> "Light"; ThemeChoice.DARK -> "Dark" }, open == "appearance", { toggle("appearance") }) {
+                SegmentedChoice(listOf(ThemeChoice.SYSTEM to "System", ThemeChoice.LIGHT to "Light", ThemeChoice.DARK to "Dark"), st.theme,
+                    { v -> store.update { it.copy(theme = v) } }, label = "Appearance")
+            }
+            GroupDivider()
+            SettingsSection("Look and background", runCatching { Backdrop.valueOf(st.backdrop).label }.getOrDefault("None"), open == "look", { toggle("look") }) { LookSettings(store) }
+            GroupDivider()
+            SettingsSection("Messages", when (st.tone) { Tone.CALM -> "Calm"; Tone.DIRECT -> "Direct"; Tone.PLAYFUL -> "Playful"; Tone.CUSTOM -> "My own words"; Tone.QUIET -> "Off" }, open == "messages", { toggle("messages") }) {
+                SettingsGroup {
+                    Column(Modifier.selectableGroup()) {
+                        listOf(Tone.CALM to "Calm", Tone.DIRECT to "Direct", Tone.PLAYFUL to "Playful", Tone.CUSTOM to "My own words", Tone.QUIET to "Off").forEachIndexed { i, (v, l) ->
+                            if (i > 0) GroupDivider()
+                            RadioRow(l, st.tone == v) { store.update { it.copy(tone = v) } }
+                        }
                     }
                 }
+                Text(message(st.tone, Moment.BREAK_ENDING, "TAM 212", custom = st.customMessages, seed = "example")?.let { "Example: “$it”" } ?: "No messages during sessions.", style = UiType.caption, color = c.inkMuted,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                if (st.tone == Tone.CUSTOM) MessageListEditor(store)
+                if (st.tone != Tone.QUIET) AppMessagesEditor(store)
             }
-            Spacer(Modifier.height(Dim.s2))
-            Text(message(store.state.tone, Moment.BREAK_ENDING, "TAM 212", custom = store.state.customMessages, seed = "example")?.let { "Example: “$it”" } ?: "No messages during sessions.", style = UiType.caption, color = c.inkMuted,
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-            if (store.state.tone == Tone.CUSTOM) { Spacer(Modifier.height(Dim.s3)); MessageListEditor(store) }
-            if (store.state.tone != Tone.QUIET) { Spacer(Modifier.height(Dim.s3)); AppMessagesEditor(store) }
-        }
-        CoachingSettings(store)
-        DefaultsSettings(store)
-        LookSettings(store)
-        RemindersSettings(store)
-        CalendarSettings(store)
-        PlacesSettings(store, onEditPlace)
-        Column {
-            SectionLabel("Starting a session")
-            SettingsGroup {
-                SwitchRow("Haptic clicks", "The dial clicks as it turns when you start focus. Follows your phone’s touch vibration setting.",
-                    store.state.startHaptics) { v -> store.update { it.copy(startHaptics = v) } }
-                GroupDivider()
-                SwitchRow("Click sound", "A quiet mechanical click. Follows your phone’s touch sounds and silent mode.",
-                    store.state.startSound) { v -> store.update { it.copy(startSound = v) } }
-            }
-        }
-        Column {
-            SectionLabel("Ending a session early")
-            SettingsGroup {
-                Column(Modifier.selectableGroup()) {
-                    listOf(
-                        Commitment.FLEXIBLE to "Flexible: unlock right away",
-                        Commitment.DELAYED to "Delayed: a ${Commitment.DELAYED.overrideDelaySeconds}-second countdown first",
-                        Commitment.LOCKED to "Locked: no unlocking",
-                    ).forEachIndexed { i, (v, l) ->
-                        if (i > 0) GroupDivider()
-                        RadioRow(l, store.state.commitment == v) { store.update { it.copy(commitment = v) } }
-                    }
+            GroupDivider()
+            SettingsSection("Notifications", if (st.reminders.notificationsOn) "On" else "Off", open == "notifications", { toggle("notifications") }) { RemindersSettings(store) }
+            GroupDivider()
+            SettingsSection("Ending early", commitmentLabel(st.commitment), open == "ending", { toggle("ending") }) { EndingEarlySettings(store) }
+            GroupDivider()
+            SettingsSection("Starting a session", if (st.startHaptics) "Haptics on" else "Haptics off", open == "starting", { toggle("starting") }) {
+                SettingsGroup {
+                    SwitchRow("Haptic clicks", "The dial clicks as it turns when you start focus. Follows your phone’s touch vibration setting.",
+                        st.startHaptics) { v -> store.update { it.copy(startHaptics = v) } }
+                    GroupDivider()
+                    SwitchRow("Click sound", "A quiet mechanical click. Follows your phone’s touch sounds and silent mode.",
+                        st.startSound) { v -> store.update { it.copy(startSound = v) } }
                 }
             }
-            Spacer(Modifier.height(Dim.s2))
-            Text("Applies to new sessions. Emergency recovery always ends a session immediately, at every level.", style = UiType.caption, color = c.inkMuted)
-        }
-        Column {
-            SectionLabel("History")
-            SettingsGroup {
-                SettingMenuRow(
-                    "Keep history", app.lockdin.engine.History.RETENTION_CHOICES.map { it to if (it == 0) "Forever" else "$it days" },
-                    store.state.historyDays, { v ->
-                        store.update { it.copy(historyDays = v) }
-                        history.prune(v, System.currentTimeMillis())
-                    },
-                )
-                GroupDivider()
-                SettingRow("Export as CSV", "", supporting = "${history.entries.size} session${if (history.entries.size == 1) "" else "s"}. Opens Android’s share sheet.",
-                    enabled = history.entries.isNotEmpty(), onClick = {
-                        exportError = runCatching { shareHistoryCsv(ctx, history, zone) }.exceptionOrNull()?.let { "Couldn’t create the file. Try again." }
-                    })
-                GroupDivider()
-                Row(Modifier.padding(horizontal = Dim.s2)) { TextAction("Delete all history", { confirmHistory = true }, danger = true) }
+            GroupDivider()
+            SettingsSection("New session defaults", "${st.last.focusMinutes} min", open == "defaults", { toggle("defaults") }) { DefaultsSettings(store) }
+            GroupDivider()
+            SettingsSection("Check-ins and coaching", if (st.checkInMinutes > 0) "Every ${st.checkInMinutes} min" else "Off", open == "coaching", { toggle("coaching") }) { CoachingSettings(store) }
+            GroupDivider()
+            SettingsSection("Calendar", if (st.calendarOn) "On" else "Off", open == "calendar", { toggle("calendar") }) { CalendarSettings(store) }
+            GroupDivider()
+            SettingsSection("Places", if (st.places.isEmpty()) "None" else "${st.places.size} place${if (st.places.size == 1) "" else "s"}", open == "places", { toggle("places") }) { PlacesSettings(store, onEditPlace) }
+            GroupDivider()
+            SettingsSection("History and data", null, open == "data", { toggle("data") }) {
+                SettingsGroup {
+                    SettingMenuRow(
+                        "Keep history", app.lockdin.engine.History.RETENTION_CHOICES.map { it to if (it == 0) "Forever" else "$it days" },
+                        st.historyDays, { v ->
+                            store.update { it.copy(historyDays = v) }
+                            history.prune(v, System.currentTimeMillis())
+                        },
+                    )
+                    GroupDivider()
+                    SettingRow("Export as CSV", "", supporting = "${history.entries.size} session${if (history.entries.size == 1) "" else "s"}. Opens Android’s share sheet.",
+                        enabled = history.entries.isNotEmpty(), onClick = {
+                            exportError = runCatching { shareHistoryCsv(ctx, history, zone) }.exceptionOrNull()?.let { "Couldn’t create the file. Try again." }
+                        })
+                    GroupDivider()
+                    Row(Modifier.padding(horizontal = Dim.s2)) { TextAction("Delete all history", { confirmHistory = true }, danger = true) }
+                }
+                exportError?.let { Text(it, style = UiType.caption, color = c.danger) }
+                PrivacySettings()
+                SettingsGroup {
+                    SettingRow("Stored on this phone", "", supporting = "Excluded from backups. Only a partner code setup uses the internet.", chevron = null)
+                    GroupDivider()
+                    Row(Modifier.padding(horizontal = Dim.s2)) { TextAction("Delete Lockd In data", { confirm = true }, danger = true) }
+                }
             }
-            exportError?.let { Text(it, style = UiType.caption, color = c.danger) }
-        }
-        PrivacySettings()
-        Column {
-            SectionLabel("Data")
-            SettingsGroup {
-                SettingRow("Stored on this phone only", "", supporting = "Excluded from backups. Nothing is sent anywhere.", chevron = null)
-                GroupDivider()
-                Row(Modifier.padding(horizontal = Dim.s2)) { TextAction("Delete Lockd In data", { confirm = true }, danger = true) }
+            GroupDivider()
+            SettingsSection("Help and tour", null, open == "help", { toggle("help") }) {
+                SettingsGroup {
+                    SettingRow("Replay the tour", "", supporting = "A few tips on the main screens. You can end it any time.", onClick = { store.update { it.copy(tourStep = 0) } })
+                }
             }
         }
     }

@@ -194,10 +194,7 @@ private fun BlockScreen(appLabel: String, isSite: Boolean, pkg: String? = null, 
                 if (musicTimeUp) "Music browsing time is up" else "$appLabel is blocked during focus", style = Type.title, color = c.ink, textAlign = TextAlign.Center,
                 modifier = Modifier.semantics { heading() },
             )
-            if (musicTimeUp) Text(
-                "Your music can keep playing. Use the media controls in your notifications or lock screen to pause or skip.",
-                style = UiType.body, color = c.ink, textAlign = TextAlign.Center,
-            )
+
             session?.intention?.let {
                 Text("You’re working on: $it", style = UiType.body, color = c.ink, textAlign = TextAlign.Center)
             }
@@ -211,15 +208,15 @@ private fun BlockScreen(appLabel: String, isSite: Boolean, pkg: String? = null, 
                 ?: message(store.state.tone, Moment.FOCUS_START, session?.intention, custom = store.state.customMessages, seed = session?.id))?.let {
                 Text(it, style = UiType.caption, color = c.inkMuted, textAlign = TextAlign.Center)
             }
-            Text(
-                if (isSite) "The page is still open behind this screen. Nothing is lost." else "It’s still open behind this screen, not closed. Nothing is lost.",
-                style = UiType.caption, color = c.inkMuted, textAlign = TextAlign.Center,
-            )
             Spacer(Modifier.height(Dim.s4))
             MainButton(if (musicTimeUp) "Return to focus" else "Return to work", onReturn)
             SecondaryButton(
                 if (session?.commitment == Commitment.LOCKED) "Emergency options" else "Session options",
                 onOptions, modifier = Modifier.fillMaxWidth(),
+            )
+            if (musicTimeUp) Text(
+                "Your music can keep playing. Use the media controls in your notifications or lock screen to pause or skip.",
+                style = UiType.caption, color = c.inkMuted, textAlign = TextAlign.Center, modifier = Modifier.padding(top = Dim.s2),
             )
         }
     }
