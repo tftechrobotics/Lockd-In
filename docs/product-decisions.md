@@ -143,3 +143,33 @@ Three kinds of entry, kept apart on purpose:
 - **Setup:** a one-line audio summary plus "Choose music": collection, play-on-start and allowance for this session only, and "Open <app>" before the countdown starts.
 - **Session screen:** one collapsible line under the timer, with remaining browsing time shown only for limited access.
 - **Recordings:** development recordings synthesised by `design/audio/gen.py`, owned by the project and labelled in the app. See `docs/audio-assets.md` for the content needed before release.
+
+## R49: Partner code, emergency end, admin messaging, setup tour (2026-11-02, owner; design only, not built)
+- **Partner code:** set up in onboarding, which needs internet once.
+  - Lockd In creates a secret key on the phone and stores it in Android Keystore. The person never sees it.
+  - An encrypted copy goes to the Lockd In service, which returns a private partner link that the person sends from the share sheet.
+  - The partner opens the link and sets a 4-digit PIN, which claims the link. If the person opened it first, the partner sees "already claimed".
+  - The page shows a 6-digit code that changes every 30 s, computed from the key. The app checks codes offline.
+  - The owner chose not to use authenticator apps.
+- **Ending early with a partner:** the code ends the session at once.
+- **Emergency end without a code:**
+  - The wait is ¾ of the remaining focus time.
+  - Calls and messages unlock as soon as the wait starts. Phone and emergency calls are never blocked.
+  - The wait can be cancelled, and it is logged in History. No indefinite lockout is possible.
+- **Admin:**
+  - Requests come as messages from the person's own account inside the app (authenticated by the device), not phone calls.
+  - Admin (the owner now, an AI agent later) can send an unlock for the running session only. The service enforces this scope.
+  - Admin never sees keys or codes, and every action is audit-logged.
+- **Hosting:** the owner's website domain (already bought; name to come). Build and test on a free temporary Cloudflare address first. Needs a privacy policy, Play Data safety update, and account and data deletion.
+- **Setup:** a guided walkthrough (Welcome, first profile, blocking permission, optional partner, tour with tips) with "End tutorial" on every step and replay from Settings › Help and tour.
+- **No built-in profiles:** the first profile is created in setup.
+- **Canvas comments (2026-11-02) accepted:**
+  - Settings and calendar accounts become collapsible sections.
+  - The block-screen "still open behind" line is removed. On the music block screen, the playback line moves under the buttons.
+  - The Choose music dialog only turns music-app access on and sets the allowance; there are no Open buttons.
+  - The Your reason (blueprint) background is removed.
+  - A completion animation plays when the app is opened after a session ended, unless another session is running.
+  - The real wordmark is used everywhere.
+  - The focus session fits one screen.
+  - The home-screen widget is redesigned as a mini lock. A lock-screen widget is to be checked on the S24+.
+- **Pending owner input:** more music collections (which kinds; licensed recordings needed); whether "Locked" moves into session setup.
