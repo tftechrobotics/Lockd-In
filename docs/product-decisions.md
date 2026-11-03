@@ -179,3 +179,26 @@ Three kinds of entry, kept apart on purpose:
   - Tested: service crypto unit tests incl. RFC 6238 vectors (Node 22, CI); app PartnerCode against the same vectors and a grant computed by the service code (JVM unit tests); emulator UI test for the end-early screen and emergency wait.
   - Not yet tested: the full link → PIN → code → unlock flow with two real phones; admin console (off until the `LOCKDIN_ADMIN_PASSWORD` repo secret is set).
   - Privacy: the app now has the INTERNET permission, used only for the partner service. Play Data safety and a privacy policy must say so before release.
+
+## R50: Lockd In accounts in first-run setup (2026-11-03, owner; supersedes the "no accounts" part of R32)
+- **Owner:** setup should create an account so the phone connects to the online account, and to the computer once pairing exists. Before it, a short slideshow on why the app helps, ending "so let's get started by making your account".
+- **Built:** first run = 4 why-slides → account (create or sign in) → first profile → blocking → optional partner → tour. Settings › Account shows the account, Sign out and Delete account.
+- **Service:** email + first name + password on the existing Lockd In service (`/api/users`, `/api/signin`, `/api/me`); passwords stored as salted PBKDF2-SHA256 (100k) hashes; one device token per phone (stored hashed); 10 wrong passwords → 15-minute lock; 5 sign-ups per network per hour. A partner added while signed in belongs to the account.
+- **Developer choice, needs the owner's OK:** "Not now, use Lockd In on this phone only" stays available on the account step, because the brief requires offline operation and a timer must never need the internet.
+- **Not yet possible (blocked on an email provider):** email verification and password reset. Until then a forgotten password means a new account. Needs an email-sending service (e.g. Resend, Postmark, or Cloudflare Email) and its API key.
+- **Privacy:** the service now holds emails. Play Data safety and the privacy policy must list email, name and account credentials, plus account deletion (built: Delete account).
+
+## R51: Partner approves instead of reading a code (2026-11-03, owner)
+- **Owner:** the partner shouldn't have to keep their link open and read a code; the ask message should carry a link; ideally the partner just unlocks and taps accept.
+- **Built:** "Ask <partner>" creates a request (one session, expires after 30 min or at the session's end) and shares a message with its link `/r/<id>`. The partner enters their 4-digit PIN and taps Allow or Don't allow. The phone polls and ends the session only when the service's grant matches HMAC(key, session id) checked on the phone. The partner's own link also shows a waiting request.
+- The 6-digit code stays as a fallback ("<partner> is with you? Use their code"), and the emergency wait and admin messages are unchanged.
+- Wrong PINs on a request count toward the same 5-tries / 15-minute lock as the partner link.
+
+## R52: Owner phone feedback on build 34638d7 (2026-11-03)
+1. Focus status line: when blocking is already set up but the chosen profile blocks nothing, show "<profile> doesn't block any apps yet" with **Add apps** (opens that profile; setup reopens with the same choices). "Set up blocking" only shows when permissions are missing.
+2. Blocking setup decluttered: one status card, then only Accessibility (or its two steps), Notifications, Battery. Usage access + display over other apps are behind "Can't use Accessibility?" and hidden once Accessibility is on. The owner's two-step setup is Android 13+ "restricted settings" for apps installed outside Google Play; the screen now explains it as step 1 (opens App info) and says Play installs skip it.
+3. Partner approval: see R51.
+4. Partner details (and the code wording) only show in Settings › Ending early when Partner is the chosen option.
+5. Tour: six small callouts that point at New session, the next-session card, Schedule, Profiles, History and the Settings gear, with the rest of the screen dimmed.
+6. Settings is a home list of categories (Account, Blocking, Ending early, Notifications / Sessions, Look and messages, Calendar and places / History and data, Help and tour) that open to their own pages, following the owner's Freedom reference. Replaces the R49 collapsible sections.
+7. First-run account and why-slides: see R50.

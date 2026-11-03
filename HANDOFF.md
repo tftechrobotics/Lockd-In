@@ -1,8 +1,46 @@
 # Handoff — read this first
 
-**Last session:** 2026-11-03 (canvas changes, partner lock R49) · **Milestone:** M1 reliable single-device focus — **IN PROGRESS**
+**Last session:** 2026-11-03 late morning (owner phone feedback on 34638d7 → R50–R52; paused mid-CI to move accounts) · **Milestone:** M1 reliable single-device focus — **IN PROGRESS**
 **Read first:** `docs/audit-2026-11.md` (inventory, Freedom, platform limits, architecture) and `docs/milestones.md` (new M1–M5 criteria + evidence table).
 **Repository:** github.com/tftechrobotics/Lockd-In (public since 2026-11-01).
+
+**PAUSED HERE (2026-11-03 ~09:00 CT): owner feedback on build 34638d7 (R50, R51, R52 in `docs/product-decisions.md`)**
+- All work is on branch **`owner-feedback-1103`** (commit "Owner feedback 2026-11-03 …"), **not merged to main**. Main is
+  still 34638d7-era code, so the test APK on `test-apk` and the live partner service are the OLD versions.
+- CI run **41658391824** (android-app, emulator=true, ref owner-feedback-1103): build + unit + lint **passed**; UI tests and
+  blocking E2E were still running when paused. Check: `gh run view 41658391824 -R tftechrobotics/Lockd-In`.
+  If it expired or failed, re-dispatch: `gh api -X POST repos/tftechrobotics/Lockd-In/actions/workflows/android-app.yml/dispatches
+  -f ref=owner-feedback-1103 -f 'inputs[emulator]=true'`. UI test failures are most likely text/flow assertions in
+  `AppTest.kt` updated for the new onboarding, tour, Settings pages and partner dialog — fix those first.
+- **Next steps, in order:** (1) get the emulator run green; (2) merge the branch to main (fast-forward) — that builds the
+  new `lockd-in-test.apk` on `test-apk` AND deploys the service (migration 0002 runs on the real D1); (3) check the
+  partner-service workflow's live smoke test passed (it now covers approval requests and accounts); (4) send the owner
+  the APK and ask for the phone checks listed below; (5) update `docs/milestones.md` evidence.
+- What changed (code map):
+  1. Focus status line → "Add apps" for an empty profile when blocking is already set up (`ui/FocusScreen.kt` Setup note,
+     `SetupReturn` reopens setup after the profile editor). Running timer-only sessions no longer offer "Set up blocking"
+     when nothing is missing.
+  2. Blocking setup decluttered (`ui/Blocking.kt` BlockingSetup; `ui/OtherScreens.kt` DevicesScreen/BlockingStatusCard).
+     Android 13+ "restricted settings" step shown for sideloaded installs (`sideloaded()` via install source).
+  3. Partner approval (R51): app `ui/PartnerUi.kt` EndEarlyDialog + `PartnerAsk`, `partner/PartnerService.ask/answer`;
+     service `/api/requests`, `/api/requests/:id`, `/r/:id` page, `/api/r/:id` (PIN + decision). Code entry kept as fallback.
+  4. Partner details only when Partner is chosen (`EndingEarlySettings`, `commitmentChoices(includeUnsetPartner)`).
+  5. Pointing tour: `ui/Onboarding.kt` TOUR / TourOverlay / `Modifier.tourTarget`; targets on New session, next-session
+     card, three tabs, gear (`LockdInApp.kt`, `FocusScreen.kt` Home). Old TourCard removed.
+  6. Settings pages (Freedom reference): `SettingsPage`, `SettingsNav` in `ui/OtherScreens.kt`. Tests' `openSection` maps
+     old section names to pages.
+  7. Accounts (R50): `account/Account.kt` (AccountVault via shared `KeystoreFile` in `partner/PartnerVault.kt` — partner
+     vault file format unchanged), `ui/AccountUi.kt`, `AppState.account` (+codec, unit test `AccountStateTest`).
+     Service: `migrations/0002_users_requests.sql`, sign up/in/me in `src/index.js`. First run: 4 why-slides → account →
+     profile → blocking → partner → tour.
+- **Tested so far:** service end to end on a local `wrangler dev` (workerd + local D1): full `test/smoke.mjs` incl. new
+  approval and account checks passed; partner request page exercised in Chromium (PIN → Allow → grant matched).
+  Android: CI compile, JVM unit tests, lint passed. **Not yet:** emulator UI tests (running), any phone check.
+- **Owner phone checks wanted after the new APK:** add-apps prompt; blocking screen copy; two-phone partner request →
+  Allow ends the session; Settings pages; tour bubbles positions on the S24+; create account / sign in / sign out.
+- **Open owner questions:** OK to keep "Not now, use on this phone only" on the account step (offline requirement)?
+  Email provider for verification/password reset (none yet — forgotten password = new account).
+- Project docs on claude.ai (old account) were NOT updated with R50–R52; the repo copies are the source of truth.
 
 **Roadmap (R44/R45, 2026-11-02):** see `docs/android-backlog.md` › Roadmap and › Known limitations. B, B2, C,
 C2, D, E and release-readiness basics are implemented (commits 6b2a9ab … 0a601cf); none phone-checked yet. Step 1 (owner's
