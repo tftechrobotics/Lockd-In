@@ -367,6 +367,7 @@ class AppTest {
         rule.onAllNodesWithText("Save").onLast().performClick()
         org.junit.Assert.assertEquals("Physics review", store.state.presets.single().name)
         rule.onNodeWithText("Back").performClick()
+        rule.waitUntil(5_000) { rule.onAllNodesWithText("Start a preset").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Start a preset").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Physics review", substring = true).performScrollTo().performClick()
         val a = store.state.active
@@ -582,6 +583,7 @@ class AppTest {
         store.update { s -> s.copy(active = app.lockdin.state.ActiveSession(
             "sess_partner_1", now, listOf(app.lockdin.engine.Segment(app.lockdin.engine.PhaseKind.FOCUS, 60)), "Essay",
             s.profiles.first().id, app.lockdin.engine.SessionControls(), commitment = app.lockdin.enforce.Commitment.PARTNER)) }
+        rule.waitUntil(15_000) { rule.onAllNodesWithText("Partner session", substring = true).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Partner session", substring = true).performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("End early").performScrollTo().performClick()
         rule.onNodeWithText("Ask Sam for the code").assertIsDisplayed()

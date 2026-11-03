@@ -17,6 +17,10 @@ import app.lockdin.state.Store
 class TestControl : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val store = Store.get(context)
+        // New installs have no profiles (R49 setup creates the first); the E2E drives the built-in "study" one.
+        if (store.state.profiles.none { it.id == "study" }) store.update { s ->
+            s.copy(profiles = app.lockdin.state.AppState.BUILT_IN_PROFILES.filter { it.id == "study" } + s.profiles, last = s.last.copy(profileId = "study"))
+        }
         when (intent.getStringExtra("cmd")) {
             "start" -> {
                 val focus = intent.getIntExtra("focus", 1)
