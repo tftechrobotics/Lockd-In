@@ -1,25 +1,26 @@
 # Handoff — read this first
 
-**Last session:** 2026-11-03 late morning (owner phone feedback on 34638d7 → R50–R52; paused mid-CI to move accounts) · **Milestone:** M1 reliable single-device focus — **IN PROGRESS**
+**Last session:** 2026-11-03 morning (owner phone feedback on 34638d7 → R50–R52, merged + deployed) · **Milestone:** M1 reliable single-device focus — **IN PROGRESS**
 **Read first:** `docs/audit-2026-11.md` (inventory, Freedom, platform limits, architecture) and `docs/milestones.md` (new M1–M5 criteria + evidence table).
 **Repository:** github.com/tftechrobotics/Lockd-In (public since 2026-11-01).
 
-**PAUSED HERE (2026-11-03 ~09:00 CT): owner feedback on build 34638d7 (R50, R51, R52 in `docs/product-decisions.md`)**
-- All work is on branch **`owner-feedback-1103`** (commit "Owner feedback 2026-11-03 …"), **not merged to main**. Main is
-  still 34638d7-era code, so the test APK on `test-apk` and the live partner service are the OLD versions.
-- CI on the branch: run 41658391824 found 3 UI failures (tour arrow crash before first measure, Settings test helper not
-  scrolling to "Back to Settings", plus a flaky session-flow assert) → fixed in afec095. Run 41660783098: 69/70 UI tests
-  passed; the one failure (preset step "Add" tap) is a timing flake in a screen not changed here — hardened in af82dfb.
-  Blocking E2E: every check passed except `a11y-site-block` (the known emulator Chrome full-screen issue, see below).
-  **Merge to main is waiting for the owner's OK**, because pushing to main deploys the service and runs migration 0002 on
-  the live D1 database (the session's guard flagged it as a production deploy). Earlier check command: Check: `gh run view 41658391824 -R tftechrobotics/Lockd-In`.
-  If it expired or failed, re-dispatch: `gh api -X POST repos/tftechrobotics/Lockd-In/actions/workflows/android-app.yml/dispatches
-  -f ref=owner-feedback-1103 -f 'inputs[emulator]=true'`. UI test failures are most likely text/flow assertions in
-  `AppTest.kt` updated for the new onboarding, tour, Settings pages and partner dialog — fix those first.
-- **Next steps, in order:** (1) get the emulator run green; (2) merge the branch to main (fast-forward) — that builds the
-  new `lockd-in-test.apk` on `test-apk` AND deploys the service (migration 0002 runs on the real D1); (3) check the
-  partner-service workflow's live smoke test passed (it now covers approval requests and accounts); (4) send the owner
-  the APK and ask for the phone checks listed below; (5) update `docs/milestones.md` evidence.
+**Latest (2026-11-03 ~10:30 CT): owner feedback on build 34638d7 shipped (R50, R51, R52 in `docs/product-decisions.md`)**
+- Merged to **main** (fast-forward from branch `owner-feedback-1103`) with the owner's OK. That deployed the partner
+  service (migration 0002 applied to the live D1) and built test APK **95e569e**, which was sent to the owner.
+  The live smoke test passed on https://lockdin-partner.lockdin-tf.workers.dev, including the new approval and
+  account checks. A later main commit (preset "Done" key) rebuilt the APK; the owner has 95e569e.
+- **Emulator results** (API 35), final run **41672125860** on main: build, unit tests and lint pass; **UI tests 70/70**;
+  blocking E2E passes everything except `a11y-site-block` (the known emulator Chrome issue). `M1.8-process-kill` passed
+  (10.5 s); it failed once in 41665304881, so keep an eye on it on real phones. Fixed along the way: a tour arrow crash
+  before the first measure, the Settings test helper, and the preset step field (keyboard Done now adds the step; the
+  test uses it). The newest APK on `test-apk` includes these; the owner has 95e569e, which differs only in the preset
+  Done key.
+- **Owner phone checks wanted on 95e569e:** the add-apps prompt; the blocking screen copy; a two-phone partner request
+  where Allow ends the session; the Settings pages; the tour bubble positions on the S24+; create account, sign in
+  and sign out.
+- **Open owner questions:** OK to keep "Not now, use on this phone only" on the account step (offline requirement)?
+  Which email provider for verification and password reset (none yet; a forgotten password means a new account)?
+  The privacy policy and Play Data safety must now list email, name and credentials.
 - What changed (code map):
   1. Focus status line → "Add apps" for an empty profile when blocking is already set up (`ui/FocusScreen.kt` Setup note,
      `SetupReturn` reopens setup after the profile editor). Running timer-only sessions no longer offer "Set up blocking"
@@ -44,7 +45,6 @@
   Allow ends the session; Settings pages; tour bubbles positions on the S24+; create account / sign in / sign out.
 - **Open owner questions:** OK to keep "Not now, use on this phone only" on the account step (offline requirement)?
   Email provider for verification/password reset (none yet — forgotten password = new account).
-- Project docs on claude.ai (old account) were NOT updated with R50–R52; the repo copies are the source of truth.
 
 **Roadmap (R44/R45, 2026-11-02):** see `docs/android-backlog.md` › Roadmap and › Known limitations. B, B2, C,
 C2, D, E and release-readiness basics are implemented (commits 6b2a9ab … 0a601cf); none phone-checked yet. Step 1 (owner's
