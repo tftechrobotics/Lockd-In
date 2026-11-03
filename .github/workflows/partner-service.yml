@@ -68,6 +68,11 @@ jobs:
           else echo "::warning::LOCKDIN_ADMIN_PASSWORD isn't set, so the admin console is off."; fi
       - name: Live check
         run: |
-          sleep 10
-          node test/smoke.mjs "${{ steps.sub.outputs.url }}"
+          # A new workers.dev subdomain needs a few minutes for DNS and its certificate.
+          url="${{ steps.sub.outputs.url }}"
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 10 "$url/health" >/dev/null 2>&1; then break; fi
+            echo "waiting for $url ($i/30)"; sleep 20
+          done
+          node test/smoke.mjs "$url"
           echo "::notice title=Partner service URL::${{ steps.sub.outputs.url }}"
