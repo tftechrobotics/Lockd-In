@@ -17,6 +17,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
