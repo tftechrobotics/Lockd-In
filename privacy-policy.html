@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Privacy policy — Lockd In</title>
+<style>
+  :root { color-scheme: light dark; --paper:#faf7f2; --ink:#302a25; --muted:#665d55; --line:#d8cfc4; --link:#475b45; }
+  @media (prefers-color-scheme:dark) { :root { --paper:#211d19; --ink:#f0e8db; --muted:#c1b6a7; --line:#50463c; --link:#bdd2b0; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:1rem/1.65 system-ui,sans-serif; }
+  main { max-width:48rem; margin:auto; padding:2.5rem 1.25rem 4rem; }
+  h1 { line-height:1.15; font-size:clamp(1.8rem,5vw,2.4rem); }
+  h2 { margin-top:2rem; font-size:1.25rem; }
+  a { color:var(--link); text-underline-offset:.2em; overflow-wrap:anywhere; }
+  a:focus-visible { outline:3px solid currentColor; outline-offset:4px; }
+  .meta, footer { color:var(--muted); }
+  .notice { padding:1rem; border:1px solid var(--line); border-radius:12px; }
+  li { margin:.5rem 0; }
+  footer { margin-top:2.5rem; border-top:1px solid var(--line); padding-top:1rem; }
+</style>
+</head>
+<body><main>
+<nav aria-label="Policy pages"><a href="privacy-policy.html">Privacy policy</a> · <a href="delete-account.html">Delete account</a></nav>
+<h1>Lockd In privacy policy</h1>
+<p class="meta">Draft updated November 5, 2026. Covers the Lockd In Android app (<code>app.lockdin</code>), its account service, and partner features. It does not cover the separate Lockd In Probe apps.</p>
+<p class="notice"><strong>Policy draft.</strong> Deletion handling and provider retention are still being verified before Play submission.</p>
+<h2>Contact</h2>
+<p>For privacy, support, or deletion requests, email <a href="mailto:lockdin@staylockd-in.com">lockdin@staylockd-in.com</a>. Lockd In is provided by <strong>Tf.Tech</strong>.</p>
+<h2>Information used on your phone</h2>
+<ul>
+<li><strong>Focus settings and history:</strong> task names, profiles, chosen apps and website domains, schedules, presets, session results and preferences are stored on your phone.</li>
+<li><strong>Usage Access:</strong> when enabled, Lockd In uses foreground-app information to detect apps you chose to block during focus.</li>
+<li><strong>Optional Accessibility:</strong> during restricting focus periods, Lockd In can identify the foreground app and read the address bar in supported browsers to compare its domain with your rules. This information is processed on your phone; the blocking implementation does not store or upload that detected address-bar text. The service does not perform gestures or taps in other apps. You can decline or disable it.</li>
+<li><strong>Optional calendar access:</strong> calendar information is read for suggestions on the phone; Lockd In does not upload your calendar through its account/partner service.</li>
+<li><strong>Optional saved places:</strong> location is used to save places and notice arrivals for reminders or routines, including while the app is closed or not in use when you grant background location. Saved coordinates and routine settings stay on your phone; Lockd In does not keep a location-history log or send those coordinates to its account/partner service. Geofencing uses Google Play services.</li>
+<li><strong>Optional background photos:</strong> a photo you choose is copied into app-private storage for the background. It is not uploaded to the Lockd In account/partner service.</li>
+</ul>
+<h2>Information sent to the Lockd In service</h2>
+<p>Core local focus features can be used without an account. If you use online features, information is sent over HTTPS to the Lockd In service hosted using Cloudflare Workers and D1:</p>
+<ul>
+<li><strong>Accounts:</strong> first name, email address, password during sign-up/sign-in, and a manufacturer/model device label. The service stores a salted password hash, account/device identifiers, hashed authentication tokens, timestamps, sign-in failure counters and source IP addresses. It does not store the password as plain text.</li>
+<li><strong>Partner features:</strong> partner name, an encrypted code key, partner links, PIN verification material, early-end requests, session identifiers and session end times. Your selected partner can access information necessary to respond to a request.</li>
+<li><strong>Messages to support/admin:</strong> the message you send, related session identifier if supplied, replies, and timestamps. Support/admin can read these messages and respond. Avoid sending passwords or other unnecessary sensitive information.</li>
+<li><strong>Security and operations:</strong> service actions generate audit records. Infrastructure providers may also process connection and operational information under their own terms.</li>
+</ul>
+<h2>Why information is used and who receives it</h2>
+<p>Information is used to run focus features, authenticate accounts, support partner decisions, respond to messages and protect the service against abuse. Online data is processed by our hosting providers and, where the feature calls for it, your selected partner or support/admin. Google Play services supports device geofencing. When you export or share data through Android’s share sheet, you select the receiving app or person; their privacy practices then apply.</p>
+<p>The current app does not include an advertising or analytics SDK identified in the reviewed dependency list. Lockd In does not sell your information or use it for targeted advertising.</p>
+<h2>Retention and deletion</h2>
+<p>Local data stays until you clear the corresponding data in the app or remove the installation. Android backup is disabled. Signing out does not delete your account or local focus history.</p>
+<p><strong>Delete account</strong> in the app removes your account email, name, password hash and associated device sign-ins from the service. It leaves local sessions, profiles and history on your phone. Under the current implementation, partner data is separate: deleting your login account does not automatically delete your partner setup, messages or related requests. Remove the partner separately or include partner-related data in a support deletion request.</p>
+<p>Account and partner records are kept to provide those features until they are deleted. Expired requests and security audit entries are not automatically removed merely because a session or request ends. For a verified request to delete your account and associated data, Tf.Tech will remove the identifiable records associated with that request, including applicable partner records and audit entries, within 30 days after ownership is verified. This process includes support handling; the in-app login-account deletion action alone does not erase every category of record.</p>
+<p>For instructions that do not require the installed app, see <a href="delete-account.html">request account and data deletion</a>. Email requests may require verification of account ownership. Verified account/data deletion requests are completed within 30 days after verification. We will explain the scope of deletion when we respond. Copies already exported or sent to another person are outside our direct control. Our hosting and email providers may hold operational logs or backup copies under their own retention processes; contact us for the applicable handling details.</p>
+<h2>Your controls</h2>
+<p>You can change Android permissions in system Settings, decline optional online features, delete history and local app data, delete your account in the app, or contact support. Revoking a permission can stop the feature that depends on it. Uninstalling removes app-private data on that phone but does not, by itself, delete service-side account or partner records.</p>
+<h2>Security</h2>
+<p>Account and partner requests use HTTPS. Private authentication material on the phone uses the existing encrypted vault; server passwords use salted hashes and partner keys are stored encrypted. These measures do not guarantee that loss or unauthorized access can never occur.</p>
+<h2>Changes</h2>
+<p>When this policy changes, the update date will change. Depending on where you live, you may have rights to access, correct or delete your personal information. Contact Tf.Tech at the address above to make a request.</p>
+
+<footer>Lockd In · Android package <code>app.lockdin</code><br>Support: <a href="mailto:lockdin@staylockd-in.com">lockdin@staylockd-in.com</a></footer>
+</main></body>
+</html>
