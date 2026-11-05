@@ -4,6 +4,17 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Private Play upload signing is supplied at build time, never committed.
+val uploadStoreFile = System.getenv("LOCKDIN_UPLOAD_STORE_FILE")?.takeIf { it.isNotBlank() }
+val playBuild = System.getenv("LOCKDIN_PLAY_BUILD") == "1"
+fun uploadSetting(name: String): String = requireNotNull(System.getenv(name)?.takeIf { it.isNotBlank() }) {
+    "Missing $name for private Play upload signing"
+}
+require(!playBuild || uploadStoreFile != null) { "Play builds require a private upload keystore" }
+require(!playBuild || System.getenv("LOCKDIN_VERSION_CODE")?.toIntOrNull()?.let { it > 0 } == true) {
+    "Play builds require an explicit positive LOCKDIN_VERSION_CODE"
+}
+
 android {
     namespace = "app.lockdin"
     compileSdk = 36
@@ -19,6 +30,15 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
+        if (uploadStoreFile != null) {
+            create("upload") {
+                storeFile = file(uploadStoreFile)
+                storePassword = uploadSetting("LOCKDIN_UPLOAD_STORE_PASSWORD")
+                keyAlias = uploadSetting("LOCKDIN_UPLOAD_KEY_ALIAS")
+                keyPassword = System.getenv("LOCKDIN_UPLOAD_KEY_PASSWORD")?.takeIf { it.isNotBlank() }
+                    ?: uploadSetting("LOCKDIN_UPLOAD_STORE_PASSWORD")
+            }
+        }
         // Public, committed TEST key so every CI debug build can update the previous one when
         // sideloaded for testing. Never used for Play: Play builds are signed with the upload key.
         getByName("debug") {
@@ -34,6 +54,7 @@ android {
         }
         release {
             isMinifyEnabled = false
+            if (uploadStoreFile != null) signingConfig = signingConfigs.getByName("upload")
         }
     }
     compileOptions {

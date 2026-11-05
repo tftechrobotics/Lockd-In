@@ -1,0 +1,68 @@
+# Full Lockd In app. Manual only; does not publish or roll out a Play release.
+name: Android Play internal bundle
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: "Unused positive version code, higher than prior Play uploads"
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  bundle:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: apps/android
+    env:
+      LOCKDIN_PLAY_BUILD: "1"
+      LOCKDIN_VERSION_CODE: ${{ inputs.version_code }}
+      LOCKDIN_UPLOAD_KEY_ALIAS: lockdin-app-upload
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gradle/actions/wrapper-validation@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Validate input and load private upload key
+        env:
+          KEYSTORE_B64: ${{ secrets.LOCKDIN_APP_UPLOAD_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.LOCKDIN_APP_UPLOAD_STORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          [[ "$LOCKDIN_VERSION_CODE" =~ ^[1-9][0-9]*$ ]] || { echo 'A positive version code is required'; exit 1; }
+          test -n "$KEYSTORE_B64" && test -n "$STORE_PASSWORD" || { echo 'Configure the full-app upload signing secrets'; exit 1; }
+          umask 077
+          key="$RUNNER_TEMP/lockdin-app-upload.p12"
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$key"
+          printf 'LOCKDIN_UPLOAD_STORE_FILE=%s\n' "$key" >> "$GITHUB_ENV"
+      - name: Build full app bundle, release tests and lint
+        env:
+          LOCKDIN_UPLOAD_STORE_PASSWORD: ${{ secrets.LOCKDIN_APP_UPLOAD_STORE_PASSWORD }}
+        run: ./gradlew --no-daemon bundleRelease testReleaseUnitTest lintRelease
+      - name: Verify bundle signature and record build
+        run: |
+          set -euo pipefail
+          bundle=app/build/outputs/bundle/release/app-release.aab
+          jarsigner -verify "$bundle" > "$RUNNER_TEMP/lockdin-signature.txt"
+          grep -q 'jar verified' "$RUNNER_TEMP/lockdin-signature.txt" || { echo 'Bundle is not signed'; exit 1; }
+          keytool -printcert -jarfile "$bundle" > "$RUNNER_TEMP/lockdin-certificate.txt"
+          if grep -qi 'F8:10:E2:01:06:17:94:FF:4F:EB:4C:46:1F:E8:FA:09:67:7D:7F:B4:A5:4A:0C:0A:3C:3C:81:9F:F2:25:31:B0' "$RUNNER_TEMP/lockdin-certificate.txt"; then
+            echo 'Refusing the public debug signing key'; exit 1
+          fi
+          mkdir -p ../../out/play-internal
+          cp "$bundle" ../../out/play-internal/lockdin-internal.aab
+          cp "$RUNNER_TEMP/lockdin-certificate.txt" ../../out/play-internal/upload-certificate.txt
+          printf 'Lockd In internal test bundle\nCommit: %s\nVersion code: %s\n' "$GITHUB_SHA" "$LOCKDIN_VERSION_CODE" > ../../out/play-internal/BUILD.txt
+          sha256sum "$bundle" >> ../../out/play-internal/BUILD.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lockdin-full-app-play-internal
+          path: out/play-internal
+          retention-days: 7
+      - name: Remove private upload key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/lockdin-app-upload.p12"

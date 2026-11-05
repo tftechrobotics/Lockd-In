@@ -1,5 +1,10 @@
 # Handoff — read this first
 
+**2026-11-05: full-app Play internal bundle preparation (source based on 93a7172)**
+- Owner wants installation through Play internal testing with Samsung Auto Blocker enabled. Keep the reverted app UI, session engine and blocking behavior unchanged. Private upload signing is opt-in through environment variables; debug signing remains the original public test key.
+- Added a manual full-app `Android Play internal bundle` workflow. Existing Play automation builds probes, not this app. New secrets use `LOCKDIN_APP_UPLOAD_*` to avoid confusing them with probe credentials. No Play release is submitted automatically.
+- A private upload key is kept outside Git in `/workspace/.local/lockdin-signing/`; owner needs secure backup/CI secret provisioning. Only signed AAB and public certificate can be shared. See `docs/play/FULL-APP-INTERNAL.md`. Google-generated Play app signing will differ from installed debug signing; preserve needed phone data before switching. No data migration or uninstall was performed.
+
 **Last session:** 2026-11-03 morning (owner phone feedback on 34638d7 → R50–R52, merged + deployed) · **Milestone:** M1 reliable single-device focus — **IN PROGRESS**
 **Read first:** `docs/audit-2026-11.md` (inventory, Freedom, platform limits, architecture) and `docs/milestones.md` (new M1–M5 criteria + evidence table).
 **Repository:** github.com/tftechrobotics/Lockd-In (public since 2026-11-01).
