@@ -1,0 +1,25 @@
+Signer #1:
+
+Certificate #1:
+Owner: CN=Lockd In Upload, O=Tf.Tech
+Issuer: CN=Lockd In Upload, O=Tf.Tech
+Serial number: f5553ab1f769405d
+Valid from: Thu Nov 05 06:54:43 UTC 2026 until: Mon Mar 23 06:54:43 UTC 2054
+Certificate fingerprints:
+	 SHA1: 7A:D3:8F:56:40:3D:3D:F7:3F:40:CE:1A:23:F0:F9:2F:C5:31:5C:FB
+	 SHA256: 3E:78:B3:47:32:08:12:B0:5E:8C:09:43:0E:C5:F8:49:2E:C8:C1:5E:87:C6:A8:26:CE:1F:44:A5:1D:2E:F7:6E
+Signature algorithm name: SHA256withRSA
+Subject Public Key Algorithm: 3072-bit RSA key
+Version: 3
+
+Extensions: 
+
+#1: ObjectId: 2.5.29.14 Criticality=false
+SubjectKeyIdentifier [
+KeyIdentifier [
+0000: DD 5B C1 EA 36 6A 65 B9   0A 4E 56 5D 51 07 98 B4  .[..6je..NV]Q...
+0010: 44 A0 7B 49                                        D..I
+]
+]
+
+
