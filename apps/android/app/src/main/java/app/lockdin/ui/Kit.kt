@@ -114,6 +114,9 @@ val LocalBoxed = androidx.compose.runtime.staticCompositionLocalOf { false }
 @Composable fun Modifier.plate(): Modifier = if (LocalBoxed.current) this.glass(RoundedCornerShape(Dim.plate)) else this
 @Composable fun plateSide(d: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp = if (LocalBoxed.current) d else 0.dp
 
+/** Height of the see-through header; scrolling screens pad their content by it so it can scroll up behind the header. */
+val LocalTopInset = androidx.compose.runtime.staticCompositionLocalOf { 0.dp }
+
 /** True when the person turned animations off (Android's "Remove animations"). */
 @Composable
 fun reducedMotion(): Boolean {

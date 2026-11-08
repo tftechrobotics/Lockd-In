@@ -153,7 +153,10 @@ fun LockdInApp(
             contentWindowInsets = WindowInsets.safeDrawing,
             topBar = {
                 Row(
-                    Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                    // A soft fade behind the header keeps the wordmark and gear readable over scrolled content.
+                    Modifier.fillMaxWidth().background(androidx.compose.ui.graphics.Brush.verticalGradient(
+                        listOf(c.ground.copy(alpha = 0.92f), c.ground.copy(alpha = 0.75f), c.ground.copy(alpha = 0f)),
+                    )).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
                         .height(56.dp).padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -208,9 +211,16 @@ fun LockdInApp(
         ) { padding ->
             // Each screen owns its scrolling and pinned actions; the IME pushes the content up.
             Box(
-                Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding(),
+                // Owner 2026-11-08: content scrolls up behind the see-through header instead of being cut
+                // off under it. Screens add LocalTopInset inside their scrolling content.
+                Modifier.fillMaxSize().padding(
+                    start = padding.calculateStartPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
+                    end = padding.calculateEndPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
+                    bottom = padding.calculateBottomPadding(),
+                ).consumeWindowInsets(padding).imePadding(),
                 contentAlignment = Alignment.TopCenter,
             ) {
+                androidx.compose.runtime.CompositionLocalProvider(LocalTopInset provides padding.calculateTopPadding()) {
                 Box(Modifier.widthIn(max = 600.dp).fillMaxSize().semantics { contentDescription = "${route.label} screen" }) {
                     // R55: screens slide a little toward the tab you chose and fade in.
                     val still = reducedMotion()
@@ -235,6 +245,7 @@ fun LockdInApp(
                         Route.HISTORY -> HistoryScreen(store, hist, clock, zone)
                     }
                     }
+                }
                 }
             }
         }

@@ -56,7 +56,7 @@ import app.lockdin.state.Tone
 @Composable
 fun ScrollScreen(content: @Composable () -> Unit) {
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Dim.gutter).padding(top = Dim.s2, bottom = Dim.s5),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = LocalTopInset.current).padding(horizontal = Dim.gutter).padding(top = Dim.s2, bottom = Dim.s5),
         verticalArrangement = Arrangement.spacedBy(Dim.s5),
     ) { content() }
 }

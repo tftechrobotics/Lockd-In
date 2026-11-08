@@ -271,7 +271,7 @@ fun WithActionBar(content: @Composable () -> Unit, actions: @Composable () -> Un
     val large = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
     Column(Modifier.fillMaxSize()) {
         Column(
-            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = LocalTopInset.current)
                 .padding(horizontal = Dim.gutter).padding(top = Dim.s2, bottom = Dim.s5),
             verticalArrangement = Arrangement.spacedBy(Dim.s5),
         ) { content(); if (large) note?.invoke() }
@@ -782,7 +782,7 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
     var more by rememberSaveable { mutableStateOf(false) }
     val pending = snap.overrideState is OverrideState.Pending
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Dim.gutter).padding(top = Dim.s4, bottom = Dim.s6),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = LocalTopInset.current).padding(horizontal = Dim.gutter).padding(top = Dim.s4, bottom = Dim.s6),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(task ?: if (isBreak) "Break" else "Focus session", style = TimerType.task, color = c.ink, textAlign = TextAlign.Center,

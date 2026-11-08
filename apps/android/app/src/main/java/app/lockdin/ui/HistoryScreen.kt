@@ -90,7 +90,7 @@ fun HistoryScreen(store: Store, history: HistoryStore, clock: AppClock, zone: Zo
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = Dim.gutter, end = Dim.gutter, top = Dim.s2, bottom = Dim.s5),
+        contentPadding = PaddingValues(start = Dim.gutter, end = Dim.gutter, top = LocalTopInset.current + Dim.s2, bottom = Dim.s5),
         verticalArrangement = Arrangement.spacedBy(Dim.s4),
     ) {
         item {
