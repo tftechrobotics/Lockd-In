@@ -728,8 +728,8 @@ class AppTest {
         rule.onNodeWithText("Every week").performScrollTo().assertIsDisplayed()
         rule.onAllNodesWithText("Physics review").onFirst().assertIsDisplayed()
         rule.onNodeWithContentDescription("Physics review on").performClick()
-        rule.onNodeWithText("Off").assertIsDisplayed()
-        // The plan shows on the chosen day, under Next up and in the routine list; edit from the list.
+        rule.onNodeWithText("Off").performScrollTo().assertIsDisplayed()
+        // The plan shows on the chosen day and in "Your plans"; edit from the list.
         rule.onAllNodesWithText("Physics review").onLast().performScrollTo().performClick()
         rule.onNodeWithText("Edit session").assertIsDisplayed()
         rule.onNodeWithText("Delete").performClick()
@@ -740,7 +740,8 @@ class AppTest {
     // ---- Screenshots for design review (pulled by CI; not assertions) ----
     private fun shot(name: String) {
         rule.waitForIdle()
-        val bmp = rule.onRoot().captureToImage().asAndroidBitmap()
+        // The software-rendered emulator sometimes misses the redraw deadline once; try again.
+        val bmp = runCatching { rule.onRoot().captureToImage() }.getOrElse { rule.waitForIdle(); rule.onRoot().captureToImage() }.asAndroidBitmap()
         val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir, "screens").apply { mkdirs() }
         File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
