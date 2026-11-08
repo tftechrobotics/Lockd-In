@@ -215,3 +215,12 @@ Three kinds of entry, kept apart on purpose:
 - The ui-ux-pro-max database suggested a blue Swiss-style system with testimonials; not used. Its rules
   (contrast, 48 dp targets, reduced motion) were applied through the existing checks.
 - Web and Windows still use Outfit + Figtree (paused, R40).
+
+## R54: Greeting under the lock, Bricolage Grotesque (2026-11-07, owner)
+- **Owner:** pass 5 still read as AI (text too big, digits overlapping the clock ticks); pointed to Freedom's
+  home (greeting + line, characterful face). Chose the greeting mockup, with the greeting **under the lock**.
+- **Built (Android):** Home = lock (210 dp) on top, then "Good evening, <first name>" (Bricolage Grotesque 700)
+  and one plain line about what's next ("Nothing planned tonight." / "Physics review in 25 min."), tappable to
+  Schedule; the "Next session" box is gone. Main button "Start a session". Bricolage Grotesque (OFL) for
+  headings, buttons and digits; Archivo stays for interface text. Clock digits 46 units so "10:35" fits.
+- Supersedes the expanded-Archivo voice from R53 (Archivo Wide is no longer used in the app).

@@ -77,7 +77,7 @@ object Dim {
 /** Interface type: Archivo. Expanded Archivo only for titles, digits and the primary button. */
 object UiType {
     val title = Type.title
-    val section = Type.caption.copy(fontWeight = FontWeight.SemiBold, fontSize = 13.sp, lineHeight = 18.sp)
+    val section = Type.caption.copy(fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 18.sp)
     val body = Type.body
     val label = Type.label
     val value = Type.label.copy(fontWeight = FontWeight.Normal)

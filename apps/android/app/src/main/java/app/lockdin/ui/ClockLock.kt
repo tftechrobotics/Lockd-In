@@ -370,7 +370,8 @@ fun ClockLock(
         }
         val px = maxWidth / W // dp per unit
         val showCaption = maxWidth >= 130.dp
-        val digits = with(LocalDensity.current) { (52f * px.value).dp.toSp() }
+        // 46 units: "10:35" in Bricolage fits inside the tick ring (owner 2026-11-07: digits overlapped it).
+        val digits = with(LocalDensity.current) { (46f * px.value).dp.toSp() }
         val small = with(LocalDensity.current) { (14f * px.value).dp.toSp() }
         Column(
             Modifier.align(BiasAlignment(0f, 2 * ((CY - MIN_Y + 8) / H) - 1)).then(if (face.value < 1f) Modifier.alpha(face.value) else Modifier),
@@ -378,7 +379,7 @@ fun ClockLock(
         ) {
             Text(
                 text ?: if (state == TimerState.DONE) "Done" else Fmt.countdown(remainingMs),
-                style = Type.timer.copy(fontSize = digits, lineHeight = digits, fontWeight = FontWeight.Medium, letterSpacing = (-1).dp.let { with(LocalDensity.current) { it.toSp() } }),
+                style = Type.timer.copy(fontSize = digits, lineHeight = digits, letterSpacing = (-1).dp.let { with(LocalDensity.current) { it.toSp() } }),
                 color = if (state == TimerState.DONE || (state == TimerState.READY && text == null)) c.inkMuted else c.ink,
                 textAlign = TextAlign.Center, maxLines = 1,
             )

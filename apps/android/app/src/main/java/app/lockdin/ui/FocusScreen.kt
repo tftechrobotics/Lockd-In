@@ -143,38 +143,34 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
     val inProgress = upcoming != null && upcoming.start <= now
     WithActionBar(
         content = {
-            Column(Modifier.fillMaxWidth().padding(top = Dim.s5), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Dim.s5)) {
+            Column(Modifier.fillMaxWidth().padding(top = Dim.s4), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Dim.s5)) {
                 ClockLock(
                     TimerState.READY, 0, 1, locked = false, label = "It's ${Fmt.clock(now, zone)}, $weekday",
-                    caption = "$period · $weekday", text = hm, width = 230.dp,
+                    caption = "$period · $weekday", text = hm, width = 210.dp,
                 )
-                // Pass 5: a timetable plate. The start time is stamped in the left column.
-                androidx.compose.material3.Surface(
-                    shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft,
-                    modifier = Modifier.fillMaxWidth().tourTarget("next").clickable(role = Role.Button, onClickLabel = "Open schedule", onClick = openSchedule),
+                // Owner 2026-11-07 (R54): a greeting under the lock that says what's next, like Freedom's
+                // header, instead of a "Next session" box. Tapping it opens Schedule.
+                val hour = at.hour
+                val hello = when (hour) { in 5..11 -> "Good morning"; in 12..16 -> "Good afternoon"; in 17..21 -> "Good evening"; else -> "Good night" }
+                val first = store.state.account?.name?.trim()?.split(" ")?.firstOrNull()?.takeIf { it.isNotBlank() }
+                val line = when {
+                    upcoming == null -> "Nothing planned ${if (hour >= 17 || hour < 5) "tonight" else "today"}."
+                    inProgress -> "${upcoming.session.title} is on now, until ${Fmt.clock(upcoming.end, zone)}."
+                    else -> {
+                        val mins = maxOf(1, ((upcoming.start - now) / 60_000).toInt())
+                        val whenText = if (mins <= 180) "in ${durationLabel(mins)}" else "${Fmt.dayLabel(upcoming.start, now, zone).replaceFirstChar { it.lowercase() }} at ${Fmt.clock(upcoming.start, zone)}"
+                        "${upcoming.session.title} $whenText."
+                    }
+                }
+                Column(
+                    Modifier.fillMaxWidth().tourTarget("next").clickable(role = Role.Button, onClickLabel = "Open schedule", onClick = openSchedule)
+                        .padding(vertical = Dim.s1),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                  Row(Modifier.padding(horizontal = Dim.s4, vertical = Dim.s4), verticalAlignment = Alignment.CenterVertically) {
-                    if (upcoming != null) {
-                        val st = java.time.Instant.ofEpochMilli(upcoming.start).atZone(zone)
-                        Column(Modifier.widthIn(min = 64.dp).padding(end = Dim.s3).clearAndSetSemantics { }) {
-                            Text(st.format(java.time.format.DateTimeFormatter.ofPattern("h:mm")), style = Type.display.copy(fontSize = 19.sp, lineHeight = 24.sp), color = c.ink)
-                            Text(st.format(java.time.format.DateTimeFormatter.ofPattern("a", java.util.Locale.getDefault())), style = UiType.caption, color = c.inkMuted)
-                        }
-                    }
-                    Column(Modifier.weight(1f)) {
-                        Text(if (inProgress) "Scheduled now" else "Next session", style = UiType.caption, color = c.inkMuted)
-                        Text(upcoming?.session?.title ?: "Nothing planned", style = TimerType.task, color = c.ink)
-                        Text(
-                            if (upcoming == null) "Plan one on Schedule" else buildString {
-                                append("${Fmt.dayLabel(upcoming.start, now, zone)} · ${Fmt.clock(upcoming.start, zone)}–${Fmt.clock(upcoming.end, zone)}")
-                                if (!inProgress) append(" · in ${durationLabel(maxOf(1, ((upcoming.start - now) / 60_000).toInt()))}")
-                            },
-                            style = UiType.caption, color = c.inkMuted,
-                        )
-                        if (upcoming?.session?.autoStart == true) Text("Starts automatically", style = UiType.caption.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
-                    }
-                    LockdIcon(LIcon.Chevron, size = 18.dp, tint = c.inkMuted)
-                  }
+                    Text(if (first != null) "$hello, $first" else hello, style = Type.greeting, color = c.ink, modifier = Modifier.semantics { heading() })
+                    Text(line, style = UiType.body.copy(fontSize = 17.sp, lineHeight = 24.sp), color = c.inkMuted)
+                    if (upcoming?.session?.autoStart == true && !inProgress) Text("Starts automatically.", style = UiType.body.copy(fontSize = 17.sp, lineHeight = 24.sp), color = c.inkMuted)
+                    if (upcoming == null) Text("Plan one", style = UiType.label.copy(fontSize = 16.sp, fontWeight = FontWeight.SemiBold, textDecoration = TextDecoration.Underline), color = c.ink)
                 }
                 // Presets: one tap starts the session (a manual start, so the start sequence plays).
                 val homeCtx = androidx.compose.ui.platform.LocalContext.current
@@ -221,7 +217,7 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
                 }
             }
         },
-        actions = { MainButton("New session", onNew, modifier = Modifier.tourTarget("new")) },
+        actions = { MainButton("Start a session", onNew, modifier = Modifier.tourTarget("new")) },
     )
 }
 

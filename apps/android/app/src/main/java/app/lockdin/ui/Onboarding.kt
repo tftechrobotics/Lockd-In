@@ -272,8 +272,8 @@ private fun Body(t: String, center: Boolean = false) = Text(t, style = UiType.bo
 data class TourTip(val target: String, val title: String, val text: String)
 
 val TOUR = listOf(
-    TourTip("new", "Start a session", "Pick what you’re working on, how long, and which profile to block with."),
-    TourTip("next", "What’s next", "Your next planned session. Tap it to open your schedule."),
+    TourTip("new", "Start here", "Pick what you’re working on, how long, and which profile to block with."),
+    TourTip("next", "What’s next", "Your next planned session, or what’s free. Tap it to open your schedule."),
     TourTip("tab-schedule", "Schedule", "Plan sessions and weekly routines. Lockd In reminds you, or starts them."),
     TourTip("tab-profiles", "Profiles", "Each profile decides which apps and websites are blocked."),
     TourTip("tab-history", "History", "Finished sessions, kept on this phone."),

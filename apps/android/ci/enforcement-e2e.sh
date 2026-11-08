@@ -100,7 +100,7 @@ anim_scale() { for k in window_animation_scale transition_animation_scale animat
 # start keeps the shackle open; Remove animations replaces the turn with a fade.
 manual_start() { # manual_start <button text>
   adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2
-  tap_text "New session" || return 1
+  tap_text "Start a session" || return 1
   sleep 1.5
   tap_text "$1"
 }
@@ -154,7 +154,7 @@ intro_phase() {
   ctl --es cmd finish; ctl --es cmd rules --es block "$T"
   anim_scale 1
   adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2
-  tap_text "New session" || record intro-ui FAIL "couldn't find New session"
+  tap_text "Start a session" || record intro-ui FAIL "couldn't find Start a session"
   sleep 1.5
   p0=$(intro_count "played session="); c0=$(intro_count "shackle_closed"); p1=$p0
   if xy=$(find_text "Start focus"); then
@@ -187,7 +187,7 @@ intro_phase() {
   # Dark theme recording (same sequence).
   ctl --es cmd finish; adb shell cmd uimode night yes; sleep 2
   adb shell am start -W -n "$A/.MainActivity" >/dev/null; sleep 2
-  if tap_text "New session" && sleep 1.5 && xy=$(find_text "Start focus"); then
+  if tap_text "Start a session" && sleep 1.5 && xy=$(find_text "Start focus"); then
     adb shell screenrecord --time-limit 5 --bit-rate 8000000 /sdcard/dark.mp4 & rec=$!
     sleep 1; adb shell input tap $xy; wait $rec
     adb pull /sdcard/dark.mp4 "$OUT/start-sequence-dark.mp4" >/dev/null 2>&1

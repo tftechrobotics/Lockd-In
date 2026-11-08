@@ -25,7 +25,10 @@ UI is faithful implementation and refinement of that reference, not new aestheti
 - **Colors only from tokens.** Change `design/tokens.json`, then regenerate:
   `node apps/web/scripts/gen-tokens.mjs`, `python3 design/export-android.py`, and run
   `node design/check-contrast.mjs` (must pass: text 4.5:1, control borders and focus 3:1).
-- **Type (pass 5, R53):** Archivo only. Archivo Expanded (wdth 125, 600/800) for screen titles,
+- **Type (R54, current):** Bricolage Grotesque (display 600/700, text 600, digits wdth 92) for greetings,
+  headings, buttons and clock digits; Archivo (400/500/600) for interface text. Home = lock, then a
+  greeting + one line about what's next under it (no "Next session" box).
+- *(Superseded by R54)* **Type (pass 5, R53):** Archivo only. Archivo Expanded (wdth 125, 600/800) for screen titles,
   big numbers, stamped times and the primary button; semi-expanded 800 for timer digits; normal width
   400/500/600 for the interface. Width carries hierarchy. (Android done; web and Windows still use the
   old Outfit + Figtree pair until they are updated.)

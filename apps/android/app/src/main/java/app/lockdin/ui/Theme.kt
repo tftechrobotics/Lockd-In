@@ -32,23 +32,37 @@ val ArchivoWide = FontFamily(
 )
 /** Semi-expanded heavy digits: wide enough to feel stamped, narrow enough for the dial face. */
 val ArchivoDigits = FontFamily(Font(R.font.archivo_semiwide_800, FontWeight.ExtraBold))
+/**
+ * Bricolage Grotesque (Mathieu Triay, OFL; owner 2026-11-07: Freedom-like character): the voice for
+ * greetings, headings, buttons and clock digits. Static cuts at display optical size (48) for headings,
+ * text size (16) for buttons, and slightly narrowed (wdth 92) for digits so they sit inside the dial.
+ */
+val Bricolage = FontFamily(
+    Font(R.font.bricolage_text_600, FontWeight.Medium),
+    Font(R.font.bricolage_display_600, FontWeight.SemiBold),
+    Font(R.font.bricolage_display_700, FontWeight.Bold),
+)
+val BricolageDigits = FontFamily(Font(R.font.bricolage_digits_600, FontWeight.SemiBold))
 
 /** Lockd In's own palette, available everywhere (Material colors are mapped from it). */
 val LocalColors = staticCompositionLocalOf { LightColors }
 
 object Type {
-    // Owner 2026-11-07: pass 5 felt blown up. Titles and buttons use the semi-wide cut, a step smaller.
-    val display = TextStyle(fontFamily = ArchivoDigits, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp, lineHeight = 30.sp, letterSpacing = (-0.2).sp)
-    val taskTitle = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, lineHeight = 24.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-    val timer = TextStyle(fontFamily = ArchivoDigits, fontWeight = FontWeight.ExtraBold, fontSize = 52.sp, lineHeight = 56.sp, fontFeatureSettings = "tnum")
-    val title = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, lineHeight = 24.sp)
-    val fact = TextStyle(fontFamily = ArchivoDigits, fontWeight = FontWeight.ExtraBold, fontSize = 17.sp, lineHeight = 24.sp, fontFeatureSettings = "tnum")
+    // Pass 6 (R54): Bricolage for headings, buttons and digits; Archivo for the interface text.
+    val display = TextStyle(fontFamily = Bricolage, fontWeight = FontWeight.Bold, fontSize = 28.sp, lineHeight = 32.sp, letterSpacing = (-0.4).sp)
+    val taskTitle = TextStyle(fontFamily = Bricolage, fontWeight = FontWeight.SemiBold, fontSize = 19.sp, lineHeight = 24.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    val timer = TextStyle(fontFamily = BricolageDigits, fontWeight = FontWeight.SemiBold, fontSize = 52.sp, lineHeight = 56.sp, fontFeatureSettings = "tnum")
+    val title = TextStyle(fontFamily = Bricolage, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 24.sp)
+    val fact = TextStyle(fontFamily = BricolageDigits, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, lineHeight = 24.sp, fontFeatureSettings = "tnum")
     val body = TextStyle(fontFamily = Archivo, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp)
     val bodyStrong = body.copy(fontWeight = FontWeight.SemiBold)
     val label = TextStyle(fontFamily = Archivo, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 20.sp)
     val caption = TextStyle(fontFamily = Archivo, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp)
-    val button = TextStyle(fontFamily = ArchivoDigits, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, lineHeight = 20.sp, letterSpacing = 0.2.sp)
+    val button = TextStyle(fontFamily = Bricolage, fontWeight = FontWeight.Medium, fontSize = 17.sp, lineHeight = 22.sp)
+    /** The home greeting under the lock. */
+    val greeting = TextStyle(fontFamily = Bricolage, fontWeight = FontWeight.Bold, fontSize = 30.sp, lineHeight = 34.sp, letterSpacing = (-0.5).sp)
 }
+
 
 
 @Composable

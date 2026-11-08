@@ -111,7 +111,7 @@ class AppTest {
                 LockdInApp(store, clock, zone, dark, history = hist)
             }
         }
-        if (!home && state.active == null) rule.onNodeWithText("New session").performClick()
+        if (!home && state.active == null) rule.onNodeWithText("Start a session").performClick()
         return store
     }
 
@@ -179,7 +179,7 @@ class AppTest {
         rule.onNodeWithText("Timer only: nothing was blocked on this phone.").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Done").performClick()
         // Back to the idle lock.
-        rule.onNodeWithText("New session").assertExists()
+        rule.onNodeWithText("Start a session").assertExists()
     }
 
     @Test fun customLengthMatchingAPresetSelectsIt() {
@@ -318,7 +318,7 @@ class AppTest {
         val tester = androidx.compose.ui.test.junit4.StateRestorationTester(rule)
         val store = Store(AppState()) {}
         tester.setContent { LockdInApp(store, clock, zone, false) }
-        rule.onNodeWithText("New session").performClick()
+        rule.onNodeWithText("Start a session").performClick()
         val before = app.lockdin.ui.StartIntro.plays
         rule.onNodeWithText("Start timer").performClick()
         rule.waitForIdle()
@@ -338,7 +338,7 @@ class AppTest {
         rule.onNodeWithText("Start timer").performClick(); rule.waitForIdle()
         clock.advanceMinutes(26); tick(store)
         rule.onNodeWithText("Done").performClick()
-        rule.onNodeWithText("New session").performClick()
+        rule.onNodeWithText("Start a session").performClick()
         rule.onNodeWithText("Start timer").performClick(); rule.waitForIdle()
         clock.advanceMinutes(26); tick(store)
         rule.onNodeWithText("Same again").performClick(); rule.waitForIdle()
@@ -510,7 +510,7 @@ class AppTest {
         rule.onNodeWithText("Quotes").performScrollTo().performClick()
         org.junit.Assert.assertTrue(store.state.quotesOn)
         rule.onNodeWithTag("tab-focus").performClick()
-        rule.onNodeWithText("New session").performClick()
+        rule.onNodeWithText("Start a session").performClick()
         rule.onNodeWithText("Start timer").performClick()
         val line = app.lockdin.ui.Quotes.forSession(store.state.active!!.id)
         rule.onNodeWithText(line).assertIsDisplayed()
@@ -528,7 +528,7 @@ class AppTest {
         rule.onAllNodesWithText("Add").onFirst().performClick()
         org.junit.Assert.assertEquals(listOf("Problem set first, then rest."), store.state.customMessages)
         rule.onNodeWithTag("tab-focus").performClick()
-        rule.onNodeWithText("New session").performClick()
+        rule.onNodeWithText("Start a session").performClick()
         rule.onNodeWithText("Start timer").performClick()
         openDetails()
         rule.onNodeWithText("Problem set first, then rest.").performScrollTo().assertIsDisplayed()
@@ -605,7 +605,7 @@ class AppTest {
         org.junit.Assert.assertTrue(store.state.onboarded)
         // The tour points at parts of the home screen, one small bubble at a time.
         rule.onNodeWithText("1 of 6").assertIsDisplayed()
-        rule.onNodeWithText("Start a session").assertIsDisplayed()
+        rule.onNodeWithText("Start here").assertIsDisplayed()
         rule.onNodeWithText("Next").performClick()
         rule.onNodeWithText("What’s next").assertIsDisplayed()
         rule.onNodeWithText("Skip tour").performClick()
@@ -620,7 +620,7 @@ class AppTest {
         rule.onNodeWithText("End tutorial").performClick()
         org.junit.Assert.assertTrue(store.state.onboarded)
         org.junit.Assert.assertEquals(-1, store.state.tourStep)
-        rule.onNodeWithText("New session").assertIsDisplayed()
+        rule.onNodeWithText("Start a session").assertIsDisplayed()
     }
 
     @Test fun signInFormChecksEmailAndPassword() {
@@ -656,7 +656,7 @@ class AppTest {
         val now = clock.now()
         val p = app.lockdin.state.Partner("Sam", "acct_test_0001", "link_test_0001", claimed = true)
         val store = launch(AppState(partner = p, commitment = app.lockdin.enforce.Commitment.PARTNER), home = true)
-        rule.onNodeWithText("New session").performClick()
+        rule.onNodeWithText("Start a session").performClick()
         rule.onNodeWithText("Ending early:", substring = true).performScrollTo().assertIsDisplayed()
         store.update { s -> s.copy(active = app.lockdin.state.ActiveSession(
             "sess_partner_1", now, listOf(app.lockdin.engine.Segment(app.lockdin.engine.PhaseKind.FOCUS, 60)), "Essay",
@@ -799,12 +799,13 @@ class AppTest {
         val start = java.time.LocalTime.of(19, 0)
         launch(AppState(schedule = listOf(app.lockdin.engine.ScheduledSession("p", "Physics review", java.time.DayOfWeek.entries.toSet(), start, 40, 10, 2, "study"))), home = true)
         rule.onNodeWithContentDescription("It's 6:00", substring = true).assertIsDisplayed()
-        rule.onNodeWithText("Physics review").assertIsDisplayed()
-        rule.onNodeWithText("in 1 h", substring = true).assertIsDisplayed()
-        rule.onNodeWithText("New session").performClick()
+        // Greeting under the lock (R54): "Good evening" and "Physics review in 1 h."
+        rule.onNodeWithText("Good evening").assertIsDisplayed()
+        rule.onNodeWithText("Physics review in 1 h.").assertIsDisplayed()
+        rule.onNodeWithText("Start a session").performClick()
         rule.onNodeWithText("Start timer").assertExists()
         rule.onNodeWithText("Back").performClick()
-        rule.onNodeWithText("New session").assertExists()
+        rule.onNodeWithText("Start a session").assertExists()
     }
     @Test fun recapListsBlockedAttemptsAndReturnsHomeAfter30s() {
         val rules = app.lockdin.enforce.AppRules(sites = setOf("youtube.com"))
@@ -819,7 +820,7 @@ class AppTest {
         rule.onNodeWithText("3 times").assertExists()
         rule.onNodeWithText("Back to home in 30 s").assertExists()
         clock.advanceMinutes(1); tick(store)
-        rule.onNodeWithText("New session").assertIsDisplayed()
+        rule.onNodeWithText("Start a session").assertIsDisplayed()
     }
     @Test fun autoStartIsExplainedBeforeItTurnsOn() {
         launch()
