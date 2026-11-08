@@ -51,9 +51,9 @@ enum class TimerState { READY, FOCUS, BREAK, DONE }
 
 object TimerType {
     val numerals = TextStyle(fontFamily = ArchivoDigits, fontWeight = FontWeight.ExtraBold, fontFeatureSettings = "tnum", letterSpacing = (-1).sp)
-    val question = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, lineHeight = 24.sp)
-    val task = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.SemiBold, fontSize = 19.sp, lineHeight = 26.sp)
-    val bigField = TextStyle(fontFamily = Archivo, fontWeight = FontWeight.Medium, fontSize = 22.sp, lineHeight = 28.sp)
+    val question = TextStyle(fontFamily = Archivo, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 22.sp)
+    val task = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, lineHeight = 24.sp)
+    val bigField = TextStyle(fontFamily = Archivo, fontWeight = FontWeight.Normal, fontSize = 19.sp, lineHeight = 26.sp)
     val status = Type.caption.copy(fontWeight = FontWeight.SemiBold)
 }
 

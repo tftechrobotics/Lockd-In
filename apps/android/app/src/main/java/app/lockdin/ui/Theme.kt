@@ -37,16 +37,17 @@ val ArchivoDigits = FontFamily(Font(R.font.archivo_semiwide_800, FontWeight.Extr
 val LocalColors = staticCompositionLocalOf { LightColors }
 
 object Type {
-    val display = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.ExtraBold, fontSize = 28.sp, lineHeight = 34.sp, letterSpacing = (-0.3).sp)
-    val taskTitle = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.SemiBold, fontSize = 19.sp, lineHeight = 26.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    // Owner 2026-11-07: pass 5 felt blown up. Titles and buttons use the semi-wide cut, a step smaller.
+    val display = TextStyle(fontFamily = ArchivoDigits, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp, lineHeight = 30.sp, letterSpacing = (-0.2).sp)
+    val taskTitle = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, lineHeight = 24.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     val timer = TextStyle(fontFamily = ArchivoDigits, fontWeight = FontWeight.ExtraBold, fontSize = 52.sp, lineHeight = 56.sp, fontFeatureSettings = "tnum")
-    val title = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp)
-    val fact = TextStyle(fontFamily = ArchivoDigits, fontWeight = FontWeight.ExtraBold, fontSize = 19.sp, lineHeight = 26.sp, fontFeatureSettings = "tnum")
+    val title = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, lineHeight = 24.sp)
+    val fact = TextStyle(fontFamily = ArchivoDigits, fontWeight = FontWeight.ExtraBold, fontSize = 17.sp, lineHeight = 24.sp, fontFeatureSettings = "tnum")
     val body = TextStyle(fontFamily = Archivo, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp)
     val bodyStrong = body.copy(fontWeight = FontWeight.SemiBold)
     val label = TextStyle(fontFamily = Archivo, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 20.sp)
     val caption = TextStyle(fontFamily = Archivo, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp)
-    val button = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.ExtraBold, fontSize = 17.sp, lineHeight = 22.sp, letterSpacing = 0.2.sp)
+    val button = TextStyle(fontFamily = ArchivoDigits, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, lineHeight = 20.sp, letterSpacing = 0.2.sp)
 }
 
 

@@ -141,8 +141,8 @@ fun ScheduleScreen(store: Store, now: Long, zone: ZoneId, onEdit: (ScheduledSess
                 Surface(shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft, modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { onEdit(n.session) }) {
                     Row(Modifier.padding(Dim.s4), verticalAlignment = Alignment.CenterVertically) {
                         val st = Instant.ofEpochMilli(n.start).atZone(zone)
-                        Column(Modifier.widthIn(min = 76.dp).padding(end = Dim.s3).clearAndSetSemantics { }) {
-                            Text(st.format(DateTimeFormatter.ofPattern("h:mm")), style = Type.display.copy(fontSize = 24.sp, lineHeight = 28.sp), color = c.ink)
+                        Column(Modifier.widthIn(min = 64.dp).padding(end = Dim.s3).clearAndSetSemantics { }) {
+                            Text(st.format(DateTimeFormatter.ofPattern("h:mm")), style = Type.display.copy(fontSize = 19.sp, lineHeight = 24.sp), color = c.ink)
                             Text(st.format(DateTimeFormatter.ofPattern("a", java.util.Locale.getDefault())), style = UiType.caption, color = c.inkMuted)
                         }
                         Column(Modifier.weight(1f)) {
@@ -194,8 +194,8 @@ private fun PlanRow(store: Store, s: ScheduledSession, whenText: String, profile
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Stamped start time (pass 5): hour in expanded Archivo, AM/PM small underneath.
-            Column(Modifier.widthIn(min = 76.dp)) {
-                Text(s.startTime.format(DateTimeFormatter.ofPattern("h:mm")), style = Type.display.copy(fontSize = 22.sp, lineHeight = 26.sp), color = if (muted) c.inkMuted else c.ink)
+            Column(Modifier.widthIn(min = 64.dp)) {
+                Text(s.startTime.format(DateTimeFormatter.ofPattern("h:mm")), style = Type.display.copy(fontSize = 18.sp, lineHeight = 22.sp), color = if (muted) c.inkMuted else c.ink)
                 Text(s.startTime.format(DateTimeFormatter.ofPattern("a", java.util.Locale.getDefault())), style = UiType.caption, color = c.inkMuted)
             }
             Spacer(Modifier.width(Dim.s3))

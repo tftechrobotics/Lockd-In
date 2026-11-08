@@ -77,7 +77,7 @@ object Dim {
 /** Interface type: Archivo. Expanded Archivo only for titles, digits and the primary button. */
 object UiType {
     val title = Type.title
-    val section = Type.caption.copy(fontFamily = ArchivoWide, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, lineHeight = 18.sp, letterSpacing = 0.2.sp)
+    val section = Type.caption.copy(fontWeight = FontWeight.SemiBold, fontSize = 13.sp, lineHeight = 18.sp)
     val body = Type.body
     val label = Type.label
     val value = Type.label.copy(fontWeight = FontWeight.Normal)
@@ -260,7 +260,7 @@ fun MainButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
         onClick = onClick,
         shape = RoundedCornerShape(Dim.radiusLarge),
         colors = ButtonDefaults.buttonColors(containerColor = c.ink, contentColor = c.onInk),
-        modifier = modifier.fillMaxWidth().heightIn(min = Dim.primary + 4.dp),
+        modifier = modifier.fillMaxWidth().heightIn(min = Dim.primary),
     ) {
         Text(text, style = Type.button, maxLines = 1, overflow = TextOverflow.Ellipsis)
         icon?.let { Spacer(Modifier.width(Dim.s2)); LockdIcon(it, tint = c.onInk, size = Dim.icon) }

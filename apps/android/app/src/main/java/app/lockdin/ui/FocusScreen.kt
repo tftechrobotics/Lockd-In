@@ -156,8 +156,8 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
                   Row(Modifier.padding(horizontal = Dim.s4, vertical = Dim.s4), verticalAlignment = Alignment.CenterVertically) {
                     if (upcoming != null) {
                         val st = java.time.Instant.ofEpochMilli(upcoming.start).atZone(zone)
-                        Column(Modifier.widthIn(min = 76.dp).padding(end = Dim.s3).clearAndSetSemantics { }) {
-                            Text(st.format(java.time.format.DateTimeFormatter.ofPattern("h:mm")), style = Type.display.copy(fontSize = 24.sp, lineHeight = 28.sp), color = c.ink)
+                        Column(Modifier.widthIn(min = 64.dp).padding(end = Dim.s3).clearAndSetSemantics { }) {
+                            Text(st.format(java.time.format.DateTimeFormatter.ofPattern("h:mm")), style = Type.display.copy(fontSize = 19.sp, lineHeight = 24.sp), color = c.ink)
                             Text(st.format(java.time.format.DateTimeFormatter.ofPattern("a", java.util.Locale.getDefault())), style = UiType.caption, color = c.inkMuted)
                         }
                     }
@@ -611,7 +611,7 @@ private fun LengthTiles(selected: Int, onSelect: (Int) -> Unit) {
                     val on = m == selected
                     Surface(
                         shape = RoundedCornerShape(Dim.radiusLarge), color = if (on) c.ink else c.taupeSoft, contentColor = if (on) c.onInk else c.ink,
-                        modifier = Modifier.weight(1f).heightIn(min = 68.dp)
+                        modifier = Modifier.weight(1f).heightIn(min = 60.dp)
                             .selectable(on, role = Role.RadioButton, onClick = { onSelect(m) })
                             .semantics(mergeDescendants = true) {},
                     ) {
@@ -621,7 +621,7 @@ private fun LengthTiles(selected: Int, onSelect: (Int) -> Unit) {
                             verticalArrangement = Arrangement.Bottom,
                         ) {
                             if (m > 0) {
-                                Text("$m", style = Type.display.copy(fontSize = 28.sp, lineHeight = 30.sp, letterSpacing = 0.sp))
+                                Text("$m", style = Type.display.copy(fontSize = 22.sp, lineHeight = 26.sp, letterSpacing = 0.sp))
                                 Text("min", style = UiType.caption)
                             } else {
                                 Text("Custom", style = UiType.label.copy(fontWeight = FontWeight.SemiBold))
