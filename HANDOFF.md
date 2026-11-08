@@ -24,6 +24,12 @@
     behind the header.
   - Emulator UI tests for these changes still need a clean run. The run for 756ab76 to c40ee01 lost its emulator
     on the first test.
+- R60 (lock A) was rejected. R61 is the "Watch crystal" lock: polished bezel, face under a watch glass, and
+  a shorter, thicker shackle (TOP 56, LIFT 50, STROKE 28). APK for 4788be7 sent.
+- Emulator UI tests: 70/70 pass on 97dd356+ (API 35, emulator only). The earlier "device not found"
+  failures were the runner losing its emulator. Failed runs now print the emulator log. Screenshots are on
+  `ci-screenshots`; publishing can race with the blocking E2E job's push, so re-fetch if it is stale.
+- Check with the owner: the open shackle now lifts less (50). Confirm it still reads clearly as unlocked.
 - Next: the focus streak in History (R59 spec in product-decisions). Mock it up first, then build.
 
 **Earlier (2026-11-08): owner-led restyle R54-R56, build 428104d (emulator UI tests pass, screenshots reviewed)**
