@@ -28,6 +28,6 @@ object EnforcerStatus {
     fun clear() { state.value = null }
 
     /** True only for a fresh report of verified protection for this session. */
-    fun protecting(sessionId: String, r: Report? = state.value): Boolean =
-        r != null && r.sessionId == sessionId && r.protection == Protection.PROTECTING && r.fresh()
+    fun protecting(sessionId: String, r: Report? = state.value, nowElapsed: Long = SystemClock.elapsedRealtime()): Boolean =
+        r != null && r.sessionId == sessionId && r.protection == Protection.PROTECTING && r.fresh(nowElapsed)
 }

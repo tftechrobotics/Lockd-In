@@ -304,3 +304,20 @@ Three kinds of entry, kept apart on purpose:
 - "One day at a time." is fixed copy the owner asked for. It's a deliberate exception to the no-motivational-filler rule.
 - Added `res/font/literata_display_italic_500.ttf`: a static instance (opsz 36, wght 500) of Google Fonts'
   Literata Italic, subset to Latin (OFL, same license as the other Literata files).
+
+## R64: Profile summary screen (2026-11-08, owner's spec)
+- Opening an existing profile now shows a read-only summary: the name, a status pill, one help line, "Blocked
+  apps · N" (or "Allowed apps · N" in allow-only mode) with real launcher icons, "Websites · N", other rules
+  (music app access, when it isn't "Follow blocking rules"), and a pinned "Edit apps and sites" button. That
+  button opens the existing ProfileEditor, unchanged, and Save or Close returns to the summary. New profiles
+  still go straight to the editor. The header shows "Back to profiles", and switching tabs leaves the summary.
+- Status pill: "Blocking active" only for a running session with this profile and a fresh PROTECTING report
+  (`profileStatus`, unit-tested). Otherwise "Blocking isn't set up" (with a link to Settings › Blocking) when
+  permissions are missing, or "Not in use".
+- Differences from the spec:
+  - There's no olive token and the spec says no new colours, so the active pill uses the existing warm
+    `statusDot` accent at low opacity.
+  - Profiles have no ending-early default (it's global), so that line doesn't appear.
+- Empty block list: "No apps blocked yet" with an "Add apps" button that opens the editor on its Apps tab (the
+  picker). An uninstalled app keeps its row, with a generic icon and "Not installed".
+- CI screenshots: `16-profile-summary-light.png`, `17-profile-summary-dark.png`.

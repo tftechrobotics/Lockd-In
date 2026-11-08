@@ -39,6 +39,7 @@ import app.lockdin.state.ThemeChoice
 import app.lockdin.ui.LockdInApp
 import org.junit.Rule
 import org.junit.Test
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.performScrollToNode
 import org.junit.runner.RunWith
 import java.io.File
@@ -246,8 +247,10 @@ class AppTest {
         launch()
         rule.onNodeWithTag("tab-profiles").performClick()
         rule.onNodeWithText("Study").performClick()
+        rule.onNodeWithText("Edit apps and sites").performClick() // R64: summary first
         rule.onNodeWithText("Allow only these").performClick()
         rule.onNodeWithText("Save").performClick()
+        rule.onNodeWithContentDescription("Back to profiles").performClick() // Save returns to the summary
         rule.onNodeWithText("Only essential apps", substring = true).assertIsDisplayed()
     }
 
@@ -274,6 +277,7 @@ class AppTest {
         launch()
         rule.onNodeWithTag("tab-profiles").performClick()
         rule.onNodeWithText("Study").performClick()
+        rule.onNodeWithText("Edit apps and sites").performClick() // R64: summary first
         rule.onNodeWithText("Websites").performClick()
         rule.onNodeWithContentDescription("Website to block").performTextInput("not a site")
         rule.onNodeWithText("Add").performClick()
@@ -284,6 +288,7 @@ class AppTest {
         // The field is empty again (its placeholder also says youtube.com); the list has the new row.
         rule.onNodeWithText("Remove").assertIsDisplayed()
         rule.onNodeWithText("Save").performClick()
+        rule.onNodeWithContentDescription("Back to profiles").performClick() // Save returns to the summary
         rule.onNodeWithText("1 website blocked during focus").assertIsDisplayed()
     }
 
@@ -291,13 +296,59 @@ class AppTest {
         launch()
         rule.onNodeWithTag("tab-profiles").performClick()
         rule.onNodeWithText("Study").performClick()
+        rule.onNodeWithText("Edit apps and sites").performClick() // R64: summary first
         rule.onNodeWithText("Websites").performClick()
         rule.onAllNodesWithText("Allow only these").onFirst().performClick()
         rule.onNodeWithText("No sites allowed yet", substring = true).assertIsDisplayed()
         rule.onNodeWithContentDescription("Website to allow").performTextInput("wikipedia.org")
         rule.onNodeWithText("Add").performClick()
         rule.onNodeWithText("Save").performClick()
+        rule.onNodeWithContentDescription("Back to profiles").performClick() // Save returns to the summary
         rule.onNodeWithText("Only 1 website allowed during focus").assertIsDisplayed()
+    }
+
+    @Test fun profileSummaryListsAppsAndUpdatesAfterEdit() {
+        val ctx = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        val two = app.lockdin.enforce.InstalledApps.launchable(ctx).take(2)
+        org.junit.Assume.assumeTrue("needs two launchable apps on the emulator", two.size == 2)
+        val rules = app.lockdin.enforce.AppRules(packages = two.map { it.packageName }.toSet(), sites = setOf("youtube.com"))
+        val s = AppState()
+        launch(s.copy(profiles = s.profiles.map { if (it.id == "study") it.copy(rules = rules) else it }), home = true)
+        rule.onNodeWithTag("tab-profiles").performClick()
+        rule.onNodeWithText("Study").performClick()
+        rule.onNodeWithText("Blocked apps · 2").assertIsDisplayed()
+        rule.onNodeWithContentDescription("${two[0].label}, blocked").performScrollTo().assertExists()
+        rule.onNodeWithText("Websites · 1").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag("profile-status").assertContentDescriptionEquals("Status: Not in use")
+        shot("16-profile-summary-light")
+        rule.onNodeWithTag("edit-profile").performClick()
+        rule.onNodeWithContentDescription("Search apps").performTextInput(two[0].label)
+        rule.onAllNodesWithText(two[0].label).onFirst().performClick()
+        rule.onNodeWithText("Save").performClick()
+        rule.onNodeWithText("Blocked apps · 1").assertIsDisplayed()
+        rule.onNodeWithContentDescription("${two[0].label}, blocked").assertDoesNotExist()
+    }
+
+    @Test fun profileSummaryDark() {
+        val ctx = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        val apps = app.lockdin.enforce.InstalledApps.launchable(ctx).take(4).map { it.packageName }.toSet()
+        val rules = app.lockdin.enforce.AppRules(packages = apps, sites = setOf("youtube.com", "reddit.com"))
+        val s = AppState()
+        launch(s.copy(profiles = s.profiles.map { if (it.id == "study") it.copy(rules = rules) else it }), dark = true, home = true)
+        rule.onNodeWithTag("tab-profiles").performClick()
+        rule.onNodeWithText("Study").performClick()
+        rule.onNodeWithText("Edit apps and sites").assertIsDisplayed()
+        shot("17-profile-summary-dark")
+    }
+
+    @Test fun profileSummaryEmptyOffersAddApps() {
+        launch(home = true)
+        rule.onNodeWithTag("tab-profiles").performClick()
+        rule.onNodeWithText("Study").performClick()
+        if (rule.onAllNodesWithText("No apps blocked yet").fetchSemanticsNodes().isNotEmpty()) {
+            rule.onNodeWithText("Add apps").performScrollTo().performClick()
+            rule.onNodeWithContentDescription("Search apps").assertExists()
+        }
     }
 
     @Test fun newProfileOpensEditorAndCanBeDeleted() {
@@ -478,6 +529,7 @@ class AppTest {
         val store = launch(home = true)
         rule.onNodeWithTag("tab-profiles").performClick()
         rule.onNodeWithText("Study").performClick()
+        rule.onNodeWithText("Edit apps and sites").performClick() // R64: summary first
         rule.onNodeWithText("Audio").performClick()
         rule.onNodeWithText("Play study audio").performClick()
         rule.onNodeWithText("Strings").performScrollTo().performClick()

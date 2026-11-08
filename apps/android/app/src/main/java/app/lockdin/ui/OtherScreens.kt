@@ -64,7 +64,7 @@ fun ScrollScreen(content: @Composable () -> Unit) {
 // ---------------- Profiles ----------------
 
 @Composable
-fun ProfilesScreen(store: Store, onEdit: (Profile) -> Unit = {}, onEditPreset: (String) -> Unit = {}) {
+fun ProfilesScreen(store: Store, onOpen: (Profile) -> Unit = {}, onEdit: (Profile) -> Unit = {}, onEditPreset: (String) -> Unit = {}) {
     val c = LocalColors.current
     var naming by rememberSaveable { mutableStateOf(false) }
     ScrollScreen {
@@ -80,7 +80,7 @@ fun ProfilesScreen(store: Store, onEdit: (Profile) -> Unit = {}, onEditPreset: (
                 if (i > 0) GroupDivider()
                 Row(
                     Modifier.fillMaxWidth().heightIn(min = 64.dp)
-                        .clickable(role = Role.Button, onClickLabel = "Edit") { onEdit(p) }
+                        .clickable(role = Role.Button, onClickLabel = "Open") { onOpen(p) }
                         .semantics(mergeDescendants = true) {}
                         .padding(horizontal = Dim.s4, vertical = Dim.s3),
                     verticalAlignment = Alignment.CenterVertically,

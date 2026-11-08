@@ -82,9 +82,11 @@ fun LockdInApp(
         var lastTab by rememberSaveable { mutableStateOf(Route.FOCUS) }
         var editing by remember { mutableStateOf<ScheduledSession?>(null) }
         var editingProfile by remember { mutableStateOf<String?>(null) }
+        // R64: an existing profile opens on its summary first; the editor opens from there.
+        var viewingProfile by rememberSaveable { mutableStateOf<String?>(null) }
         var editingPreset by remember { mutableStateOf<String?>(null) }
         var editingPlace by remember { mutableStateOf<app.lockdin.engine.Place?>(null) }
-        fun go(r: Route) { if (r.tab) lastTab = r; route = r }
+        fun go(r: Route) { if (r.tab) lastTab = r; viewingProfile = null; route = r }
         // The tour points at parts of the Focus home screen (owner 2026-11-03), so it runs there.
         val touring = store.state.tourStep >= 0
         androidx.compose.runtime.LaunchedEffect(touring) { if (touring) go(Route.FOCUS) }
@@ -94,11 +96,12 @@ fun LockdInApp(
             when (asked) { "schedule" -> go(Route.SCHEDULE); "focus" -> go(Route.FOCUS) }
             if (asked != null) Resumes.route = null
         }
-        BackHandler(enabled = editing != null || editingProfile != null || editingPreset != null || editingPlace != null || !route.tab || route != Route.FOCUS) {
+        BackHandler(enabled = editing != null || editingProfile != null || viewingProfile != null || editingPreset != null || editingPlace != null || !route.tab || route != Route.FOCUS) {
             when {
                 editingPlace != null -> editingPlace = null
                 editing != null -> editing = null
                 editingProfile != null -> editingProfile = null
+                viewingProfile != null -> viewingProfile = null
                 editingPreset != null -> editingPreset = null
                 !route.tab -> go(lastTab)
                 else -> go(Route.FOCUS)
@@ -162,7 +165,9 @@ fun LockdInApp(
                         .height(56.dp).padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (!route.tab) {
+                    if (route == Route.PROFILES && viewingProfile != null) {
+                        IconButton(onClick = { viewingProfile = null }) { LockdIcon(LIcon.Back, description = "Back to profiles") }
+                    } else if (!route.tab) {
                         IconButton(onClick = { go(lastTab) }) { LockdIcon(LIcon.Back, description = "Back") }
                     } else Spacer(Modifier.width(16.dp))
                     Image(
@@ -241,7 +246,12 @@ fun LockdInApp(
                     when (route) {
                         Route.FOCUS -> FocusScreen(store, clock, zone, openDevices = { go(Route.DEVICES) }, openSchedule = { go(Route.SCHEDULE) }, openProfile = { editingProfile = it })
                         Route.SCHEDULE -> ScheduleScreen(store, clock.now(), zone, onEdit = { editing = it })
-                        Route.PROFILES -> ProfilesScreen(store, onEdit = { editingProfile = it.id }, onEditPreset = { editingPreset = it })
+                        Route.PROFILES -> {
+                            val viewed = store.state.profiles.firstOrNull { it.id == viewingProfile }
+                            if (viewed != null) ProfileSummary(store, viewed, onEdit = { editingProfile = viewed.id },
+                                openBlocking = { go(Route.SETTINGS); SettingsNav.page = SettingsPage.BLOCKING })
+                            else ProfilesScreen(store, onOpen = { viewingProfile = it.id }, onEdit = { editingProfile = it.id }, onEditPreset = { editingPreset = it })
+                        }
                         Route.DEVICES -> DevicesScreen()
                         Route.SETTINGS -> SettingsScreen(store, hist, zone, onEditPlace = { editingPlace = it })
                         Route.HISTORY -> HistoryScreen(store, hist, clock, zone, onTryUnlocked = { UnlockedTry.pending = true; go(Route.FOCUS) })
