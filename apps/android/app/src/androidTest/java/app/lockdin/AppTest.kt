@@ -452,8 +452,9 @@ class AppTest {
         shot("15-history-streak")
         rule.onNodeWithTag("history-list").performScrollToNode(hasText("Try an unlocked session"))
         rule.onNodeWithText("Try an unlocked session").performClick()
-        rule.onNodeWithText("Unlocked session").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("Start unlocked").performScrollTo().performClick()
+        // Both sit in the pinned area above the tab bar, which doesn't scroll.
+        rule.onNodeWithText("Unlocked session").assertIsDisplayed()
+        rule.onNodeWithText("Start unlocked").performClick()
         org.junit.Assert.assertTrue(store.state.active!!.unlocked)
         openDetails()
         rule.onNodeWithText("Unlocked session · nothing is blocked", substring = true).assertExists()
