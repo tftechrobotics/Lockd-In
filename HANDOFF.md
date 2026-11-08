@@ -4,7 +4,18 @@
 **Read first:** `docs/audit-2026-11.md` (inventory, Freedom, platform limits, architecture) and `docs/milestones.md` (new M1–M5 criteria + evidence table).
 **Repository:** github.com/tftechrobotics/Lockd-In (public since 2026-11-01).
 
-**Newest (2026-11-03 ~11:20 CT), build bb52cc6 sent to owner, compile-only (owner asked: no test run):**
+**Newest (2026-11-07): skills + interface pass 5 (R53), build 1636571**
+- Design skills added in `.claude/skills/` (ui-ux-pro-max set, MIT, upstream 4f2dbb6; `lockd-in-design` moved
+  there). README there: Lockd In rules win; script paths; optional network scripts.
+- Pass 5 (Android): Archivo replaces Outfit + Figtree (expanded = titles, numbers, stamped times, primary
+  button); tonal plates instead of outlined cards; tonal (taupe) secondary buttons; timetable rows with stamped
+  times on Home and Schedule; tab labels capped at 150% text. Open lock lifts higher (LIFT 62), swing removed.
+- Emulator run on 1636571: build/unit/lint pass, UI tests pass, screenshots on `ci-screenshots` reviewed
+  (light, dark, 200% text). Not yet on the owner's phone. Web/Windows still on the old fonts (paused).
+- Still parked on branch `wip-lift-widgets`: Quick start + Today widgets (the lift change is now on main).
+  Not done there: the "new" and "history" routes from the widget taps. Next after the owner's look at pass 5.
+
+**Earlier (2026-11-03 ~11:20 CT), build bb52cc6 sent to owner, compile-only (owner asked: no test run):**
 - `enforce/ShareWindow.kt`: after Ask / invite, messaging apps plus the app picked in the share sheet (chooser callback
   `ShareChosenReceiver`) aren't covered for 5 min (checked in `BlockPolicy.isRestrictedIn`). Owner report: the Ask
   message was blocked. A small race is possible if a non-messaging app is picked (it may be covered before the
