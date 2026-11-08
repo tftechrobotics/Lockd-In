@@ -73,7 +73,7 @@ fun CalendarSuggestions(store: Store, now: Long, zone: ZoneId, onPlan: (Schedule
     }
     val permitted = remember(Resumes.tick) { DeviceCalendar.permitted(ctx) }
     if (!store.state.calendarOn || !permitted) {
-        Surface(shape = RoundedCornerShape(Dim.plate), color = plateColor(), modifier = Modifier.fillMaxWidth()) {
+        Surface(shape = RoundedCornerShape(Dim.plate), color = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.fillMaxWidth().plate()) {
             Column(Modifier.padding(horizontal = plateSide(Dim.s4), vertical = Dim.s4), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
                 Text("Find free time in your calendar", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
                 Text(

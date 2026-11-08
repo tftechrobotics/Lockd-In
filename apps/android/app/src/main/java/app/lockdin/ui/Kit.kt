@@ -6,6 +6,9 @@ package app.lockdin.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -105,7 +108,9 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) {
 val LocalBoxed = androidx.compose.runtime.staticCompositionLocalOf { false }
 
 /** Plate colour and side padding: a plate in Settings, plain (no box, no side inset) elsewhere. */
-@Composable fun plateColor(): Color = if (LocalBoxed.current) LocalColors.current.taupeSoft else Color.Transparent
+@Composable fun plateColor(): Color = Color.Transparent
+/** A Settings plate is frosted glass (R58); elsewhere there is no box. */
+@Composable fun Modifier.plate(): Modifier = if (LocalBoxed.current) this.glass(RoundedCornerShape(Dim.plate)) else this
 @Composable fun plateSide(d: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp = if (LocalBoxed.current) d else 0.dp
 
 /** True when the person turned animations off (Android's "Remove animations"). */
@@ -252,14 +257,79 @@ fun CustomLengthRow(minutes: Int, onChange: (Int) -> Unit, label: String = "Cust
 fun SettingsGroup(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val c = LocalColors.current
     if (!LocalBoxed.current) { Column(modifier.fillMaxWidth(), content = content); return }
-    Surface(shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft, modifier = modifier.fillMaxWidth()) {
-        Column(content = content)
+    // R58: frosted glass over the (blurred) background, a light edge along the top.
+    Column(modifier.fillMaxWidth().glass(RoundedCornerShape(Dim.plate)), content = content)
+}
+
+/** Glass tints (R58). Dark: cream-tinted smoke. Light: milky white. */
+private object Glass {
+    val darkFill = listOf(Color(0x1CF2E6D6), Color(0x0FF2E6D6))
+    val darkEdge = listOf(Color(0x3DFFF5E6), Color(0x0AFFF5E6))
+    val lightFill = listOf(Color(0xB3FFFFFF), Color(0x80FFFFFF))
+    val lightEdge = listOf(Color(0xF2FFFFFF), Color(0x4DFFFFFF))
+}
+
+/** A frosted glass surface: translucent vertical tint and a 1 dp edge that is brightest at the top. */
+@Composable
+fun Modifier.glass(shape: androidx.compose.ui.graphics.Shape): Modifier {
+    val dark = LocalColors.current == DarkColors
+    val fill = if (dark) Glass.darkFill else Glass.lightFill
+    val edge = if (dark) Glass.darkEdge else Glass.lightEdge
+    return this.clip(shape)
+        .background(androidx.compose.ui.graphics.Brush.verticalGradient(fill), shape)
+        .border(1.dp, androidx.compose.ui.graphics.Brush.verticalGradient(edge), shape)
+}
+
+/**
+ * The "Start a session" button (R58, owner's pick "Lens" without the tab lens): a thick slab of
+ * clear glass — bright top edge, a darker lip at the bottom, the background showing through.
+ */
+@Composable
+fun GlassButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val c = LocalColors.current
+    val dark = c == DarkColors
+    val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val shape = RoundedCornerShape(50)
+    val fill = if (dark) listOf(0f to Color(0x4DFFF8EC), 0.48f to Color(0x1AFFF0DC), 1f to Color(0x2EFFF0DC))
+        else listOf(0f to Color(0xF2FFFFFF), 0.48f to Color(0xA6FFFFFF), 1f to Color(0xC7FFFFFF))
+    val rim = if (dark) Color(0x73FFF5E6) else Color(0xFFFFFFFF)
+    val lip = if (dark) Color(0x52000000) else Color(0x24302A25)
+    Box(
+        modifier.fillMaxWidth().heightIn(min = 58.dp).pressScale(source)
+            .clip(shape)
+            .background(androidx.compose.ui.graphics.Brush.verticalGradient(*fill.toTypedArray()), shape)
+            .border(1.5.dp, rim, shape)
+            .drawWithContent {
+                drawContent()
+                val r = size.height / 2
+                // Inner light along the top, inner shade along the bottom: the glass has depth.
+                drawRoundRect(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        0f to Color.White.copy(alpha = if (dark) 0.5f else 0.9f), 0.08f to Color.Transparent,
+                        0.78f to Color.Transparent, 1f to lip,
+                    ),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r),
+                )
+            }
+            .clickable(interactionSource = source, indication = androidx.compose.material3.ripple(), role = Role.Button, onClick = onClick)
+            .padding(horizontal = Dim.s4),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            style = Type.button.copy(
+                fontWeight = FontWeight.SemiBold,
+                shadow = if (dark) androidx.compose.ui.graphics.Shadow(Color(0x80000000), androidx.compose.ui.geometry.Offset(0f, 2f), 4f) else null,
+            ),
+            color = if (dark) Color(0xFFFFF8EE) else c.ink,
+        )
     }
 }
 
 /** Between rows: a cut of the background colour on a Settings plate, a hairline elsewhere. */
 @Composable
-fun GroupDivider() = if (LocalBoxed.current) HorizontalDivider(thickness = 2.dp, color = LocalColors.current.ground)
+fun GroupDivider() = if (LocalBoxed.current) HorizontalDivider(thickness = 1.dp,
+        color = if (LocalColors.current == DarkColors) Color(0x14FFF5E6) else Color(0x1A302A25))
     else HorizontalDivider(thickness = 1.dp, color = LocalColors.current.line)
 
 /** One setting: label on the left, value and chevron on the right; opens a menu of options. */

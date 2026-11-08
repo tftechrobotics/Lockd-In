@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -88,10 +89,13 @@ fun photoFile(ctx: android.content.Context) = File(ctx.filesDir, "backdrop.jpg")
 
 /** Content over the chosen background. With no background this is just `content`. */
 @Composable
-fun BackdropBox(choice: Backdrop, words: String = DEFAULT_BACKDROP_WORDS, content: @Composable BoxScope.() -> Unit) {
+fun BackdropBox(choice: Backdrop, words: String = DEFAULT_BACKDROP_WORDS, frosted: Boolean = false, content: @Composable BoxScope.() -> Unit) {
     if (choice == Backdrop.NONE) { Box(Modifier.fillMaxSize(), content = content); return }
     Box(Modifier.fillMaxSize()) {
-        BackdropLayer(choice, words, Modifier.fillMaxSize())
+        // Frosted (Settings, R58): blurred where the phone supports it (Android 12+) and dimmed
+        // further everywhere so rows stay readable over the glass plates.
+        BackdropLayer(choice, words, Modifier.fillMaxSize().then(if (frosted) Modifier.blur(28.dp) else Modifier))
+        if (frosted) Box(Modifier.fillMaxSize().background(LocalColors.current.ground.copy(alpha = 0.45f)))
         content()
     }
 }

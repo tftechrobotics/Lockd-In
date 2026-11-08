@@ -145,8 +145,9 @@ fun LockdInApp(
         // The chosen background (C2) fills the Focus screen edge to edge, behind the header too.
         Box(Modifier.fillMaxSize()) {
         // Owner 2026-11-03: the chosen background shows on the Focus screen all the time, not only while locked.
-        val backdrop = if (route == Route.FOCUS) runCatching { Backdrop.valueOf(store.state.backdrop) }.getOrDefault(Backdrop.NONE) else Backdrop.NONE
-        BackdropBox(backdrop, store.state.backdropWords) {
+        // R58: Settings shows the same background, blurred and dimmed, behind its glass plates.
+        val backdrop = if (route == Route.FOCUS || route == Route.SETTINGS) runCatching { Backdrop.valueOf(store.state.backdrop) }.getOrDefault(Backdrop.NONE) else Backdrop.NONE
+        BackdropBox(backdrop, store.state.backdropWords, frosted = route == Route.SETTINGS) {
         Scaffold(
             containerColor = if (backdrop != Backdrop.NONE) androidx.compose.ui.graphics.Color.Transparent else c.ground,
             contentWindowInsets = WindowInsets.safeDrawing,
@@ -169,15 +170,22 @@ fun LockdInApp(
                 }
             },
             bottomBar = {
-                Column {
-                    HorizontalDivider(color = c.line)
+                // R58 smoked-glass bar (owner's pick: "Lens", without a lens on the active tab):
+                // the background shows through a dark tint that deepens toward the bottom, with a
+                // light edge along the top. The active tab is marked by ink and weight only.
+                val darkBar = c == DarkColors
+                Column(Modifier.background(androidx.compose.ui.graphics.Brush.verticalGradient(
+                    if (darkBar) listOf(c.ground.copy(alpha = 0.55f), c.ground.copy(alpha = 0.9f))
+                    else listOf(c.ground.copy(alpha = 0.6f), c.ground.copy(alpha = 0.92f)),
+                ))) {
+                    HorizontalDivider(color = if (darkBar) androidx.compose.ui.graphics.Color(0x47FFF0DC) else androidx.compose.ui.graphics.Color(0xE6FFFFFF))
                     // Tab labels grow up to 150% of normal; beyond that "Schedule" breaks mid-word in the
                     // wider LiterataText (pass 5). Screen content still follows the full system text size.
                     val dens = androidx.compose.ui.platform.LocalDensity.current
                     androidx.compose.runtime.CompositionLocalProvider(
                         androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(dens.density, dens.fontScale.coerceAtMost(1.5f)),
                     ) {
-                    NavigationBar(containerColor = c.ground, contentColor = c.ink, tonalElevation = 0.dp) {
+                    NavigationBar(containerColor = androidx.compose.ui.graphics.Color.Transparent, contentColor = c.ink, tonalElevation = 0.dp) {
                         Route.entries.filter { it.tab }.forEach { r ->
                             val selected = (if (route.tab) route else lastTab) == r
                             NavigationBarItem(
@@ -187,7 +195,7 @@ fun LockdInApp(
                                 label = { Text(r.label, style = UiType.caption.copy(fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)) },
                                 modifier = Modifier.testTag("tab-${r.name.lowercase()}").tourTarget("tab-${r.name.lowercase()}"),
                                 colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = c.ink, selectedTextColor = c.ink, indicatorColor = c.taupeSoft,
+                                    selectedIconColor = c.ink, selectedTextColor = c.ink, indicatorColor = androidx.compose.ui.graphics.Color.Transparent,
                                     unselectedIconColor = c.inkMuted, unselectedTextColor = c.inkMuted,
                                 ),
                             )

@@ -124,7 +124,7 @@ fun ScheduleScreen(store: Store, now: Long, zone: ZoneId, onEdit: (ScheduledSess
         }
         CalendarSuggestions(store, now, zone, onPlan = onEdit)
         if (all.isEmpty()) {
-            Surface(shape = RoundedCornerShape(Dim.plate), color = plateColor(), modifier = Modifier.fillMaxWidth()) {
+            Surface(shape = RoundedCornerShape(Dim.plate), color = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.fillMaxWidth().plate()) {
                 Column(Modifier.padding(horizontal = plateSide(Dim.s5), vertical = Dim.s5), verticalArrangement = Arrangement.spacedBy(Dim.s3), horizontalAlignment = Alignment.CenterHorizontally) {
                     LockdIcon(LIcon.Calendar, size = 28.dp, tint = c.inkMuted)
                     Text("No sessions planned yet", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
@@ -138,7 +138,7 @@ fun ScheduleScreen(store: Store, now: Long, zone: ZoneId, onEdit: (ScheduledSess
         next?.let { n ->
             Column {
                 SectionLabel("Next up")
-                Surface(shape = RoundedCornerShape(Dim.plate), color = plateColor(), modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { onEdit(n.session) }) {
+                Surface(shape = RoundedCornerShape(Dim.plate), color = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.fillMaxWidth().plate().clickable(role = Role.Button) { onEdit(n.session) }) {
                     Row(Modifier.padding(horizontal = plateSide(Dim.s4), vertical = Dim.s3), verticalAlignment = Alignment.CenterVertically) {
                         val st = Instant.ofEpochMilli(n.start).atZone(zone)
                         Column(Modifier.widthIn(min = 64.dp).padding(end = Dim.s3).clearAndSetSemantics { }) {

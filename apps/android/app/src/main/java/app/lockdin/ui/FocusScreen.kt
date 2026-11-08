@@ -248,7 +248,7 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
                 }
             }
         },
-        actions = { MainButton("Start a session", onNew, modifier = Modifier.tourTarget("new")) },
+        actions = { GlassButton("Start a session", onNew, modifier = Modifier.tourTarget("new")) },
     )
 }
 
@@ -846,7 +846,7 @@ private fun AudioControl(session: ActiveSession, isBreak: Boolean) {
     val a = session.audio
     val player = app.lockdin.audio.StudyPlayer
     var open by rememberSaveable { mutableStateOf(false) }
-    Surface(shape = RoundedCornerShape(Dim.plate), color = plateColor(), modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(Dim.plate), color = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.fillMaxWidth().plate()) {
         Column(Modifier.padding(horizontal = plateSide(Dim.s2), vertical = Dim.s1)) {
             if (a.builtIn) {
                 val playing = player.isPlaying
@@ -931,7 +931,7 @@ private fun QuestionTimer(store: Store, session: ActiveSession, now: Long) {
     }
     val t = app.lockdin.engine.Questions.elapsed(cur, q, now)
     val long = app.lockdin.engine.Questions.runningLong(q, store.state.questionTimes + app.lockdin.engine.Questions.durations(q), now)
-    Surface(shape = RoundedCornerShape(Dim.plate), color = plateColor(), modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(Dim.plate), color = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.fillMaxWidth().plate()) {
         Column(Modifier.padding(horizontal = plateSide(Dim.s3), vertical = Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Question ${cur.n}", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink, modifier = Modifier.weight(1f))

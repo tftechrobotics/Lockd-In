@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -287,16 +288,22 @@ fun ClockLock(
             val center = Offset(CX * s, (CY - MIN_Y) * s)
             val hiFrame = lerp(lc.frame, Color.White, if (dark) 0.14f else 0.32f)
             val loFrame = lerp(lc.frame, Color.Black, if (dark) 0.28f else 0.14f)
-            // Shackle: matte, lit from the upper left, with a soft shadow to the lower right.
+            // Shackle: lit from the upper left, with a soft shadow to the lower right.
             translate(top = -LIFT * s * (1 - closed)) {
                 drawIntoCanvas { cv ->
                     shadowPaint.color = lc.frame.toArgb()
                     shadowPaint.setShadowLayer(7f * s, 2.5f * s, 4f * s, Color.Black.copy(alpha = if (dark) 0.45f else 0.13f).toArgb())
                     cv.nativeCanvas.drawPath(shackleNative, shadowPaint)
                 }
-                drawPath(shackle, Brush.linearGradient(
-                    listOf(hiFrame, lc.frame, loFrame),
-                    start = Offset((CX - RO) * s, (TOP - MIN_Y) * s), end = Offset((CX + RO) * s, (TOP + RO - MIN_Y) * s),
+                // Polished metal (R58): banded across the bar like turned steel, then a gloss from the top.
+                drawPath(shackle, Brush.horizontalGradient(
+                    0f to loFrame, 0.12f to hiFrame, 0.22f to lc.frame, 0.5f to lerp(lc.frame, Color.White, if (dark) 0.06f else 0.12f),
+                    0.78f to lc.frame, 0.88f to hiFrame, 1f to loFrame,
+                    startX = (CX - RO) * s, endX = (CX + RO) * s,
+                ))
+                drawPath(shackle, Brush.verticalGradient(
+                    0f to Color.White.copy(alpha = if (dark) 0.34f else 0.5f), 0.32f to Color.White.copy(alpha = 0.06f), 0.5f to Color.Transparent,
+                    startY = (TOP - MIN_Y) * s, endY = (CY - MIN_Y) * s,
                 ))
             }
             // Dial: soft lower-right shadow, a rim lit from the upper left, a matte face.
@@ -334,6 +341,17 @@ fun ClockLock(
                 ),
                 faceR - 1f * s, center, style = Stroke(2.2f * s),
             )
+            // Glass face (R58): a soft reflection across the upper half, clipped to the face.
+            clipPath(Path().apply { addOval(Rect(center, faceR)) }) {
+                drawOval(
+                    Brush.verticalGradient(
+                        0f to Color.White.copy(alpha = if (dark) 0.16f else 0.42f), 1f to Color.Transparent,
+                        startY = center.y - faceR, endY = center.y - faceR * 0.05f,
+                    ),
+                    topLeft = Offset(center.x - faceR * 0.92f, center.y - faceR * 1.02f),
+                    size = androidx.compose.ui.geometry.Size(faceR * 1.84f, faceR * 0.98f),
+                )
+            }
             // Tick ring: the only layer the start sequence turns. The 12 o'clock index is slightly
             // heavier so the turn reads like a combination dial.
             rotate(dial.value, pivot = center) {
