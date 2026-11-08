@@ -95,6 +95,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           working-directory: apps/android
           script: |
+            mkdir -p ../../out && (adb logcat -v time > ../../out/logcat.txt 2>&1 &)
             ./gradlew --no-daemon connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true || touch ../../ui-tests-failed
             mkdir -p ../../out/screens && adb exec-out run-as app.lockdin tar c -C files screens > ../../out/screens.tar || true
       - name: Report UI test results
@@ -112,7 +113,12 @@ jobs:
                       print(f"::error title=UI test {tc.get('name')}::{msg}")
           print(f"::notice title=Android UI tests (EMULATOR ONLY)::{total - failed}/{total} passed")
           PY
-          if [ -f ui-tests-failed ]; then exit 1; fi
+          if [ -f ui-tests-failed ]; then
+            echo "--- last emulator log lines (errors and crashes) ---"
+            grep -E " (F|E)/|FATAL|AndroidRuntime|DEBUG|libc" out/logcat.txt 2>/dev/null | tail -n 120 || true
+            echo "--- final lines ---"; tail -n 40 out/logcat.txt 2>/dev/null || true
+            exit 1
+          fi
       - name: Publish screenshots to the ci-screenshots branch
         if: always()
         run: |
