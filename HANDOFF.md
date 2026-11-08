@@ -12,6 +12,20 @@
   "Start a session" button. The greeting stays unboxed. Check the emulator screenshots for both themes before
   sending the APK.
 
+- R59 (owner feedback from the phone, build 3e75a56):
+  - Stronger Settings glass, and no strip behind pinned actions.
+  - Tab bar nearly solid smoke so it's always readable.
+  - Light-mode scenes faded to 45%.
+  - Glossier lock: rim bands, shackle streak, face glint.
+  - Schedule is now three parts split by `SectionRule()`: month calendar (`MonthCalendar.kt`), the chosen
+    day (Skip per day, free time via `DayFreeTime`), and "Your plans". "Next up" was removed from Schedule.
+  - History: a rule plus a title for each day, and time-first rows.
+  - Content scrolls behind the header: `LocalTopInset` is added inside each scrolling screen, with a soft fade
+    behind the header.
+  - Emulator UI tests for these changes still need a clean run. The run for 756ab76 to c40ee01 lost its emulator
+    on the first test.
+- Next: the focus streak in History (R59 spec in product-decisions). Mock it up first, then build.
+
 **Earlier (2026-11-08): owner-led restyle R54-R56, build 428104d (emulator UI tests pass, screenshots reviewed)**
 - Home: lock (lower), then a greeting + one line about what's next (R54). No boxes outside Settings via
   `LocalBoxed` in `ui/Kit.kt`; underline-bar choices (`UnderlineOption`); motion: press-in, sliding selection
