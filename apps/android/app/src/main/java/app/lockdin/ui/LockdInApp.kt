@@ -244,7 +244,7 @@ fun LockdInApp(
                         Route.PROFILES -> ProfilesScreen(store, onEdit = { editingProfile = it.id }, onEditPreset = { editingPreset = it })
                         Route.DEVICES -> DevicesScreen()
                         Route.SETTINGS -> SettingsScreen(store, hist, zone, onEditPlace = { editingPlace = it })
-                        Route.HISTORY -> HistoryScreen(store, hist, clock, zone, onTryUnlocked = { UnlockedTry.pending = true; route = Route.FOCUS })
+                        Route.HISTORY -> HistoryScreen(store, hist, clock, zone, onTryUnlocked = { UnlockedTry.pending = true; go(Route.FOCUS) })
                     }
                     }
                 }
