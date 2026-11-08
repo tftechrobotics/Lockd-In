@@ -3,4 +3,6 @@
     <string name="app_name">Lockd In</string>
     <string name="a11y_label">Lockd In blocking</string>
     <string name="a11y_description">During focus sessions you start, Lockd In uses this to see which app comes to the front and, in supported browsers, the web address, so it can cover the apps and sites you chose to block. It does not read what you type, your messages or page content, stores and sends nothing, and never acts in other apps.</string>
+    <string name="widget_quick_description">A small lock. Tap to start a focus session; shows the countdown while you focus.</string>
+    <string name="widget_today_description">How long you focused today and this week.</string>
 </resources>

@@ -78,14 +78,11 @@ private const val RIM = 7f
 private const val RO = 74.5f
 private const val STROKE = 21f
 private const val TOP = 40f
-private const val LIFT = 36f
-/** Open shackle also swings out on its left leg (owner 2026-11-04: open must not read as locked). */
-private const val SWING = 24f
-/** Lift while swung (the swing itself raises the free end ~60 units; keeps the arc inside the layout). */
-private const val OPEN_LIFT = 14f
+/** How far the open shackle rises (owner 2026-11-04: higher, so open can't be mistaken for locked; was 36). */
+private const val LIFT = 62f
 private const val TICKS = 60
-private const val MIN_Y = TOP - LIFT - 4f            // 0
-private const val H = CY + R + 4f - MIN_Y             // 344
+private const val MIN_Y = TOP - LIFT - 4f            // -26
+private const val H = CY + R + 4f - MIN_Y             // 370
 
 private fun shacklePath(s: Float): Path {
     val ri = RO - STROKE
@@ -290,10 +287,7 @@ fun ClockLock(
             val hiFrame = lerp(lc.frame, Color.White, if (dark) 0.14f else 0.32f)
             val loFrame = lerp(lc.frame, Color.Black, if (dark) 0.28f else 0.14f)
             // Shackle: matte, lit from the upper left, with a soft shadow to the lower right.
-            // Open: lifted and swung out around the left leg, so the free end sits clearly away from the body.
-            val legTop = CY - sqrt(R * R - RO * RO)
-            rotate(degrees = -SWING * (1 - closed), pivot = Offset((CX - RO) * s, (legTop - MIN_Y) * s))
-            { translate(top = -OPEN_LIFT * s * (1 - closed)) {
+            translate(top = -LIFT * s * (1 - closed)) {
                 drawIntoCanvas { cv ->
                     shadowPaint.color = lc.frame.toArgb()
                     shadowPaint.setShadowLayer(7f * s, 2.5f * s, 4f * s, Color.Black.copy(alpha = if (dark) 0.45f else 0.13f).toArgb())
@@ -303,7 +297,7 @@ fun ClockLock(
                     listOf(hiFrame, lc.frame, loFrame),
                     start = Offset((CX - RO) * s, (TOP - MIN_Y) * s), end = Offset((CX + RO) * s, (TOP + RO - MIN_Y) * s),
                 ))
-            } }
+            }
             // Dial: soft lower-right shadow, a rim lit from the upper left, a matte face.
             drawIntoCanvas { cv ->
                 shadowPaint.color = lc.frame.toArgb()

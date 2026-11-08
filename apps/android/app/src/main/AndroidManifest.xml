@@ -153,6 +153,19 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info" />
         </receiver>
+        <!-- More widgets (owner 2026-11-04): Quick start (small lock) and Today (time focused). -->
+        <receiver android:name=".widget.QuickStartWidget" android:exported="false" android:label="Quick start">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_quick_info" />
+        </receiver>
+        <receiver android:name=".widget.TodayWidget" android:exported="false" android:label="Today">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_today_info" />
+        </receiver>
         <receiver android:name=".sched.CheckInReceiver" android:exported="false" />
         <receiver android:name=".loc.GeofenceReceiver" android:exported="false" />
         <receiver android:name=".loc.PlaceActionReceiver" android:exported="false" />

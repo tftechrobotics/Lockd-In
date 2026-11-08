@@ -60,6 +60,8 @@ class LockdInWidget : AppWidgetProvider() {
 
         /** Refreshes every placed widget if what it shows changed (or `force`). Main thread. */
         fun update(ctx: Context, force: Boolean = false) {
+            runCatching { QuickStartWidget.update(ctx) }
+            runCatching { TodayWidget.update(ctx) }
             val mgr = AppWidgetManager.getInstance(ctx) ?: return
             val ids = runCatching { mgr.getAppWidgetIds(ComponentName(ctx, LockdInWidget::class.java)) }.getOrNull() ?: return
             if (ids.isEmpty()) return
