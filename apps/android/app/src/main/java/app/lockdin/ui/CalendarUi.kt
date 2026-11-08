@@ -61,9 +61,12 @@ fun rememberCalendarEvents(store: Store, from: Long, to: Long): List<CalEvent>? 
     return events
 }
 
-/** "Free time" suggestions for today and tomorrow, or the offer to turn them on. */
+/**
+ * Free time on one day from the phone's calendars (R59: one day at a time, picked on the month
+ * calendar), or the offer to turn calendar suggestions on.
+ */
 @Composable
-fun CalendarSuggestions(store: Store, now: Long, zone: ZoneId, onPlan: (ScheduledSession) -> Unit) {
+fun DayFreeTime(store: Store, day: LocalDate, now: Long, zone: ZoneId, onPlan: (ScheduledSession) -> Unit) {
     val c = LocalColors.current
     val ctx = LocalContext.current
     val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
@@ -73,43 +76,33 @@ fun CalendarSuggestions(store: Store, now: Long, zone: ZoneId, onPlan: (Schedule
     }
     val permitted = remember(Resumes.tick) { DeviceCalendar.permitted(ctx) }
     if (!store.state.calendarOn || !permitted) {
-        Surface(shape = RoundedCornerShape(Dim.plate), color = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.fillMaxWidth().plate()) {
-            Column(Modifier.padding(horizontal = plateSide(Dim.s4), vertical = Dim.s4), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
-                Text("Find free time in your calendar", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
-                Text(
-                    "Lockd In can read the calendars on this phone, including Google Calendar, to suggest study times. It never changes your calendar, and nothing is planned unless you save it.",
-                    style = UiType.caption, color = c.inkMuted,
-                )
-                SecondaryButton(if (store.state.calendarOn && !permitted) "Allow calendar access" else "Use my calendar", {
-                    if (permitted) store.update { it.copy(calendarOn = true) } else ask.launch(Manifest.permission.READ_CALENDAR)
-                })
-            }
+        Column(verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+            Text("Find free time in your calendar", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
+            Text(
+                "Lockd In can read the calendars on this phone, including Google Calendar, to suggest study times. It never changes your calendar, and nothing is planned unless you save it.",
+                style = UiType.caption, color = c.inkMuted,
+            )
+            SecondaryButton(if (store.state.calendarOn && !permitted) "Allow calendar access" else "Use my calendar", {
+                if (permitted) store.update { it.copy(calendarOn = true) } else ask.launch(Manifest.permission.READ_CALENDAR)
+            })
         }
         return
     }
-    val from = today.atStartOfDay(zone).toInstant().toEpochMilli()
-    val to = today.plusDays(2).atStartOfDay(zone).toInstant().toEpochMilli()
+    if (day.isBefore(today)) return
+    val from = day.atStartOfDay(zone).toInstant().toEpochMilli()
+    val to = day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
     val events = rememberCalendarEvents(store, from, to)
-    Column(verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
-        Text("Free time", style = UiType.section, color = c.inkMuted, modifier = Modifier.semantics { heading() })
+    Column {
+        Text("Free time", style = UiType.section, color = c.inkMuted, modifier = Modifier.padding(bottom = Dim.s1).semantics { heading() })
         when {
             events == null -> Text("Reading your calendar…", style = UiType.caption, color = c.inkMuted)
             else -> {
-                val days = listOf(today, today.plusDays(1)).map { d ->
-                    d to CalendarPlan.freeWindows(events, d, zone, now).take(3)
+                val windows = CalendarPlan.freeWindows(events, day, zone, now).take(4)
+                if (windows.isEmpty()) Text("No free blocks of 25 minutes or more between 8 AM and 10 PM.", style = UiType.caption, color = c.inkMuted)
+                windows.forEachIndexed { i, w ->
+                    if (i > 0) androidx.compose.material3.HorizontalDivider(color = c.line)
+                    WindowRow(w, zone) { onPlan(suggested(store, w, day, zone)) }
                 }
-                if (days.all { it.second.isEmpty() }) Text("No free blocks of 25 minutes or more between 8 AM and 10 PM today or tomorrow.", style = UiType.caption, color = c.inkMuted)
-                else SettingsGroup {
-                    var first = true
-                    days.forEach { (d, windows) ->
-                        windows.forEach { w ->
-                            if (!first) GroupDivider()
-                            first = false
-                            WindowRow(w, d, today, zone) { onPlan(suggested(store, w, d, zone)) }
-                        }
-                    }
-                }
-                Text("From the calendars on this phone. Tap one to plan it; you can change anything before saving.", style = UiType.caption, color = c.inkMuted)
             }
         }
     }
@@ -121,18 +114,19 @@ private fun suggested(store: Store, w: FreeWindow, d: LocalDate, zone: ZoneId): 
 }
 
 @Composable
-private fun WindowRow(w: FreeWindow, d: LocalDate, today: LocalDate, zone: ZoneId, onClick: () -> Unit) {
+private fun WindowRow(w: FreeWindow, zone: ZoneId, onClick: () -> Unit) {
     val c = LocalColors.current
+    // R59: the time on its own line, larger, with room around it (owner: the list felt clumped).
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button, onClickLabel = "Plan a session", onClick = onClick)
-            .semantics(mergeDescendants = true) {}.padding(horizontal = Dim.s4, vertical = Dim.s2),
+        Modifier.fillMaxWidth().heightIn(min = 72.dp).clickable(role = Role.Button, onClickLabel = "Plan a session", onClick = onClick)
+            .semantics(mergeDescendants = true) {}.padding(vertical = Dim.s3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
-            Text("${if (d == today) "Today" else "Tomorrow"} · ${Fmt.clock(w.start, zone)}–${Fmt.clock(w.end, zone)}", style = UiType.label, color = c.ink)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("${Fmt.clock(w.start, zone)} – ${Fmt.clock(w.end, zone)}", style = Type.fact, color = c.ink)
             Text("${minutesLabel(w.minutes)} free", style = UiType.caption, color = c.inkMuted)
         }
-        LockdIcon(LIcon.Plus, size = 18.dp, tint = c.inkMuted)
+        Text("Plan", style = UiType.label.copy(fontWeight = FontWeight.SemiBold, textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline), color = c.ink)
     }
 }
 

@@ -94,8 +94,8 @@ fun BackdropBox(choice: Backdrop, words: String = DEFAULT_BACKDROP_WORDS, froste
     Box(Modifier.fillMaxSize()) {
         // Frosted (Settings, R58): blurred where the phone supports it (Android 12+) and dimmed
         // further everywhere so rows stay readable over the glass plates.
-        BackdropLayer(choice, words, Modifier.fillMaxSize().then(if (frosted) Modifier.blur(28.dp) else Modifier))
-        if (frosted) Box(Modifier.fillMaxSize().background(LocalColors.current.ground.copy(alpha = 0.45f)))
+        BackdropLayer(choice, words, Modifier.fillMaxSize().then(if (frosted) Modifier.blur(14.dp) else Modifier))
+        if (frosted) Box(Modifier.fillMaxSize().background(LocalColors.current.ground.copy(alpha = 0.3f)))
         content()
     }
 }

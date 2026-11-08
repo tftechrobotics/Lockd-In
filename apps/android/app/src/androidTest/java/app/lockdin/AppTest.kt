@@ -217,7 +217,7 @@ class AppTest {
         rule.onNodeWithText("Display over other apps").performScrollTo().assertIsDisplayed()
         rule.onNodeWithContentDescription("Back").performClick()
         rule.onNodeWithTag("tab-schedule").performClick()
-        rule.onNodeWithText("No sessions planned yet").assertIsDisplayed()
+        rule.onNodeWithText("No sessions planned yet").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag("tab-profiles").performClick()
         rule.onNodeWithText("Study").assertIsDisplayed()
         rule.onNodeWithContentDescription("Settings").performClick()
@@ -491,8 +491,8 @@ class AppTest {
     @Test fun scheduleOffersCalendarSuggestionsOnlyWhenAsked() {
         launch(home = true)
         rule.onNodeWithTag("tab-schedule").performClick()
-        rule.onNodeWithText("Find free time in your calendar").assertIsDisplayed()
-        rule.onNodeWithText("never changes your calendar", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Find free time in your calendar").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("never changes your calendar", substring = true).performScrollTo().assertIsDisplayed()
         rule.onNodeWithContentDescription("Settings").performClick()
         openSection("Calendar")
         rule.onNodeWithText("Suggest times from my calendar").performScrollTo().assertIsDisplayed()
@@ -720,21 +720,22 @@ class AppTest {
     @Test fun scheduleAddToggleEditDelete() {
         launch()
         rule.onNodeWithTag("tab-schedule").performClick()
-        rule.onNodeWithText("Add session").performClick()
+        rule.onNodeWithText("Add session").performScrollTo().performClick()
         rule.onNode(hasText("Name") and hasSetTextAction()).performTextInput("Physics review")
         // The software keyboard can cover this summary on the test device; checking it exists is enough here.
         rule.onNodeWithText("every week at", substring = true).assertExists()
         rule.onNodeWithText("Save session").performClick()
-        rule.onNodeWithText("Weekly routines").assertIsDisplayed()
-        rule.onNodeWithText("Next up").assertIsDisplayed()
+        rule.onNodeWithText("Weekly routines").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Next up").performScrollTo().assertIsDisplayed()
         rule.onAllNodesWithText("Physics review").onFirst().assertIsDisplayed()
         rule.onNodeWithContentDescription("Physics review on").performClick()
         rule.onNodeWithText("Off").assertIsDisplayed()
-        rule.onNodeWithText("Physics review").performClick()
+        // The plan shows on the chosen day, under Next up and in the routine list; edit from the list.
+        rule.onAllNodesWithText("Physics review").onLast().performScrollTo().performClick()
         rule.onNodeWithText("Edit session").assertIsDisplayed()
         rule.onNodeWithText("Delete").performClick()
         rule.onAllNodesWithText("Delete").onLast().performClick()
-        rule.onNodeWithText("No sessions planned yet").assertIsDisplayed()
+        rule.onNodeWithText("No sessions planned yet").performScrollTo().assertIsDisplayed()
     }
 
     // ---- Screenshots for design review (pulled by CI; not assertions) ----
@@ -789,7 +790,7 @@ class AppTest {
         launch()
         rule.onNodeWithTag("tab-schedule").performClick()
         shot("07-schedule-empty")
-        rule.onNodeWithText("Add session").performClick()
+        rule.onNodeWithText("Add session").performScrollTo().performClick()
         rule.onNode(hasText("Name") and hasSetTextAction()).performTextInput("Physics review")
         shot("08-schedule-editor")
         rule.onNodeWithText("Save session").performClick()
@@ -825,7 +826,7 @@ class AppTest {
     @Test fun autoStartIsExplainedBeforeItTurnsOn() {
         launch()
         rule.onNodeWithTag("tab-schedule").performClick()
-        rule.onNodeWithText("Add session").performClick()
+        rule.onNodeWithText("Add session").performScrollTo().performClick()
         rule.onNode(hasText("Name") and hasSetTextAction()).performTextInput("Physics review")
         rule.onNodeWithText("Start automatically").performScrollTo().performClick()
         rule.onNodeWithText("Start this session automatically?").assertIsDisplayed()

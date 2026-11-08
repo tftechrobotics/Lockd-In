@@ -122,16 +122,21 @@ fun ScheduleScreen(store: Store, now: Long, zone: ZoneId, onEdit: (ScheduledSess
             ScreenTitle("Schedule", Modifier.weight(1f))
             if (all.isNotEmpty()) SecondaryButton("Add session", add)
         }
-        CalendarSuggestions(store, now, zone, onPlan = onEdit)
+        // R59: a real month calendar; the chosen day's plans and free time show under it.
+        var month by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(java.time.YearMonth.from(today)) }
+        var day by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(today) }
+        MonthCalendar(
+            month = month, onMonth = { month = it }, selected = day, today = today,
+            planned = { d -> all.count { it.enabled && it.occursOn(d) } },
+            onSelect = { day = it },
+        )
+        DayAgenda(store, day, today, now, zone, profileName, onEdit)
         if (all.isEmpty()) {
-            Surface(shape = RoundedCornerShape(Dim.plate), color = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.fillMaxWidth().plate()) {
-                Column(Modifier.padding(horizontal = plateSide(Dim.s5), vertical = Dim.s5), verticalArrangement = Arrangement.spacedBy(Dim.s3), horizontalAlignment = Alignment.CenterHorizontally) {
-                    LockdIcon(LIcon.Calendar, size = 28.dp, tint = c.inkMuted)
-                    Text("No sessions planned yet", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
-                    Text("Plan a weekly routine, like weeknights at 7, or a one-time study block. The next one shows on Focus.",
-                        style = UiType.caption, color = c.inkMuted, textAlign = TextAlign.Center)
-                    MainButton("Add session", add, icon = LIcon.Plus)
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
+                Text("No sessions planned yet", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
+                Text("Plan a weekly routine, like weeknights at 7, or a one-time study block. The next one shows on Focus.",
+                    style = UiType.caption, color = c.inkMuted)
+                GlassButton("Add session", add)
             }
             return@Column
         }
@@ -181,6 +186,44 @@ fun ScheduleScreen(store: Store, now: Long, zone: ZoneId, onEdit: (ScheduledSess
         if (past.isNotEmpty()) TextAction("Clear ${past.size} past one-time session${if (past.size > 1) "s" else ""}", {
             store.update { st -> st.copy(schedule = st.schedule.filterNot { it in past }) }
         })
+    }
+}
+
+/** The chosen day: its planned sessions (tap to edit), a way to plan one, then free time. */
+@Composable
+private fun DayAgenda(
+    store: Store, day: LocalDate, today: LocalDate, now: Long, zone: ZoneId,
+    profileName: (String) -> String, onEdit: (ScheduledSession) -> Unit,
+) {
+    val c = LocalColors.current
+    val plans = store.state.schedule.filter { it.enabled && it.occursOn(day) }.sortedBy { it.startTime }
+    Column(verticalArrangement = Arrangement.spacedBy(Dim.s4)) {
+        Text(dayTitle(day, today), style = Type.title, color = c.ink, modifier = Modifier.semantics { androidx.compose.ui.semantics.heading() })
+        if (plans.isEmpty()) Text(if (day.isBefore(today)) "Nothing was planned." else "Nothing planned.", style = UiType.caption, color = c.inkMuted)
+        else Column {
+            plans.forEachIndexed { i, s ->
+                if (i > 0) androidx.compose.material3.HorizontalDivider(color = c.line)
+                val st = Schedule.startOn(s, day, zone)
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 72.dp).clickable(role = Role.Button, onClickLabel = "Edit") { onEdit(s) }
+                        .semantics(mergeDescendants = true) {}.padding(vertical = Dim.s3),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("${Fmt.clock(st, zone)} – ${Fmt.clock(st + s.totalMinutes * 60_000L, zone)}", style = Type.fact, color = c.ink)
+                        Text(s.title.ifBlank { "Study" }, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
+                        Text("${planLabel(s)} · ${profileName(s.profileId)}", style = UiType.caption, color = c.inkMuted)
+                    }
+                    LockdIcon(LIcon.Chevron, size = 18.dp, tint = c.inkMuted)
+                }
+            }
+        }
+        if (!day.isBefore(today)) {
+            TextAction("Plan a session ${if (day == today) "today" else if (day == today.plusDays(1)) "tomorrow" else "this day"}", {
+                onEdit(ScheduledSession("", "Study", emptySet(), LocalTime.of(19, 0), 40, 10, 2, store.state.last.profileId, date = day))
+            })
+            DayFreeTime(store, day, now, zone, onPlan = onEdit)
+        }
     }
 }
 

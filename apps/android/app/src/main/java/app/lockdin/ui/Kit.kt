@@ -8,6 +8,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -263,20 +264,32 @@ fun SettingsGroup(modifier: Modifier = Modifier, content: @Composable ColumnScop
 
 /** Glass tints (R58). Dark: cream-tinted smoke. Light: milky white. */
 private object Glass {
-    val darkFill = listOf(Color(0x1CF2E6D6), Color(0x0FF2E6D6))
-    val darkEdge = listOf(Color(0x3DFFF5E6), Color(0x0AFFF5E6))
-    val lightFill = listOf(Color(0xB3FFFFFF), Color(0x80FFFFFF))
-    val lightEdge = listOf(Color(0xF2FFFFFF), Color(0x4DFFFFFF))
+    // Owner 2026-11-08: the first pass read as plain plates; stronger tint, edge and a sheen.
+    val darkFill = listOf(Color(0x33F2E6D6), Color(0x14F2E6D6))
+    val darkEdge = listOf(Color(0x8CFFF5E6), Color(0x14FFF5E6))
+    val lightFill = listOf(Color(0xB3FFFFFF), Color(0x73FFFFFF))
+    val lightEdge = listOf(Color(0xFFFFFFFF), Color(0x4DFFFFFF))
 }
 
-/** A frosted glass surface: translucent vertical tint and a 1 dp edge that is brightest at the top. */
+/**
+ * A frosted glass surface: translucent tint, a 1 dp edge brightest at the top, and a soft diagonal
+ * sheen across the upper left, so it reads as glass rather than a flat plate.
+ */
 @Composable
 fun Modifier.glass(shape: androidx.compose.ui.graphics.Shape): Modifier {
     val dark = LocalColors.current == DarkColors
     val fill = if (dark) Glass.darkFill else Glass.lightFill
     val edge = if (dark) Glass.darkEdge else Glass.lightEdge
+    val sheen = Color.White.copy(alpha = if (dark) 0.10f else 0.35f)
     return this.clip(shape)
         .background(androidx.compose.ui.graphics.Brush.verticalGradient(fill), shape)
+        .drawBehind {
+            drawRect(androidx.compose.ui.graphics.Brush.linearGradient(
+                0f to sheen, 0.35f to Color.Transparent, 1f to Color.Transparent,
+                start = androidx.compose.ui.geometry.Offset.Zero,
+                end = androidx.compose.ui.geometry.Offset(size.width * 0.6f, size.height * 1.2f),
+            ))
+        }
         .border(1.dp, androidx.compose.ui.graphics.Brush.verticalGradient(edge), shape)
 }
 
@@ -394,8 +407,8 @@ fun SettingRow(
 @Composable
 fun ActionBar(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val c = LocalColors.current
-    Column(modifier.fillMaxWidth().background(c.ground)) {
-        HorizontalDivider(color = c.line)
+    // Owner 2026-11-08: no strip behind the pinned actions; the screen's background shows through.
+    Column(modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = Dim.gutter, vertical = Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s2), content = content)
     }
 }

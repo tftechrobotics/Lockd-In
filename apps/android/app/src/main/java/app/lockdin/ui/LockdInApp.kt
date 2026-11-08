@@ -175,8 +175,8 @@ fun LockdInApp(
                 // light edge along the top. The active tab is marked by ink and weight only.
                 val darkBar = c == DarkColors
                 Column(Modifier.background(androidx.compose.ui.graphics.Brush.verticalGradient(
-                    if (darkBar) listOf(c.ground.copy(alpha = 0.55f), c.ground.copy(alpha = 0.9f))
-                    else listOf(c.ground.copy(alpha = 0.6f), c.ground.copy(alpha = 0.92f)),
+                    if (darkBar) listOf(c.ground.copy(alpha = 0.22f), c.ground.copy(alpha = 0.6f))
+                    else listOf(c.ground.copy(alpha = 0.3f), c.ground.copy(alpha = 0.7f)),
                 ))) {
                     HorizontalDivider(color = if (darkBar) androidx.compose.ui.graphics.Color(0x47FFF0DC) else androidx.compose.ui.graphics.Color(0xE6FFFFFF))
                     // Tab labels grow up to 150% of normal; beyond that "Schedule" breaks mid-word in the
