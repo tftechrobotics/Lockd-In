@@ -28,6 +28,8 @@ data class HistoryEntry(
     /** Set when the session came from a planned occurrence ("KIND-free" occurrence key). */
     val occurrenceKey: String? = null,
     val blocked: Map<String, Int> = emptyMap(),
+    /** An unlocked session (R62): nothing was blocked; `blocked` holds apps opened anyway. */
+    val unlocked: Boolean = false,
 ) {
     val focusedMinutes: Long get() = focusedMs / 60_000
 }
@@ -57,6 +59,7 @@ object History {
     fun entryFor(
         id: String, start: Long, segments: List<Segment>, controls: SessionControls, now: Long,
         task: String?, profileId: String, profileName: String, occurrenceKey: String?, blocked: Map<String, Int>,
+        unlocked: Boolean = false,
     ): HistoryEntry {
         val occ = Session.occurrenceFrom(start, segments)
         val snap = Session.evaluate(occ, controls, now)
@@ -75,7 +78,7 @@ object History {
             plannedFocusMs = focus.sumOf { it.end - it.start },
             roundsDone = focus.count { it.end <= end }, roundsPlanned = focus.size,
             task = task, profileId = profileId, profileName = profileName, outcome = outcome,
-            occurrenceKey = occurrenceKey, blocked = blocked,
+            occurrenceKey = occurrenceKey, blocked = blocked, unlocked = unlocked,
         )
     }
 

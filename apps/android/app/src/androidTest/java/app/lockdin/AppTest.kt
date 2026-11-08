@@ -437,6 +437,22 @@ class AppTest {
         org.junit.Assert.assertTrue(store.state.presets.isEmpty())
     }
 
+    @Test fun streakReachesGoalAndStartsAnUnlockedSession() {
+        val store = launch(home = true)
+        val day = 86_400_000L
+        for (i in 1..30) hist.add(app.lockdin.engine.HistoryEntry("d$i", clock.now() - i * day, clock.now() - i * day + 1_500_000, clock.now() - i * day + 1_500_000,
+            1_500_000, 1_500_000, 1, 1, "Read", "study", "Study", app.lockdin.engine.Outcome.COMPLETED), 365, clock.now())
+        rule.onNodeWithTag("tab-history").performClick()
+        rule.onNodeWithContentDescription("Focus streak: 30 of 30 days", substring = true).assertExists()
+        shot("15-history-streak")
+        rule.onNodeWithText("Try an unlocked session").performScrollTo().performClick()
+        rule.onNodeWithText("Unlocked session").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Start unlocked").performScrollTo().performClick()
+        org.junit.Assert.assertTrue(store.state.active!!.unlocked)
+        openDetails()
+        rule.onNodeWithText("Unlocked session · nothing is blocked", substring = true).assertExists()
+    }
+
     @Test fun historySettingsRetentionAndDeleteAll() {
         val store = launch(home = true)
         hist.add(app.lockdin.engine.HistoryEntry("e1", clock.now() - 3_600_000, clock.now() - 1_800_000, clock.now() - 1_800_000,

@@ -200,6 +200,12 @@ class FocusAccessibilityService : AccessibilityService() {
     private fun cover(pkg: String, site: String?, latencyMs: Long?) {
         val key = site ?: pkg
         val t = SystemClock.elapsedRealtime()
+        // Unlocked session (R62): note the opening once, never cover it.
+        val store = Store.get(this)
+        store.state.active?.takeIf { it.unlocked }?.let { a ->
+            if (UnlockedNotes.shouldNote(key, t)) store.recordBlocked(a.id, if (site != null) "site:$site" else pkg)
+            return
+        }
         // Only skip duplicate events for the same opening: the block screen is already up, or
         // was asked for a moment ago. Opening the app again later is always covered again.
         if (BlockActivity.showing) {

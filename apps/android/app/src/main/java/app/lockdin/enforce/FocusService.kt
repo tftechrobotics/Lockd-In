@@ -342,6 +342,12 @@ class FocusService : Service() {
 
     private fun cover(pkg: String) {
         val t = SystemClock.elapsedRealtime()
+        // Unlocked session (R62): note the opening once, never cover it.
+        val store = Store.get(this)
+        store.state.active?.takeIf { it.unlocked }?.let { a ->
+            if (UnlockedNotes.shouldNote(pkg, t)) store.recordBlocked(a.id, pkg)
+            return
+        }
         if (BlockActivity.showing || t - lastCoverElapsed < COVER_DEBOUNCE_MS) return
         lastCoverElapsed = t
         try {

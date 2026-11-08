@@ -115,13 +115,19 @@ private object SetupReturn {
     var pending: Triple<String, String, Int>? = null // profile id, task, focus minutes
 }
 
+/** Set by History's "Try an unlocked session" (R62); the next setup opens as an unlocked session. */
+object UnlockedTry {
+    var pending by androidx.compose.runtime.mutableStateOf(false)
+}
+
 @Composable
 fun FocusScreen(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -> Unit, openSchedule: () -> Unit, openProfile: (String) -> Unit = {}) {
     val active = store.state.active
     // Approved idle view (R36): the lock shows the time and the next session; setup opens on demand.
-    var composing by rememberSaveable { mutableStateOf(SetupReturn.pending != null) }
+    var composing by rememberSaveable { mutableStateOf(SetupReturn.pending != null || UnlockedTry.pending) }
     var viewingLast by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(active?.id) { if (active != null) composing = false }
+    LaunchedEffect(UnlockedTry.pending) { if (UnlockedTry.pending && active == null) composing = true }
     BackHandler(enabled = active == null && composing) { composing = false }
     when {
         active != null -> SessionView(store, active, clock, zone, openDevices)
@@ -384,6 +390,7 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
     val c = LocalColors.current
     val s = store.state
     val back = remember { SetupReturn.pending.also { SetupReturn.pending = null } }
+    var unlocked by rememberSaveable { mutableStateOf(UnlockedTry.pending.also { UnlockedTry.pending = false }) }
     var intention by rememberSaveable { mutableStateOf(back?.second ?: "") }
     var focus by rememberSaveable { mutableStateOf(back?.third ?: s.last.focusMinutes) }
     var breakMin by rememberSaveable { mutableStateOf(if (s.last.rounds > 1) s.last.breakMinutes else 0) }
@@ -551,7 +558,13 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
                 )
                 }
             }
-            MainButton(if (blockingReady) "Start focus" else "Start timer", onClick = {
+            if (unlocked) Column(verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
+                Text("Unlocked session", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
+                Text("Nothing is blocked this time. If you open an app this profile would block, Lockd In notes it and your streak starts over.",
+                    style = UiType.caption, color = c.inkMuted)
+                TextAction("Lock apps instead", { unlocked = false })
+            }
+            MainButton(if (unlocked) "Start unlocked" else if (blockingReady) "Start focus" else "Start timer", onClick = {
                 val problem = Session.validatePlan(segments)
                 if (problem != null) error = problem
                 else {
@@ -560,7 +573,7 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
                     store.startSession(
                         clock.now(), segments, intention, profileId,
                         LastChoice(focus, if (breakMin > 0) breakMin else s.last.breakMinutes, effectiveRounds, profileId),
-                        presetId = presetId, audio = audioOverride, commitment = commitment,
+                        presetId = presetId, audio = audioOverride, commitment = commitment, unlocked = unlocked,
                     )
                     // The start sequence plays once, for this manual start only.
                     store.state.active?.let { StartIntro.request(it.id) }
@@ -765,6 +778,7 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
     }
     val blocks = session.rules.restrictsAnything
     val protection = when {
+        session.unlocked -> "Unlocked session · nothing is blocked. Opening a blocked app is noted and resets your streak."
         protected -> "Blocking on this phone · ${rulesSummary(session.rules).replace(" during focus", "")}"
         !blocks -> "Timer only. Apps stay available on this phone."
         isBreak -> "Apps are available until focus resumes"

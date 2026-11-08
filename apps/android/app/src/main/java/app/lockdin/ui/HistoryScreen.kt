@@ -11,6 +11,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -70,7 +74,7 @@ fun minutesLabel(m: Long): String = when {
 }
 
 @Composable
-fun HistoryScreen(store: Store, history: HistoryStore, clock: AppClock, zone: ZoneId) {
+fun HistoryScreen(store: Store, history: HistoryStore, clock: AppClock, zone: ZoneId, onTryUnlocked: () -> Unit = {}) {
     val c = LocalColors.current
     val now = clock.now()
     val today = History.dateOf(now, zone)
@@ -109,6 +113,13 @@ fun HistoryScreen(store: Store, history: HistoryStore, clock: AppClock, zone: Zo
                 }
             }
             return@LazyColumn
+        }
+        item(key = "streak") {
+            val streak = remember(entries) { app.lockdin.engine.Streak.compute(entries, zone) }
+            StreakCard(streak, store.state.active == null, onTryUnlocked)
+        }
+        item {
+            androidx.compose.material3.HorizontalDivider(thickness = 1.5.dp, color = c.inkMuted.copy(alpha = 0.45f))
         }
         item {
             WeekCard(
@@ -222,6 +233,7 @@ private fun EntryRow(e: HistoryEntry, zone: ZoneId, onOpen: () -> Unit) {
             Text(e.task ?: "Focus session", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink, maxLines = 1)
             Text("${minutesLabel(e.focusedMinutes)} focused · ${e.profileName}", style = UiType.caption, color = c.inkMuted, maxLines = 2)
             if (e.outcome != Outcome.COMPLETED) Text(outcomeText(e.outcome), style = UiType.caption, color = c.ink)
+            if (e.unlocked) Text(if (e.blocked.isEmpty()) "Unlocked · nothing opened" else "Unlocked · blocked apps opened", style = UiType.caption, color = c.ink)
         }
         LockdIcon(LIcon.Chevron, size = 18.dp, tint = c.inkMuted)
     }
@@ -270,4 +282,55 @@ private fun HistoryDetail(e: HistoryEntry, zone: ZoneId, now: Long, onBack: () -
         confirmButton = { TextButton(onClick = { confirm = false; onDelete() }) { Text("Delete", style = UiType.label, color = c.danger) } },
         dismissButton = { TextButton(onClick = { confirm = false }) { Text("Keep", style = UiType.label, color = c.ink) } },
     )
+}
+
+/**
+ * Focus streak (R62): days in a row with clean sessions, as a bar toward 30 days. At 30 it offers an
+ * unlocked session, which only starts if the person taps it.
+ */
+@Composable
+private fun StreakCard(st: app.lockdin.engine.Streak.Result, canStart: Boolean, onTryUnlocked: () -> Unit) {
+    val c = LocalColors.current
+    val goal = app.lockdin.engine.Streak.GOAL
+    val fill by androidx.compose.animation.core.animateFloatAsState(st.progress, androidx.compose.animation.core.tween(if (reducedMotion()) 0 else 700), label = "streak")
+    Column(
+        Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
+            contentDescription = "Focus streak: ${st.days} of $goal days" + if (st.best > st.days) ", best ${st.best}" else ""
+        },
+        verticalArrangement = Arrangement.spacedBy(Dim.s2),
+    ) {
+        Text("Focus streak", style = UiType.section, color = c.inkMuted, modifier = Modifier.semantics { heading() })
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text("${st.days}", style = Type.timer.copy(fontSize = 40.sp, lineHeight = 44.sp), color = c.ink)
+            Text(if (st.days == 1) " day" else " days", style = Type.fact, color = c.ink, modifier = Modifier.padding(bottom = 6.dp))
+            Spacer(Modifier.weight(1f))
+            Text(if (st.reachedGoal) "Goal reached" else "${goal - st.days} to go", style = UiType.caption, color = c.inkMuted, modifier = Modifier.padding(bottom = 6.dp))
+        }
+        // The bar: a glass track with an ink fill.
+        Box(Modifier.fillMaxWidth().height(12.dp).clip(RoundedCornerShape(6.dp)).glass(RoundedCornerShape(6.dp))) {
+            Box(Modifier.fillMaxWidth(fill).height(12.dp).clip(RoundedCornerShape(6.dp)).background(c.ink))
+        }
+        Text(
+            "Days in a row where your sessions finished without ending early or a blocked app coming up. Days without a session don’t count against it.",
+            style = UiType.caption, color = c.inkMuted,
+        )
+        val now = LocalDate.now()
+        if (st.lastBreak != null && st.days < 7 && st.lastBreak >= now.minusDays(14)) {
+            val h = dayHeading(st.lastBreak, now)
+            val whenText = if (h == "Today" || h == "Yesterday") h.lowercase() else "on $h"
+            Text("Started over $whenText: ${st.lastBreakReason}.", style = UiType.caption, color = c.ink)
+        }
+        if (st.best > st.days) Text("Best so far: ${st.best} days", style = UiType.caption, color = c.inkMuted)
+        if (st.reachedGoal) {
+            Spacer(Modifier.height(Dim.s1))
+            Text("$goal days without slipping. Try a session with nothing locked?", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
+            Text(
+                "Your apps stay open. Lockd In only notes if you open one this profile would block. It’s a check on your own control, not the app’s." +
+                    if (st.unlockedClean > 0) " You’ve done ${st.unlockedClean} cleanly so far." else "",
+                style = UiType.caption, color = c.inkMuted,
+            )
+            if (canStart) GlassButton("Try an unlocked session", onTryUnlocked)
+            else Text("Available when no session is running.", style = UiType.caption, color = c.inkMuted)
+        }
+    }
 }

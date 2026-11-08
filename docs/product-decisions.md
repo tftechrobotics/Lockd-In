@@ -282,3 +282,16 @@ Three kinds of entry, kept apart on purpose:
   The face sits under a watch glass, with a soft cap of light over the upper half and a hairline edge. The
   round-bar shackle stays, now thicker (STROKE 28) and shorter (TOP 56, open lift 50), so the whole lock is
   shorter.
+
+## R62: Focus streak and unlocked sessions (2026-11-08, owner: "Great add it")
+- History opens with a **Focus streak**: a day count and a glass bar filling toward 30 days, plus the best run
+  so far and why it last started over (when that was recent).
+- A day is clean when a session finished as planned and none ended early (including emergency recovery) or had
+  a blocked app or site come up. Any slip that day resets the streak. Days with no session pause it.
+  Logic is in `engine/Streak.kt`, with unit tests in `StreakTest`.
+- At 30 days History offers **"Try an unlocked session"**. Nothing changes unless it's tapped. Setup then shows
+  "Unlocked session" (with "Lock apps instead"), and the button reads "Start unlocked".
+- During an unlocked session the enforcement services still watch, but they never show the block screen. Each
+  opening of a would-be-blocked app or site is noted once (5-minute window, `UnlockedNotes`) in the session's
+  `blocked` map. That breaks the streak and appears in History as "Unlocked · blocked apps opened".
+- Limits: the streak counts Lockd In sessions only. Browser tabs count only where sites are watched today.

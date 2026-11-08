@@ -96,6 +96,11 @@ data class ActiveSession(
     val questions: app.lockdin.engine.QuestionLog = app.lockdin.engine.QuestionLog(),
     /** Inactivity check-ins in this session (D). */
     val checkIn: CheckInState = CheckInState(),
+    /**
+     * Unlocked session (R62): nothing is blocked. Opening an app or site the profile would block is
+     * only noted in `blocked` (for the streak and the recap); no block screen is shown.
+     */
+    val unlocked: Boolean = false,
 )
 
 data class AppState(
@@ -354,6 +359,7 @@ object StateCodec {
                 CheckInState(t("askedAt"), t("answeredAt"), t("snoozedUntil"),
                     c.optJSONObject("answers")?.let { m -> m.keys().asSequence().take(8).associateWith { m.optInt(it, 0).coerceIn(0, 1000) } } ?: emptyMap())
             } ?: CheckInState(),
+            a.optBoolean("unlocked", false),
         )
     } catch (e: Exception) {
         null
@@ -388,6 +394,7 @@ object StateCodec {
                 .put("intention", a.intention ?: JSONObject.NULL).put("profileId", a.profileId)
                 .put("rules", rulesJson(a.rules)).put("commitment", a.commitment.name)
                 .put("blocked", JSONObject().apply { a.blocked.forEach { (k, v) -> put(k, v) } })
+                .put("unlocked", a.unlocked)
                 .put("emergencyRecoveryAt", a.controls.emergencyRecoveryAt ?: JSONObject.NULL)
                 .put("overrides", JSONArray(a.controls.overrides.map {
                     JSONObject().put("id", it.id).put("scope", it.scope.name).put("phaseIndex", it.phaseIndex)

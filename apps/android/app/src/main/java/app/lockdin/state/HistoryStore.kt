@@ -35,7 +35,7 @@ class HistoryStore(initial: List<HistoryEntry>, private val persist: (String) ->
     fun record(a: ActiveSession, s: AppState, now: Long) = add(
         History.entryFor(
             a.id, a.start, a.segments, a.controls, now, a.intention, a.profileId,
-            s.profiles.firstOrNull { it.id == a.profileId }?.name ?: "Profile", a.occurrenceKey, a.blocked,
+            s.profiles.firstOrNull { it.id == a.profileId }?.name ?: "Profile", a.occurrenceKey, a.blocked, a.unlocked,
         ),
         s.historyDays, now,
     )
@@ -80,6 +80,7 @@ object HistoryCodec {
             .put("task", e.task ?: JSONObject.NULL).put("profileId", e.profileId).put("profileName", e.profileName)
             .put("outcome", e.outcome.name).put("occurrenceKey", e.occurrenceKey ?: JSONObject.NULL)
             .put("blocked", JSONObject().apply { e.blocked.forEach { (k, v) -> put(k, v) } })
+            .put("unlocked", e.unlocked)
     })).toString()
 
     /** Unknown versions and damaged entries are skipped, never fatal. */
@@ -107,6 +108,7 @@ object HistoryCodec {
             blocked = e.optJSONObject("blocked")?.let { b ->
                 b.keys().asSequence().take(100).filter { it.length <= 260 }.associateWith { b.optInt(it, 0).coerceIn(0, 100_000) }.filterValues { it > 0 }
             } ?: emptyMap(),
+            unlocked = e.optBoolean("unlocked", false),
         )
     }
 }

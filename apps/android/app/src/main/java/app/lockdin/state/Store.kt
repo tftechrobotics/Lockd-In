@@ -53,6 +53,8 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
         audio: ProfileAudio? = null,
         /** How this session may end early; null = the default from Settings. */
         commitment: app.lockdin.enforce.Commitment? = null,
+        /** R62: nothing is blocked; blocked apps opened anyway are only noted. */
+        unlocked: Boolean = false,
     ) = update { s0 ->
         leaving(s0)
         val s = keepQuestionTimes(s0)
@@ -66,6 +68,7 @@ class Store(initial: AppState, private val persist: (String) -> Unit) {
                 commitment = commitment ?: s.commitment,
                 occurrenceKey = occurrenceKey,
                 presetId = presetId,
+                unlocked = unlocked,
             ),
             recentStarts = (s.recentStarts + now).takeLast(40),
             lastSession = null,
