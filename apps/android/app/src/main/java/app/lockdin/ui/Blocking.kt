@@ -51,6 +51,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import app.lockdin.enforce.AppRules
 import app.lockdin.enforce.BlockPolicy
 import app.lockdin.enforce.Capabilities
@@ -551,11 +553,10 @@ private fun RadioRow(title: String, detail: String, on: Boolean, onClick: () -> 
 @Composable
 private fun Chip(label: String, on: Boolean, onClick: () -> Unit) {
     val c = LocalColors.current
-    androidx.compose.material3.Surface(
-        shape = RoundedCornerShape(Dim.radius), color = if (on) c.ink else c.taupeSoft,
-        contentColor = if (on) c.onInk else c.ink,
-        modifier = Modifier.heightIn(min = Dim.control).androidx_selectable(on, onClick),
-    ) { Box(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), contentAlignment = Alignment.Center) { Text(label, style = UiType.label, maxLines = 1) } }
+    // R55: no box; the chosen option gets the sliding underline.
+    UnderlineOption(on, onClick, Modifier.semantics { stateDescription = if (on) "Selected" else "Not selected" }) {
+        Text(label, style = UiType.label.copy(fontSize = 16.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium), color = if (on) c.ink else c.inkMuted, maxLines = 1)
+    }
 }
 
 private fun Modifier.androidx_selectable(on: Boolean, onClick: () -> Unit): Modifier =

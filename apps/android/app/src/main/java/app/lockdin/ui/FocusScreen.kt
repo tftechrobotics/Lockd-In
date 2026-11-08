@@ -1,5 +1,11 @@
 package app.lockdin.ui
 
+import kotlinx.coroutines.launch
+
+import androidx.compose.runtime.rememberCoroutineScope
+
+import androidx.compose.animation.togetherWith
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.graphics.graphicsLayer
@@ -143,10 +149,27 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
     val inProgress = upcoming != null && upcoming.start <= now
     WithActionBar(
         content = {
-            Column(Modifier.fillMaxWidth().padding(top = Dim.s4), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Dim.s5)) {
+            // Owner 2026-11-07: lock and words a bit lower on the screen.
+            val still = reducedMotion()
+            val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+            val rattle = remember { androidx.compose.animation.core.Animatable(0f) }
+            val scope = rememberCoroutineScope()
+            var shown by remember { mutableStateOf(still) }
+            LaunchedEffect(Unit) { shown = true }
+            Column(Modifier.fillMaxWidth().padding(top = 56.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Dim.s6)) {
+                // R55: tap the lock and it rattles on its shackle (a small haptic tick too).
                 ClockLock(
                     TimerState.READY, 0, 1, locked = false, label = "It's ${Fmt.clock(now, zone)}, $weekday",
                     caption = "$period · $weekday", text = hm, width = 210.dp,
+                    modifier = Modifier
+                        .graphicsLayer { rotationZ = rattle.value; transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.05f) }
+                        .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, onClickLabel = "Rattle the lock") {
+                            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                            if (!still) scope.launch {
+                                rattle.snapTo(0f)
+                                for ((deg, ms) in listOf(-6f to 70, 5f to 80, -3.5f to 80, 2f to 90, 0f to 110)) rattle.animateTo(deg, androidx.compose.animation.core.tween(ms))
+                            }
+                        },
                 )
                 // Owner 2026-11-07 (R54): a greeting under the lock that says what's next, like Freedom's
                 // header, instead of a "Next session" box. Tapping it opens Schedule.
@@ -162,6 +185,13 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
                         "${upcoming.session.title} $whenText."
                     }
                 }
+                // R55: the greeting rises in when Home opens.
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = shown,
+                    enter = if (still) androidx.compose.animation.EnterTransition.None else
+                        androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(420, delayMillis = 120)) +
+                            androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(480, delayMillis = 120, easing = androidx.compose.animation.core.FastOutSlowInEasing)) { it / 3 },
+                ) {
                 Column(
                     Modifier.fillMaxWidth().tourTarget("next").clickable(role = Role.Button, onClickLabel = "Open schedule", onClick = openSchedule)
                         .padding(vertical = Dim.s1),
@@ -172,6 +202,7 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
                     if (upcoming?.session?.autoStart == true && !inProgress) Text("Starts automatically.", style = UiType.body.copy(fontSize = 17.sp, lineHeight = 24.sp), color = c.inkMuted)
                     if (upcoming == null) Text("Plan one", style = UiType.label.copy(fontSize = 16.sp, fontWeight = FontWeight.SemiBold, textDecoration = TextDecoration.Underline), color = c.ink)
                 }
+                }
                 // Presets: one tap starts the session (a manual start, so the start sequence plays).
                 val homeCtx = androidx.compose.ui.platform.LocalContext.current
                 if (store.state.presets.isNotEmpty()) {
@@ -181,13 +212,13 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
                             store.state.presets.take(6).forEach { p ->
                                 val due = p.due?.let { " · due ${Fmt.dueLabel(it, now, zone)}" } ?: ""
                                 Surface(
-                                    shape = RoundedCornerShape(Dim.radius), color = c.taupeSoft, contentColor = c.ink,
+                                    shape = RoundedCornerShape(Dim.radius), color = Color.Transparent, contentColor = c.ink,
                                     modifier = Modifier.heightIn(min = Dim.control).clickable(role = Role.Button, onClickLabel = "Start ${p.name}") {
                                         startPreset(store, p, clock.now(), homeCtx)
                                     },
                                 ) {
-                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-                                        Text("${p.name} · ${durationLabel(p.focusMinutes * p.rounds)}$due", style = UiType.label)
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 10.dp)) {
+                                        Text("${p.name} · ${durationLabel(p.focusMinutes * p.rounds)}$due", style = UiType.label.copy(fontWeight = FontWeight.SemiBold, textDecoration = TextDecoration.Underline))
                                     }
                                 }
                             }
@@ -502,6 +533,15 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
         },
         actions = {
             if (valid) {
+                // R55: the end time rolls up or down as the length changes.
+                androidx.compose.animation.AnimatedContent(
+                    targetState = total, label = "ends",
+                    transitionSpec = {
+                        val up = targetState > initialState
+                        (androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(220)) { h -> if (up) h else -h } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220))) togetherWith
+                            (androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(180)) { h -> if (up) -h else h } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(150)))
+                    },
+                ) { total ->
                 Text(
                     buildAnnotatedString {
                         withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = c.ink)) { append("Ends at ${Fmt.clock(now + total * 60_000L, zone)}") }
@@ -509,6 +549,7 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
                     },
                     style = UiType.caption.copy(fontFeatureSettings = "tnum"), color = c.inkMuted,
                 )
+                }
             }
             MainButton(if (blockingReady) "Start focus" else "Start timer", onClick = {
                 val problem = Session.validatePlan(segments)
@@ -595,34 +636,24 @@ private fun TaskField(value: String, onChange: (String) -> Unit, onDone: () -> U
     )
 }
 
-/** 25 / 40 / 60 / Custom as tiles (radio group); 2 × 2 at large text so nothing squeezes. */
+/** 25 / 40 / 60 / Custom (R55): big numbers, no tiles; an ink bar slides under the chosen one. */
 @Composable
 private fun LengthTiles(selected: Int, onSelect: (Int) -> Unit) {
     val c = LocalColors.current
     val large = LocalDensity.current.fontScale > 1.3f
-    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
         (LENGTHS + (-1)).chunked(if (large) 2 else 4).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Dim.s4)) {
                 row.forEach { m ->
                     val on = m == selected
-                    Surface(
-                        shape = RoundedCornerShape(Dim.radiusLarge), color = if (on) c.ink else c.taupeSoft, contentColor = if (on) c.onInk else c.ink,
-                        modifier = Modifier.weight(1f).heightIn(min = 60.dp)
-                            .selectable(on, role = Role.RadioButton, onClick = { onSelect(m) })
-                            .semantics(mergeDescendants = true) {},
-                    ) {
-                        Column(
-                            Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
-                                .clearAndSetSemantics { contentDescription = if (m > 0) "$m minutes" else "Custom minutes" },
-                            verticalArrangement = Arrangement.Bottom,
-                        ) {
-                            if (m > 0) {
-                                Text("$m", style = Type.display.copy(fontSize = 22.sp, lineHeight = 26.sp, letterSpacing = 0.sp))
-                                Text("min", style = UiType.caption)
-                            } else {
-                                Text("Custom", style = UiType.label.copy(fontWeight = FontWeight.SemiBold))
-                            }
-                        }
+                    UnderlineOption(on, { onSelect(m) }, Modifier.weight(1f).semantics {
+                        contentDescription = if (m > 0) "$m minutes" else "Custom minutes"
+                    }) {
+                        if (m > 0) Row(verticalAlignment = Alignment.Bottom) {
+                            Text("$m", style = Type.display.copy(fontSize = 30.sp, lineHeight = 32.sp, letterSpacing = 0.sp), color = if (on) c.ink else c.inkMuted)
+                            Text(" min", style = UiType.caption, color = c.inkMuted, modifier = Modifier.padding(bottom = 3.dp))
+                        } else Text("Custom", style = UiType.label.copy(fontSize = 16.sp, fontWeight = FontWeight.SemiBold), color = if (on) c.ink else c.inkMuted,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 3.dp))
                     }
                 }
             }
@@ -651,16 +682,12 @@ private fun RoundsLine(text: String, open: Boolean, onToggle: () -> Unit) {
 @Composable
 private fun ProfileChips(profiles: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
     val c = LocalColors.current
-    FlowRow(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(Dim.s2), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+    // R55: names with the sliding underline instead of boxed chips.
+    FlowRow(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(Dim.s5), verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
         profiles.forEach { (id, name) ->
             val on = id == selected
-            Surface(
-                shape = RoundedCornerShape(Dim.radius), color = if (on) c.ink else c.taupeSoft, contentColor = if (on) c.onInk else c.ink,
-                modifier = Modifier.heightIn(min = Dim.control).selectable(on, role = Role.RadioButton, onClick = { onSelect(id) }),
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
-                    Text(name, style = UiType.label)
-                }
+            UnderlineOption(on, { onSelect(id) }) {
+                Text(name, style = UiType.label.copy(fontSize = 17.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium), color = if (on) c.ink else c.inkMuted)
             }
         }
     }
@@ -819,8 +846,8 @@ private fun AudioControl(session: ActiveSession, isBreak: Boolean) {
     val a = session.audio
     val player = app.lockdin.audio.StudyPlayer
     var open by rememberSaveable { mutableStateOf(false) }
-    Surface(shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(horizontal = Dim.s2, vertical = Dim.s1)) {
+    Surface(shape = RoundedCornerShape(Dim.plate), color = plateColor(), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = plateSide(Dim.s2), vertical = Dim.s1)) {
             if (a.builtIn) {
                 val playing = player.isPlaying
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -904,8 +931,8 @@ private fun QuestionTimer(store: Store, session: ActiveSession, now: Long) {
     }
     val t = app.lockdin.engine.Questions.elapsed(cur, q, now)
     val long = app.lockdin.engine.Questions.runningLong(q, store.state.questionTimes + app.lockdin.engine.Questions.durations(q), now)
-    Surface(shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+    Surface(shape = RoundedCornerShape(Dim.plate), color = plateColor(), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = plateSide(Dim.s3), vertical = Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Question ${cur.n}", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink, modifier = Modifier.weight(1f))
                 Text(

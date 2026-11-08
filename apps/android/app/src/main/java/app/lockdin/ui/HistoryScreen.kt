@@ -101,8 +101,8 @@ fun HistoryScreen(store: Store, history: HistoryStore, clock: AppClock, zone: Zo
         }
         if (entries.isEmpty()) {
             item {
-                Surface(shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft, modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(Dim.s4), verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
+                Surface(shape = RoundedCornerShape(Dim.plate), color = plateColor(), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(horizontal = plateSide(Dim.s4), vertical = Dim.s4), verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
                         Text("No sessions yet", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
                         Text("When you finish a session, its time and what you tried to open appear here.", style = UiType.body, color = c.inkMuted)
                     }
@@ -158,8 +158,8 @@ private fun WeekCard(w: app.lockdin.engine.WeekSummary, isCurrent: Boolean, onPr
     val c = LocalColors.current
     val max = maxOf(30L, w.days.maxOf { it.focusedMinutes })
     val spoken = w.days.joinToString(", ") { "${it.date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())} ${it.focusedMinutes} minutes" }
-    Surface(shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(Dim.s4), verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
+    Surface(shape = RoundedCornerShape(Dim.plate), color = plateColor(), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = plateSide(Dim.s4), vertical = Dim.s4), verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     if (isCurrent) "This week" else "Week of ${w.start.format(DateTimeFormatter.ofPattern("MMM d", Locale.getDefault()))}",

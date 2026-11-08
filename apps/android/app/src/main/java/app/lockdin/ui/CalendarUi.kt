@@ -73,8 +73,8 @@ fun CalendarSuggestions(store: Store, now: Long, zone: ZoneId, onPlan: (Schedule
     }
     val permitted = remember(Resumes.tick) { DeviceCalendar.permitted(ctx) }
     if (!store.state.calendarOn || !permitted) {
-        Surface(shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft, modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(Dim.s4), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+        Surface(shape = RoundedCornerShape(Dim.plate), color = plateColor(), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(horizontal = plateSide(Dim.s4), vertical = Dim.s4), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
                 Text("Find free time in your calendar", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
                 Text(
                     "Lockd In can read the calendars on this phone, including Google Calendar, to suggest study times. It never changes your calendar, and nothing is planned unless you save it.",

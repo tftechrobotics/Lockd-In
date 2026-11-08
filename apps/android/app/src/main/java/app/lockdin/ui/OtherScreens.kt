@@ -1,5 +1,7 @@
 package app.lockdin.ui
 
+import androidx.compose.animation.togetherWith
+
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.testTag
 
@@ -256,8 +258,15 @@ enum class SettingsPage(val title: String, val icon: LIcon) {
 /** The open settings page, kept while a full-screen editor (a place, say) is on top. */
 object SettingsNav { var page by mutableStateOf<SettingsPage?>(null) }
 
+/** Settings keeps its boxed plates (owner 2026-11-07, R55); the rest of the app is box-free. */
 @Composable
 fun SettingsScreen(
+    store: Store, history: app.lockdin.state.HistoryStore, zone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
+    onEditPlace: (app.lockdin.engine.Place) -> Unit = {},
+) = androidx.compose.runtime.CompositionLocalProvider(LocalBoxed provides true) { SettingsScreenBody(store, history, zone, onEditPlace) }
+
+@Composable
+private fun SettingsScreenBody(
     store: Store, history: app.lockdin.state.HistoryStore, zone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
     onEditPlace: (app.lockdin.engine.Place) -> Unit = {},
 ) {
@@ -281,6 +290,21 @@ fun SettingsScreen(
         SettingsPage.DATA, SettingsPage.HELP -> null
     }
 
+    // R55: pages slide in from the right and back out to the list.
+    val stillPages = reducedMotion()
+    androidx.compose.animation.AnimatedContent(
+        targetState = page, label = "settings",
+        transitionSpec = {
+            if (stillPages) androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None
+            else {
+                val dir = if (targetState != null) 1 else -1
+                (androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(260)) { w -> dir * w / 5 } +
+                    androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200))) togetherWith
+                    (androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(200)) { w -> -dir * w / 8 } +
+                        androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(150)))
+            }
+        },
+    ) { page ->
     if (page == null) {
         ScrollScreen {
             ScreenTitle("Settings")
@@ -383,6 +407,7 @@ fun SettingsScreen(
                 })
             }
         }
+    }
     }
     if (confirmHistory) {
         AlertDialog(

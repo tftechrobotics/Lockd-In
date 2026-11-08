@@ -124,8 +124,8 @@ fun ScheduleScreen(store: Store, now: Long, zone: ZoneId, onEdit: (ScheduledSess
         }
         CalendarSuggestions(store, now, zone, onPlan = onEdit)
         if (all.isEmpty()) {
-            Surface(shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(Dim.s5), verticalArrangement = Arrangement.spacedBy(Dim.s3), horizontalAlignment = Alignment.CenterHorizontally) {
+            Surface(shape = RoundedCornerShape(Dim.plate), color = plateColor(), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(horizontal = plateSide(Dim.s5), vertical = Dim.s5), verticalArrangement = Arrangement.spacedBy(Dim.s3), horizontalAlignment = Alignment.CenterHorizontally) {
                     LockdIcon(LIcon.Calendar, size = 28.dp, tint = c.inkMuted)
                     Text("No sessions planned yet", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
                     Text("Plan a weekly routine, like weeknights at 7, or a one-time study block. The next one shows on Focus.",
@@ -138,8 +138,8 @@ fun ScheduleScreen(store: Store, now: Long, zone: ZoneId, onEdit: (ScheduledSess
         next?.let { n ->
             Column {
                 SectionLabel("Next up")
-                Surface(shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft, modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { onEdit(n.session) }) {
-                    Row(Modifier.padding(Dim.s4), verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape = RoundedCornerShape(Dim.plate), color = plateColor(), modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { onEdit(n.session) }) {
+                    Row(Modifier.padding(horizontal = plateSide(Dim.s4), vertical = Dim.s3), verticalAlignment = Alignment.CenterVertically) {
                         val st = Instant.ofEpochMilli(n.start).atZone(zone)
                         Column(Modifier.widthIn(min = 64.dp).padding(end = Dim.s3).clearAndSetSemantics { }) {
                             Text(st.format(DateTimeFormatter.ofPattern("h:mm")), style = Type.display.copy(fontSize = 19.sp, lineHeight = 24.sp), color = c.ink)
@@ -190,7 +190,7 @@ private fun PlanRow(store: Store, s: ScheduledSession, whenText: String, profile
     val muted = !s.enabled
     Row(Modifier.fillMaxWidth().heightIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically) {
         Row(
-            Modifier.weight(1f).clickable(role = Role.Button, onClickLabel = "Edit ${s.title}") { onEdit(s) }.padding(start = Dim.s4, top = Dim.s3, bottom = Dim.s3),
+            Modifier.weight(1f).clickable(role = Role.Button, onClickLabel = "Edit ${s.title}") { onEdit(s) }.padding(start = plateSide(Dim.s4), top = Dim.s3, bottom = Dim.s3),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Stamped start time (pass 5): hour in expanded Archivo, AM/PM small underneath.

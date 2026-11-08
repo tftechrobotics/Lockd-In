@@ -60,6 +60,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 
 /** Spacing, sizes and radii (dp). Keep every screen on these. */
 object Dim {
@@ -95,11 +98,83 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) {
     Text(text, style = UiType.section, color = LocalColors.current.inkMuted, modifier = modifier.padding(bottom = Dim.s2).semantics { heading() })
 }
 
-/** Connected segmented control (TalkBack: radio buttons). Pills are used only here. */
+/**
+ * Owner 2026-11-07 (R55): boxes around text read as AI everywhere except Settings. Settings provides
+ * true; everywhere else groups, rows, choices and secondary buttons draw without boxes.
+ */
+val LocalBoxed = androidx.compose.runtime.staticCompositionLocalOf { false }
+
+/** Plate colour and side padding: a plate in Settings, plain (no box, no side inset) elsewhere. */
+@Composable fun plateColor(): Color = if (LocalBoxed.current) LocalColors.current.taupeSoft else Color.Transparent
+@Composable fun plateSide(d: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp = if (LocalBoxed.current) d else 0.dp
+
+/** True when the person turned animations off (Android's "Remove animations"). */
+@Composable
+fun reducedMotion(): Boolean {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    return remember { animationsOff(ctx.applicationContext) }
+}
+
+/** Presses in a little while held (R55: more response to touch). Pass the control's interaction source. */
+@Composable
+fun Modifier.pressScale(source: androidx.compose.foundation.interaction.MutableInteractionSource): Modifier {
+    val pressed by source.collectIsPressedAsState()
+    val still = reducedMotion()
+    val s by androidx.compose.animation.core.animateFloatAsState(
+        if (pressed && !still) 0.96f else 1f,
+        androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 900f), label = "press",
+    )
+    return this.graphicsLayer { scaleX = s; scaleY = s }
+}
+
+/**
+ * A text option with an ink bar that grows under it when chosen (no box). Used for single choices
+ * outside Settings: lengths, profiles, segmented choices.
+ */
+@Composable
+fun UnderlineOption(
+    on: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, role: Role = Role.RadioButton,
+    content: @Composable () -> Unit,
+) {
+    val c = LocalColors.current
+    val still = reducedMotion()
+    val grow by androidx.compose.animation.core.animateFloatAsState(
+        if (on) 1f else 0f, if (still) androidx.compose.animation.core.snap() else androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 500f), label = "bar",
+    )
+    val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    Column(
+        modifier.width(androidx.compose.foundation.layout.IntrinsicSize.Max).heightIn(min = Dim.control).pressScale(source)
+            .selectable(on, interactionSource = source, indication = androidx.compose.material3.ripple(bounded = false), role = role, onClick = onClick)
+            .padding(top = 6.dp),
+        horizontalAlignment = Alignment.Start,
+    ) {
+        content()
+        Spacer(Modifier.height(6.dp))
+        Box(Modifier.fillMaxWidth(grow.coerceAtLeast(0.001f)).height(3.dp).background(c.ink.copy(alpha = grow), RoundedCornerShape(2.dp)))
+    }
+}
+
+/** Connected segmented control (TalkBack: radio buttons). Boxed only inside Settings. */
 @Composable
 fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T?, onSelect: (T) -> Unit, modifier: Modifier = Modifier, label: String? = null) {
     val c = LocalColors.current
     val perRow = if (LocalDensity.current.fontScale > 1.4f) 2 else options.size
+    if (!LocalBoxed.current) {
+        Column(modifier.fillMaxWidth().selectableGroup().semantics { label?.let { contentDescription = it } }, verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
+            options.chunked(perRow).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(Dim.s4)) {
+                    row.forEach { (value, text) ->
+                        val on = value == selected
+                        UnderlineOption(on, { onSelect(value) }, Modifier.weight(1f)) {
+                            Text(text, style = UiType.label.copy(fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium), color = if (on) c.ink else c.inkMuted, maxLines = 1)
+                        }
+                    }
+                    repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+        return
+    }
     Surface(shape = RoundedCornerShape(Dim.radius + 3.dp), color = c.taupeSoft, modifier = modifier.fillMaxWidth()) {
         Column(Modifier.padding(3.dp).selectableGroup().semantics { label?.let { contentDescription = it } }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
             options.chunked(perRow).forEach { row ->
@@ -176,14 +251,16 @@ fun CustomLengthRow(minutes: Int, onChange: (Int) -> Unit, label: String = "Cust
 @Composable
 fun SettingsGroup(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val c = LocalColors.current
+    if (!LocalBoxed.current) { Column(modifier.fillMaxWidth(), content = content); return }
     Surface(shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft, modifier = modifier.fillMaxWidth()) {
         Column(content = content)
     }
 }
 
-/** A cut between rows of a plate: a band of the background colour, edge to edge. */
+/** Between rows: a cut of the background colour on a Settings plate, a hairline elsewhere. */
 @Composable
-fun GroupDivider() = HorizontalDivider(thickness = 2.dp, color = LocalColors.current.ground)
+fun GroupDivider() = if (LocalBoxed.current) HorizontalDivider(thickness = 2.dp, color = LocalColors.current.ground)
+    else HorizontalDivider(thickness = 1.dp, color = LocalColors.current.line)
 
 /** One setting: label on the left, value and chevron on the right; opens a menu of options. */
 @Composable
@@ -229,7 +306,7 @@ fun SettingRow(
         Modifier.fillMaxWidth().heightIn(min = Dim.control + 4.dp)
             .then(if (onClick != null && enabled) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
             .semantics(mergeDescendants = true) { stateDescription = value }
-            .padding(horizontal = Dim.s4, vertical = Dim.s2),
+            .padding(horizontal = if (LocalBoxed.current) Dim.s4 else 0.dp, vertical = Dim.s2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         icon?.let { LockdIcon(it, size = Dim.icon, tint = tint); Spacer(Modifier.width(Dim.s3)) }
@@ -256,11 +333,13 @@ fun ActionBar(modifier: Modifier = Modifier, content: @Composable ColumnScope.()
 @Composable
 fun MainButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: LIcon? = null) {
     val c = LocalColors.current
+    val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Button(
         onClick = onClick,
         shape = RoundedCornerShape(Dim.radiusLarge),
         colors = ButtonDefaults.buttonColors(containerColor = c.ink, contentColor = c.onInk),
-        modifier = modifier.fillMaxWidth().heightIn(min = Dim.primary),
+        interactionSource = source,
+        modifier = modifier.fillMaxWidth().heightIn(min = Dim.primary).pressScale(source),
     ) {
         Text(text, style = Type.button, maxLines = 1, overflow = TextOverflow.Ellipsis)
         icon?.let { Spacer(Modifier.width(Dim.s2)); LockdIcon(it, tint = c.onInk, size = Dim.icon) }
@@ -270,8 +349,16 @@ fun MainButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
 @Composable
 fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val c = LocalColors.current
-    // Tonal, not outlined (pass 5). Taupe, one step stronger than the plates, so it shows on
-    // the background and on a plate alike. The label identifies it, so no border is needed.
+    // Outside Settings (R55): no box, an underlined text action with a press response.
+    if (!LocalBoxed.current) {
+        val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+        TextButton(onClick = onClick, interactionSource = source, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 0.dp, vertical = 8.dp),
+            modifier = modifier.heightIn(min = Dim.control).pressScale(source)) {
+            Text(text, style = UiType.label.copy(fontSize = 16.sp, fontWeight = FontWeight.SemiBold, textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline), color = c.ink)
+        }
+        return
+    }
+    // In Settings: tonal (taupe), one step stronger than the plates.
     Button(
         onClick = onClick, shape = RoundedCornerShape(Dim.radiusLarge),
         colors = ButtonDefaults.buttonColors(containerColor = c.taupe, contentColor = c.ink),
@@ -318,8 +405,8 @@ fun PhaseTag(text: String, active: Boolean) {
 @Composable
 fun SummaryText(lines: List<String>, modifier: Modifier = Modifier) {
     val c = LocalColors.current
-    Surface(shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft, modifier = modifier.fillMaxWidth()) {
-        Column(Modifier.padding(Dim.s4), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Surface(shape = RoundedCornerShape(Dim.plate), color = if (LocalBoxed.current) c.taupeSoft else Color.Transparent, modifier = modifier.fillMaxWidth()) {
+        Column(Modifier.padding(if (LocalBoxed.current) Dim.s4 else 0.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             lines.forEachIndexed { i, l -> Text(l, style = if (i == 0) UiType.label else UiType.caption, color = if (i == 0) c.ink else c.inkMuted) }
         }
     }

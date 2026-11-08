@@ -224,3 +224,14 @@ Three kinds of entry, kept apart on purpose:
   Schedule; the "Next session" box is gone. Main button "Start a session". Bricolage Grotesque (OFL) for
   headings, buttons and digits; Archivo stays for interface text. Clock digits 46 units so "10:35" fits.
 - Supersedes the expanded-Archivo voice from R53 (Archivo Wide is no longer used in the app).
+
+## R55: No boxes outside Settings; more motion (2026-11-07, owner)
+- **Owner:** the boxes around words read as AI everywhere except Settings; the lock sat too high; wants more
+  movement and interactivity.
+- **Built (Android):** `LocalBoxed` (true only in Settings). Elsewhere groups are plain rows with hairlines,
+  secondary buttons are underlined text actions, single choices (length, profile, segmented, chips) are text
+  with an ink bar that grows under the chosen one. Home lock and greeting moved down (56 dp top, 32 dp gap).
+- **Motion (all off with Android's Remove animations):** buttons press in; selection bar grows/slides;
+  tabs fade and slide toward the chosen tab; Settings pages slide in and out; the Home greeting rises in;
+  tapping the lock makes it rattle with a haptic tick; the "Ends at" time rolls when the length changes.
+- **Font:** owner still unhappy with the font (2026-11-07); choice pending.

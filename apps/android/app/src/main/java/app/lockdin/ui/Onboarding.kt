@@ -48,6 +48,8 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.graphicsLayer
@@ -241,11 +243,9 @@ private fun ProfileNameChips(names: List<String>, current: String, onPick: (Stri
     androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Dim.s2), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
         names.forEach { n ->
             val on = n == current.trim()
-            Surface(
-                shape = RoundedCornerShape(Dim.radius), color = if (on) c.ink else c.taupeSoft,
-                contentColor = if (on) c.onInk else c.ink,
-                modifier = Modifier.heightIn(min = Dim.control).clickable(role = Role.Button) { onPick(n) },
-            ) { Box(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), contentAlignment = Alignment.Center) { Text(n, style = UiType.label) } }
+            UnderlineOption(on, { onPick(n) }, role = Role.Button) {
+                Text(n, style = UiType.label.copy(fontSize = 16.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium), color = if (on) c.ink else c.inkMuted)
+            }
         }
     }
 }

@@ -1,5 +1,7 @@
 package app.lockdin.ui
 
+import androidx.compose.animation.togetherWith
+
 import androidx.compose.material3.HorizontalDivider
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
@@ -201,6 +203,20 @@ fun LockdInApp(
                 contentAlignment = Alignment.TopCenter,
             ) {
                 Box(Modifier.widthIn(max = 600.dp).fillMaxSize().semantics { contentDescription = "${route.label} screen" }) {
+                    // R55: screens slide a little toward the tab you chose and fade in.
+                    val still = reducedMotion()
+                    androidx.compose.animation.AnimatedContent(
+                        targetState = route, label = "tabs",
+                        transitionSpec = {
+                            if (still) androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None
+                            else {
+                                val dir = if (targetState.ordinal >= initialState.ordinal) 1 else -1
+                                (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220, delayMillis = 40)) +
+                                    androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(260)) { w -> dir * w / 14 }) togetherWith
+                                    androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120))
+                            }
+                        },
+                    ) { route ->
                     when (route) {
                         Route.FOCUS -> FocusScreen(store, clock, zone, openDevices = { go(Route.DEVICES) }, openSchedule = { go(Route.SCHEDULE) }, openProfile = { editingProfile = it })
                         Route.SCHEDULE -> ScheduleScreen(store, clock.now(), zone, onEdit = { editing = it })
@@ -208,6 +224,7 @@ fun LockdInApp(
                         Route.DEVICES -> DevicesScreen()
                         Route.SETTINGS -> SettingsScreen(store, hist, zone, onEditPlace = { editingPlace = it })
                         Route.HISTORY -> HistoryScreen(store, hist, clock, zone)
+                    }
                     }
                 }
             }
