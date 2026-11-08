@@ -1,1 +1,1 @@
-Screenshots from commit 2d249b2 (emulator, API 35, Pixel 6 profile).
+Screenshots from commit 04fd822 (emulator, API 35, Pixel 6 profile).
