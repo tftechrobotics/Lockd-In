@@ -4,7 +4,15 @@
 **Read first:** `docs/audit-2026-11.md` (inventory, Freedom, platform limits, architecture) and `docs/milestones.md` (new M1–M5 criteria + evidence table).
 **Repository:** github.com/tftechrobotics/Lockd-In (public since 2026-11-01).
 
-**Newest (2026-11-07): skills + interface pass 5 (R53), build 1636571**
+**Newest (2026-11-08): owner-led restyle R54-R56, build 428104d (emulator UI tests pass, screenshots reviewed)**
+- Home: lock (lower), then a greeting + one line about what's next (R54). No boxes outside Settings via
+  `LocalBoxed` in `ui/Kit.kt`; underline-bar choices (`UnderlineOption`); motion: press-in, sliding selection
+  bar, tab and Settings page transitions, greeting rise-in, lock rattle on tap, rolling "Ends at" (R55).
+  Literata throughout (R56). Owner works from screenshots + mockups (`/tmp/mock` approach: HTML rendered with
+  Playwright) before code; ask before big visual changes.
+- Widgets still parked on `wip-lift-widgets` (Quick start + Today), next after the owner's look.
+
+**Earlier (2026-11-07): skills + interface pass 5 (R53), build 1636571**
 - Design skills added in `.claude/skills/` (ui-ux-pro-max set, MIT, upstream 4f2dbb6; `lockd-in-design` moved
   there). README there: Lockd In rules win; script paths; optional network scripts.
 - Pass 5 (Android): Archivo replaces Outfit + Figtree (expanded = titles, numbers, stamped times, primary
