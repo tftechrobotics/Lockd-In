@@ -83,8 +83,8 @@ class LockdInWidget : AppWidgetProvider() {
             val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
             val cv = android.graphics.Canvas(bmp)
             val dark = (ctx.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
-            val metal = if (dark) 0xFF8A7F73.toInt() else 0xFFA79C90.toInt()
-            val face = if (dark) 0xFF2E2823.toInt() else 0xFFF1ECE3.toInt()
+            val metal = if (dark) 0xFF7E6858.toInt() else 0xFFA79C90.toInt()
+            val face = if (dark) 0xFF241A14.toInt() else 0xFFF1ECE3.toInt()
             val rim = if (dark) 0xFF6E655B.toInt() else 0xFFBDB3A7.toInt()
             val tick = if (dark) 0xFF9C9083.toInt() else 0xFF8B8074.toInt()
             val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)

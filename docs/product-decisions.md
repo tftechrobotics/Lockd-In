@@ -241,3 +241,8 @@ Three kinds of entry, kept apart on purpose:
   Gabarito + Nunito Sans, Unbounded + Nunito Sans). Literata (OFL) now sets all app text: text cuts (opsz 12-14,
   400/500/600), display cuts (opsz 36, 600/700) for headings, buttons and the greeting, opsz 48 for clock
   digits (lining, tabular). Archivo and Bricolage removed from the app. The wordmark is unchanged (vector).
+
+## R57: Dark cocoa for dark mode (2026-11-08, owner)
+- Owner kept the chocolate direction and picked "Dark cocoa" from four variations: ground #160F0B, surface
+  #1F1611, taupeSoft #2A1F18, line/taupe #43342A, ink #F2E6D6, inkMuted #C4AE98 (all contrast checks pass).
+  Lock, widget and window background follow. A glossy glass look was requested next (mockups first).

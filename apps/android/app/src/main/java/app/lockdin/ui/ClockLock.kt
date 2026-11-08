@@ -67,7 +67,8 @@ import kotlin.math.sqrt
 private data class LockColors(val frame: Color, val body: Color, val track: Color, val arc: Color, val arcBreak: Color)
 
 private val LightLock = LockColors(Color(0xFFABA095), Color(0xFFECE5DA), Color(0x21302A25), Color(0xFF74685D), Color(0xFFB8AC9F))
-private val DarkLock = LockColors(Color(0xFF6F655B), Color(0xFF2B251F), Color(0x24F0E8DB), Color(0xFFD2C4B3), Color(0xFF85796D))
+// Dark cocoa (owner 2026-11-08, R57).
+private val DarkLock = LockColors(Color(0xFF6E5A4C), Color(0xFF241A14), Color(0x24F2E6D6), Color(0xFFD8C4AE), Color(0xFF8A7362))
 
 // Geometry in the reference's units (viewBox 240 wide).
 private const val W = 240f

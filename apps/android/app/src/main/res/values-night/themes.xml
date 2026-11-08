@@ -4,6 +4,6 @@
         <item name="android:windowBackground">@color/ground</item>
         <item name="android:colorBackground">@color/ground</item>
     </style>
-    <color name="ground">#1C1814</color>
-    <color name="ink">#F0E8DB</color>
+    <color name="ground">#160F0B</color>
+    <color name="ink">#F2E6D6</color>
 </resources>
