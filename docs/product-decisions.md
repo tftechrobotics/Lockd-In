@@ -275,3 +275,10 @@ Three kinds of entry, kept apart on purpose:
   picked A. The shackle is a round bar (stacked strokes, dark edge to bright core) and the ring has an outer
   bevel lit from the upper left. An inner reversed bevel makes the face look sunk. The lens is flat, with one
   faint diagonal band and a hairline of light on its upper-left edge. Soft drop shadows under shackle and body.
+
+## R61: Lock "Watch crystal", shorter shackle (2026-11-08, owner)
+- Lock A (R60) was rejected: the lock felt too long and the design didn't land. From four more mockups the
+  owner picked "Watch crystal": a thin polished bezel (bright upper left to dark lower right) and a dark seat.
+  The face sits under a watch glass, with a soft cap of light over the upper half and a hairline edge. The
+  round-bar shackle stays, now thicker (STROKE 28) and shorter (TOP 56, open lift 50), so the whole lock is
+  shorter.

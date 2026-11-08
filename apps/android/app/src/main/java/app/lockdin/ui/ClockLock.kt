@@ -78,10 +78,10 @@ private const val CY = 232f
 private const val R = 108f
 private const val RIM = 7f
 private const val RO = 74.5f
-private const val STROKE = 21f
-private const val TOP = 40f
+private const val STROKE = 28f
+private const val TOP = 56f  // owner 2026-11-08: shorter shackle (was 40)
 /** How far the open shackle rises (owner 2026-11-04: higher, so open can't be mistaken for locked; was 36). */
-private const val LIFT = 62f
+private const val LIFT = 50f  // shorter overall with the shorter shackle (was 62)
 private const val TICKS = 60
 private const val MIN_Y = TOP - LIFT - 4f            // -26
 private const val H = CY + R + 4f - MIN_Y             // 370
@@ -330,34 +330,36 @@ fun ClockLock(
             }
             val tl = Offset(center.x - R * s, center.y - R * s)
             val br = Offset(center.x + R * s, center.y + R * s)
-            // Outer bevel: bright upper left, dark lower right.
+            // R61 (owner's pick "Watch crystal"): a thin polished bezel, a dark seat, and the whole face
+            // under a watch glass: a soft cap of light over the upper half and a hairline at its edge.
             drawCircle(Brush.linearGradient(
-                0f to lerp(lc.frame, Color.White, if (dark) 0.45f else 0.55f), 0.45f to lc.frame,
-                1f to lerp(lc.frame, Color.Black, if (dark) 0.5f else 0.3f), start = tl, end = br,
-            ), R * s, center)
-            // Inner bevel, reversed, so the face reads as sunk into the ring.
-            drawCircle(Brush.linearGradient(
-                0f to lerp(lc.frame, Color.Black, if (dark) 0.6f else 0.35f), 1f to lerp(lc.frame, Color.White, if (dark) 0.2f else 0.4f),
+                0f to lerp(lc.frame, Color.White, if (dark) 0.62f else 0.6f), 0.4f to lerp(lc.frame, Color.White, if (dark) 0.2f else 0.15f),
+                0.75f to lerp(lc.frame, Color.Black, if (dark) 0.2f else 0.15f), 1f to lerp(lc.frame, Color.Black, if (dark) 0.6f else 0.35f),
                 start = tl, end = br,
-            ), (R - RIM) * s, center)
-            val faceR = (R - 12f) * s
+            ), R * s, center)
+            drawCircle(lerp(bodyColor, Color.Black, if (dark) 0.55f else 0.35f), R * 0.94f * s, center)
+            val faceR = R * 0.92f * s
             drawCircle(Brush.radialGradient(
-                0f to lerp(bodyColor, Color.White, if (dark) 0.04f else 0.3f), 0.85f to bodyColor,
-                1f to lerp(bodyColor, Color.Black, if (dark) 0.55f else 0.14f), center = center, radius = faceR,
+                0f to lerp(bodyColor, Color.White, if (dark) 0.07f else 0.35f), 0.75f to bodyColor,
+                1f to lerp(bodyColor, Color.Black, if (dark) 0.55f else 0.14f),
+                center = Offset(center.x, center.y - faceR * 0.16f), radius = faceR * 1.2f,
             ), faceR, center)
-            // The lens: one faint diagonal band and a hairline of light on its upper-left edge. No glare.
-            clipPath(Path().apply { addOval(Rect(center, faceR)) }) {
-                val band = Color(0xFFFFF5E6).copy(alpha = if (dark) 0.06f else 0.22f)
-                drawRect(Brush.linearGradient(
-                    0.18f to Color.Transparent, 0.26f to band, 0.4f to band, 0.46f to Color.Transparent,
-                    start = Offset(center.x - faceR, center.y - faceR), end = Offset(center.x + faceR, center.y + faceR),
-                ))
+            val cap = Path().apply {
+                val r2 = R * 1.6f * s
+                val half = faceR
+                // Upper arc of the glass, then a shallow arc back so the cap's lower edge bows upward.
+                moveTo(center.x - half, center.y)
+                arcTo(Rect(center, faceR), 180f, 180f, false)
+                val dy = sqrt(r2 * r2 - half * half)
+                arcTo(Rect(Offset(center.x, center.y + dy), r2), -90f + Math.toDegrees(kotlin.math.asin((half / r2).toDouble())).toFloat(),
+                    -2f * Math.toDegrees(kotlin.math.asin((half / r2).toDouble())).toFloat(), false)
+                close()
             }
-            drawArc(
-                Color(0xFFFFF5E6).copy(alpha = if (dark) 0.45f else 0.8f), startAngle = 225f, sweepAngle = 58f, useCenter = false,
-                topLeft = Offset(center.x - faceR, center.y - faceR), size = androidx.compose.ui.geometry.Size(2 * faceR, 2 * faceR),
-                style = Stroke(1.2f * s, cap = StrokeCap.Round),
-            )
+            drawPath(cap, Brush.verticalGradient(
+                0f to Color(0xFFFFF5E6).copy(alpha = if (dark) 0.10f else 0.32f), 0.35f to Color.Transparent,
+                startY = center.y - faceR, endY = center.y + faceR,
+            ))
+            drawCircle(Color(0xFFFFF5E6).copy(alpha = if (dark) 0.22f else 0.6f), faceR, center, style = Stroke(1f * s))
             // Tick ring: the only layer the start sequence turns. The 12 o'clock index is slightly
             // heavier so the turn reads like a combination dial.
             rotate(dial.value, pivot = center) {
