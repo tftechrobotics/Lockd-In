@@ -258,3 +258,14 @@ Three kinds of entry, kept apart on purpose:
   capsule with a bright rim, a top highlight and a darker bottom lip.
 - Limitation: Android can't blur what's behind a view. Only the app's own background image is blurred.
   With no background chosen, glass shows as a tint over the plain ground.
+
+## R59: Glass fixes, Schedule calendar, focus streak (2026-11-08, owner)
+- Settings glass was too faint on the phone: stronger tint, brighter top edge, diagonal sheen, lighter blur and dim.
+- No solid strip behind pinned actions (e.g. "Start a session"); the tab bar is mostly see-through.
+- Schedule gets a month calendar (dots on days with plans). Tapping a day shows its sessions, a "Plan a
+  session" action and that day's free time, with roomier rows (time on its own line, "Plan" action).
+- Focus streak (approved, not built yet): lives in History. It counts consecutive days with sessions finished
+  without trying to open a blocked app or ending early. Days with no session pause the streak and don't
+  break it. At 30 days History suggests trying an unlocked session; nothing changes unless the person taps it.
+  The streak is a measure of consistency, not proof of a habit. Browser tabs only count where sites are
+  already watched.
