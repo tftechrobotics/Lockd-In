@@ -319,7 +319,8 @@ class AppTest {
         rule.onNodeWithText("Blocked apps · 2").assertIsDisplayed()
         rule.onNodeWithContentDescription("${two[0].label}, blocked").performScrollTo().assertExists()
         rule.onNodeWithText("Websites · 1").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithTag("profile-status").assertContentDescriptionEquals("Status: Not in use")
+        // The test emulator hasn't granted usage access, so the truthful pill is "not set up".
+        rule.onNodeWithTag("profile-status").assertContentDescriptionEquals("Status: Blocking isn’t set up")
         shot("16-profile-summary-light")
         rule.onNodeWithTag("edit-profile").performClick()
         rule.onNodeWithContentDescription("Search apps").performTextInput(two[0].label)
