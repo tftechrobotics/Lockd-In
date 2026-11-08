@@ -108,6 +108,21 @@ private fun shacklePath(s: Float): Path {
     }
 }
 
+/** The shackle's centre line (stroked at STROKE width it covers the same shape as shacklePath). */
+private fun shackleCentrePath(s: Float): Path {
+    val rc = RO - STROKE / 2
+    val arcY = TOP + RO
+    val tip = CY - sqrt(R * R - RO * RO) + STROKE / 2
+    fun x(v: Float) = v * s
+    fun y(v: Float) = (v - MIN_Y) * s
+    return Path().apply {
+        moveTo(x(CX - rc), y(CY))
+        lineTo(x(CX - rc), y(arcY))
+        arcTo(Rect(x(CX - rc), y(arcY - rc), x(CX + rc), y(arcY + rc)), 180f, 180f, false)
+        lineTo(x(CX + rc), y(tip))
+    }
+}
+
 /**
  * One-shot start-sequence requests, in process memory only: set when the person presses Start in
  * the app, consumed by the first session screen that shows that session. Rotation, reopening,
@@ -284,90 +299,65 @@ fun ClockLock(
         val s = with(LocalDensity.current) { maxWidth.toPx() } / W
         val shackle = remember(s) { shacklePath(s) }
         val shackleNative = remember(shackle) { shackle.asAndroidPath() }
+        val shackleCentre = remember(s) { shackleCentrePath(s) }
         Canvas(Modifier.fillMaxSize()) {
             val center = Offset(CX * s, (CY - MIN_Y) * s)
-            val hiFrame = lerp(lc.frame, Color.White, if (dark) 0.14f else 0.32f)
-            val loFrame = lerp(lc.frame, Color.Black, if (dark) 0.28f else 0.14f)
-            // Shackle: lit from the upper left, with a soft shadow to the lower right.
+            // R60 (owner's pick "A: machined + glass lens"): a round-bar shackle, a bevelled metal ring,
+            // a sunken face and a flat glass lens with only a faint reflection band. Lit from the upper left.
             translate(top = -LIFT * s * (1 - closed)) {
                 drawIntoCanvas { cv ->
                     shadowPaint.color = lc.frame.toArgb()
-                    shadowPaint.setShadowLayer(7f * s, 2.5f * s, 4f * s, Color.Black.copy(alpha = if (dark) 0.45f else 0.13f).toArgb())
+                    shadowPaint.setShadowLayer(7f * s, 2.5f * s, 4f * s, Color.Black.copy(alpha = if (dark) 0.5f else 0.15f).toArgb())
                     cv.nativeCanvas.drawPath(shackleNative, shadowPaint)
                 }
-                // Polished metal (R58): banded across the bar like turned steel, then a gloss from the top.
-                drawPath(shackle, Brush.horizontalGradient(
-                    0f to loFrame, 0.12f to hiFrame, 0.22f to lc.frame, 0.5f to lerp(lc.frame, Color.White, if (dark) 0.06f else 0.12f),
-                    0.78f to lc.frame, 0.88f to hiFrame, 1f to loFrame,
-                    startX = (CX - RO) * s, endX = (CX + RO) * s,
-                ))
-                drawPath(shackle, Brush.verticalGradient(
-                    0f to Color.White.copy(alpha = if (dark) 0.42f else 0.55f), 0.32f to Color.White.copy(alpha = 0.06f), 0.5f to Color.Transparent,
-                    startY = (TOP - MIN_Y) * s, endY = (CY - MIN_Y) * s,
-                ))
-                // Specular streak along the top of the bow (owner 2026-11-08: make the gloss obvious).
-                val bowR = RO - STROKE * 0.32f
-                val bowC = Offset(CX * s, (TOP + RO - MIN_Y) * s)
-                drawArc(
-                    Color.White.copy(alpha = if (dark) 0.55f else 0.85f), startAngle = 200f, sweepAngle = 70f, useCenter = false,
-                    topLeft = Offset(bowC.x - bowR * s, bowC.y - bowR * s), size = androidx.compose.ui.geometry.Size(2 * bowR * s, 2 * bowR * s),
-                    style = Stroke(3.2f * s, cap = StrokeCap.Round),
-                )
+                // A cylinder: stacked strokes along the bar's centre line, each narrower, lighter and a
+                // little up-left of the last, so the bar shades from a dark edge to a bright core.
+                val edge = lerp(lc.frame, Color.Black, if (dark) 0.45f else 0.3f)
+                val core = lerp(lc.frame, Color.White, if (dark) 0.62f else 0.75f)
+                val layers = 9
+                for (i in 0 until layers) {
+                    val t = i / (layers - 1f)
+                    val w = STROKE * (1f - 0.86f * t)
+                    translate(left = -4.5f * s * t, top = -3f * s * t) {
+                        drawPath(shackleCentre, lerp(edge, core, t * t * 0.6f + t * 0.4f), style = Stroke(w * s, cap = StrokeCap.Round))
+                    }
+                }
             }
-            // Dial: soft lower-right shadow, a rim lit from the upper left, a matte face.
             drawIntoCanvas { cv ->
                 shadowPaint.color = lc.frame.toArgb()
-                shadowPaint.setShadowLayer(18f * s, 5f * s, 8f * s, Color.Black.copy(alpha = if (dark) 0.5f else 0.16f).toArgb())
+                shadowPaint.setShadowLayer(20f * s, 6f * s, 12f * s, Color.Black.copy(alpha = if (dark) 0.6f else 0.18f).toArgb())
                 cv.nativeCanvas.drawCircle(center.x, center.y, R * s, shadowPaint)
             }
-            // Polished rim: turned-metal bands around the ring, lit from the upper left.
-            drawCircle(Brush.sweepGradient(
-                0f to lc.frame, 0.12f to loFrame, 0.3f to lc.frame, 0.5f to hiFrame, 0.62f to lerp(hiFrame, Color.White, 0.35f),
-                0.72f to hiFrame, 0.88f to lc.frame, 1f to lc.frame, center = center,
+            val tl = Offset(center.x - R * s, center.y - R * s)
+            val br = Offset(center.x + R * s, center.y + R * s)
+            // Outer bevel: bright upper left, dark lower right.
+            drawCircle(Brush.linearGradient(
+                0f to lerp(lc.frame, Color.White, if (dark) 0.45f else 0.55f), 0.45f to lc.frame,
+                1f to lerp(lc.frame, Color.Black, if (dark) 0.5f else 0.3f), start = tl, end = br,
             ), R * s, center)
-            // Rim highlight: a fine light edge on the upper left only.
-            drawCircle(
-                Brush.sweepGradient(
-                    0f to Color.Transparent, 0.45f to Color.Transparent,
-                    0.625f to Color.White.copy(alpha = if (dark) 0.16f else 0.6f),
-                    0.8f to Color.Transparent, 1f to Color.Transparent, center = center,
-                ),
-                R * s - 1.1f * s, center, style = Stroke(1.6f * s),
-            )
-            val faceR = (R - RIM) * s
+            // Inner bevel, reversed, so the face reads as sunk into the ring.
+            drawCircle(Brush.linearGradient(
+                0f to lerp(lc.frame, Color.Black, if (dark) 0.6f else 0.35f), 1f to lerp(lc.frame, Color.White, if (dark) 0.2f else 0.4f),
+                start = tl, end = br,
+            ), (R - RIM) * s, center)
+            val faceR = (R - 12f) * s
             drawCircle(Brush.radialGradient(
-                0f to lerp(bodyColor, Color.White, if (dark) 0.06f else 0.38f),
-                0.6f to bodyColor,
-                1f to lerp(bodyColor, Color.Black, if (dark) 0.2f else 0.06f),
-                center = Offset(center.x - 30f * s, center.y - 36f * s), radius = faceR * 1.4f,
+                0f to lerp(bodyColor, Color.White, if (dark) 0.04f else 0.3f), 0.85f to bodyColor,
+                1f to lerp(bodyColor, Color.Black, if (dark) 0.55f else 0.14f), center = center, radius = faceR,
             ), faceR, center)
-            // The face sits just below the rim: a faint shade along its upper-left edge.
-            drawCircle(
-                Brush.sweepGradient(
-                    0f to Color.Transparent, 0.42f to Color.Transparent,
-                    0.625f to Color.Black.copy(alpha = if (dark) 0.3f else 0.09f),
-                    0.83f to Color.Transparent, 1f to Color.Transparent, center = center,
-                ),
-                faceR - 1f * s, center, style = Stroke(2.2f * s),
-            )
-            // Glass face (R58): a soft reflection across the upper half, clipped to the face.
+            // The lens: one faint diagonal band and a hairline of light on its upper-left edge. No glare.
             clipPath(Path().apply { addOval(Rect(center, faceR)) }) {
-                drawOval(
-                    Brush.verticalGradient(
-                        0f to Color.White.copy(alpha = if (dark) 0.3f else 0.62f), 0.55f to Color.White.copy(alpha = if (dark) 0.08f else 0.18f), 1f to Color.Transparent,
-                        startY = center.y - faceR, endY = center.y - faceR * 0.05f,
-                    ),
-                    topLeft = Offset(center.x - faceR * 0.92f, center.y - faceR * 1.02f),
-                    size = androidx.compose.ui.geometry.Size(faceR * 1.84f, faceR * 0.98f),
-                )
-                // A crisp glint on the upper-left of the glass.
-                val gR = faceR * 0.9f
-                drawArc(
-                    Color.White.copy(alpha = if (dark) 0.45f else 0.8f), startAngle = 205f, sweepAngle = 40f, useCenter = false,
-                    topLeft = Offset(center.x - gR, center.y - gR), size = androidx.compose.ui.geometry.Size(2 * gR, 2 * gR),
-                    style = Stroke(2.6f * s, cap = StrokeCap.Round),
-                )
+                val band = Color(0xFFFFF5E6).copy(alpha = if (dark) 0.06f else 0.22f)
+                drawRect(Brush.linearGradient(
+                    0.18f to Color.Transparent, 0.26f to band, 0.4f to band, 0.46f to Color.Transparent,
+                    start = Offset(center.x - faceR, center.y - faceR), end = Offset(center.x + faceR, center.y + faceR),
+                ))
             }
+            drawArc(
+                Color(0xFFFFF5E6).copy(alpha = if (dark) 0.45f else 0.8f), startAngle = 225f, sweepAngle = 58f, useCenter = false,
+                topLeft = Offset(center.x - faceR, center.y - faceR), size = androidx.compose.ui.geometry.Size(2 * faceR, 2 * faceR),
+                style = Stroke(1.2f * s, cap = StrokeCap.Round),
+            )
             // Tick ring: the only layer the start sequence turns. The 12 o'clock index is slightly
             // heavier so the turn reads like a combination dial.
             rotate(dial.value, pivot = center) {

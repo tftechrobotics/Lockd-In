@@ -269,3 +269,9 @@ Three kinds of entry, kept apart on purpose:
   break it. At 30 days History suggests trying an unlocked session; nothing changes unless the person taps it.
   The streak is a measure of consistency, not proof of a habit. Browser tabs only count where sites are
   already watched.
+
+## R60: Lock look "A: machined + glass lens" (2026-11-08, owner)
+- The R58/R59 gloss (face reflection oval and glint) read as a bubble with glare. From three mockups the owner
+  picked A. The shackle is a round bar (stacked strokes, dark edge to bright core) and the ring has an outer
+  bevel lit from the upper left. An inner reversed bevel makes the face look sunk. The lens is flat, with one
+  faint diagonal band and a hairline of light on its upper-left edge. Soft drop shadows under shackle and body.
