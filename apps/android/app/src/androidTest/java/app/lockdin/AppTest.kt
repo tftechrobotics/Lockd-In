@@ -727,7 +727,7 @@ class AppTest {
         rule.onNodeWithText("Save session").performClick()
         rule.onNodeWithText("Every week").performScrollTo().assertIsDisplayed()
         rule.onAllNodesWithText("Physics review").onFirst().assertIsDisplayed()
-        rule.onNodeWithContentDescription("Physics review on").performClick()
+        rule.onNodeWithContentDescription("Physics review on").performScrollTo().performClick()
         rule.onNodeWithText("Off").performScrollTo().assertIsDisplayed()
         // The plan shows on the chosen day and in "Your plans"; edit from the list.
         rule.onAllNodesWithText("Physics review").onLast().performScrollTo().performClick()
