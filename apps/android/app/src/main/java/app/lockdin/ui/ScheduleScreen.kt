@@ -49,6 +49,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -198,7 +199,7 @@ private fun DayAgenda(
     val c = LocalColors.current
     val plans = store.state.schedule.filter { it.enabled && it.occursOn(day) }.sortedBy { it.startTime }
     Column(verticalArrangement = Arrangement.spacedBy(Dim.s4)) {
-        Text(dayTitle(day, today), style = Type.title, color = c.ink, modifier = Modifier.semantics { androidx.compose.ui.semantics.heading() })
+        Text(dayTitle(day, today), style = Type.title, color = c.ink, modifier = Modifier.semantics { heading() })
         if (plans.isEmpty()) Text(if (day.isBefore(today)) "Nothing was planned." else "Nothing planned.", style = UiType.caption, color = c.inkMuted)
         else Column {
             plans.forEachIndexed { i, s ->
