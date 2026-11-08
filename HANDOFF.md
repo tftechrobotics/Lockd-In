@@ -36,6 +36,7 @@
   - Last emulator run: 69/71. The two failures were test-side (scroll in a LazyColumn, and a tap while the
     keyboard was closing); both were adjusted in the next commit, which needs one clean emulator run.
   - R63: the streak is now a 30-tick ring (owner's reference image). Emulator run on 2026-11-08: 71/71 passed.
+  - R64 profile summary: emulator run 74/74 passed. Screenshots 16/17 are on `ci-screenshots`.
   - Not yet verified on a real phone: that an unlocked session shows no block screen while the attempt is
     still noted. Check this on the S24+.
 
