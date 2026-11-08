@@ -324,7 +324,10 @@ class AppTest {
         shot("16-profile-summary-light")
         rule.onNodeWithTag("edit-profile").performClick()
         rule.onNodeWithContentDescription("Search apps").performTextInput(two[0].label)
-        rule.onAllNodesWithText(two[0].label).onFirst().performClick()
+        // The search field also contains the label; tap the app's row (the one that isn't a text field).
+        rule.waitUntil(5_000) { rule.onAllNodes(hasText(two[0].label) and hasSetTextAction().not()).fetchSemanticsNodes().isNotEmpty() }
+        rule.onAllNodes(hasText(two[0].label) and hasSetTextAction().not()).onFirst().performClick()
+        rule.onNodeWithText("1 chosen").assertExists()
         rule.onNodeWithText("Save").performClick()
         rule.onNodeWithText("Blocked apps · 1").performScrollTo().assertIsDisplayed()
         rule.onNodeWithContentDescription("${two[0].label}, blocked").assertDoesNotExist()
