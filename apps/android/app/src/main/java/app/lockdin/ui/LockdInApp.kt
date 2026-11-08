@@ -1,5 +1,7 @@
 package app.lockdin.ui
 
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.animation.togetherWith
 
 import androidx.compose.material3.HorizontalDivider
