@@ -4,7 +4,15 @@
 **Read first:** `docs/audit-2026-11.md` (inventory, Freedom, platform limits, architecture) and `docs/milestones.md` (new M1–M5 criteria + evidence table).
 **Repository:** github.com/tftechrobotics/Lockd-In (public since 2026-11-01).
 
-**Newest (2026-11-08): owner-led restyle R54-R56, build 428104d (emulator UI tests pass, screenshots reviewed)**
+**Newest (2026-11-08): dark cocoa (R57) + glass (R58)**
+- R57: dark mode uses the "Dark cocoa" palette (tokens.json → Tokens.kt, lock, widget). CI passed (756ab76).
+- R58: frosted glass Settings plates (`Modifier.glass` / `Modifier.plate()` / `GlassButton` in `ui/Kit.kt`). The
+  background is blurred and dimmed behind Settings (`BackdropBox(frosted=)`). Also: a polished lock
+  (`ClockLock.kt`), a smoked-glass tab bar with no indicator pill (`LockdInApp.kt`) and a clear-glass
+  "Start a session" button. The greeting stays unboxed. Check the emulator screenshots for both themes before
+  sending the APK.
+
+**Earlier (2026-11-08): owner-led restyle R54-R56, build 428104d (emulator UI tests pass, screenshots reviewed)**
 - Home: lock (lower), then a greeting + one line about what's next (R54). No boxes outside Settings via
   `LocalBoxed` in `ui/Kit.kt`; underline-bar choices (`UnderlineOption`); motion: press-in, sliding selection
   bar, tab and Settings page transitions, greeting rise-in, lock rattle on tap, rolling "Ends at" (R55).

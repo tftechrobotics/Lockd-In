@@ -246,3 +246,15 @@ Three kinds of entry, kept apart on purpose:
 - Owner kept the chocolate direction and picked "Dark cocoa" from four variations: ground #160F0B, surface
   #1F1611, taupeSoft #2A1F18, line/taupe #43342A, ink #F2E6D6, inkMuted #C4AE98 (all contrast checks pass).
   Lock, widget and window background follow. A glossy glass look was requested next (mockups first).
+
+## R58: Glass (2026-11-08, owner)
+- From mockups the owner chose: frosted glass for the Settings plates, a polished lock, and no box around
+  the Home greeting. For the tab bar and "Start a session" they picked "Lens", but without the round lens
+  over the active tab.
+- What was built: Settings plates are a translucent tint with a 1 dp edge that's brightest at the top. On
+  Settings the chosen background shows behind them, blurred (Android 12+) and dimmed. The shackle is
+  banded metal with a top gloss, and the dial face has a glass reflection. The tab bar is smoked glass with a
+  light top edge, and the active tab is marked by ink and weight only. "Start a session" is a clear glass
+  capsule with a bright rim, a top highlight and a darker bottom lip.
+- Limitation: Android can't blur what's behind a view. Only the app's own background image is blurred.
+  With no background chosen, glass shows as a tint over the plain ground.
