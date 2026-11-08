@@ -119,8 +119,10 @@ fun HistoryScreen(store: Store, history: HistoryStore, clock: AppClock, zone: Zo
         }
         days.forEach { (date, list) ->
             item(key = "day-$date") {
-                Row(Modifier.fillMaxWidth().padding(top = Dim.s2), verticalAlignment = Alignment.CenterVertically) {
-                    Text(dayHeading(date, today), style = UiType.section, color = c.inkMuted,
+                // Owner 2026-11-08: each day starts under a clear rule so days don't run together.
+                androidx.compose.material3.HorizontalDivider(thickness = 1.5.dp, color = c.inkMuted.copy(alpha = 0.45f), modifier = Modifier.padding(top = Dim.s3))
+                Row(Modifier.fillMaxWidth().padding(top = Dim.s3), verticalAlignment = Alignment.CenterVertically) {
+                    Text(dayHeading(date, today), style = Type.title, color = c.ink,
                         modifier = Modifier.weight(1f).semantics { heading() })
                     TextAction("Delete day", { deleteDay = date })
                 }
@@ -211,15 +213,14 @@ private fun EntryRow(e: HistoryEntry, zone: ZoneId, onOpen: () -> Unit) {
     val c = LocalColors.current
     Row(
         Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable(role = Role.Button, onClickLabel = "View summary", onClick = onOpen)
-            .semantics(mergeDescendants = true) {}.padding(horizontal = Dim.s4, vertical = Dim.s3),
+            .semantics(mergeDescendants = true) {}.padding(horizontal = plateSide(Dim.s4), vertical = Dim.s4),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Same shape as Schedule rows: the time first, then what it was, then the details.
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("${Fmt.clock(e.start, zone)} – ${Fmt.clock(e.end, zone)}", style = Type.fact, color = c.ink)
             Text(e.task ?: "Focus session", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink, maxLines = 1)
-            Text(
-                "${Fmt.clock(e.start, zone)}–${Fmt.clock(e.end, zone)} · ${minutesLabel(e.focusedMinutes)} focused · ${e.profileName}",
-                style = UiType.caption.copy(fontFeatureSettings = "tnum"), color = c.inkMuted, maxLines = 2,
-            )
+            Text("${minutesLabel(e.focusedMinutes)} focused · ${e.profileName}", style = UiType.caption, color = c.inkMuted, maxLines = 2)
             if (e.outcome != Outcome.COMPLETED) Text(outcomeText(e.outcome), style = UiType.caption, color = c.ink)
         }
         LockdIcon(LIcon.Chevron, size = 18.dp, tint = c.inkMuted)

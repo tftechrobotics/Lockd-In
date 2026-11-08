@@ -107,7 +107,6 @@ fun blankSession(profileId: String) = ScheduledSession(
 fun ScheduleScreen(store: Store, now: Long, zone: ZoneId, onEdit: (ScheduledSession) -> Unit) {
     val c = LocalColors.current
     val all = store.state.schedule
-    val next = Schedule.nextUp(all, now, zone)
     val routines = all.filter { !it.oneTime }.sortedBy { it.startTime }
     val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
     val once = all.filter { it.oneTime && !it.date!!.isBefore(today) }.sortedWith(compareBy({ it.date }, { it.startTime }))
@@ -128,67 +127,50 @@ fun ScheduleScreen(store: Store, now: Long, zone: ZoneId, onEdit: (ScheduledSess
         var day by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(today) }
         MonthCalendar(
             month = month, onMonth = { month = it }, selected = day, today = today,
-            planned = { d -> all.count { it.enabled && it.occursOn(d) } },
+            // Dots only from today on: past days show what's planned now, not what happened.
+            planned = { d -> if (d.isBefore(today)) 0 else all.count { it.enabled && it.occursOn(d) } },
             onSelect = { day = it },
         )
+        // Owner 2026-11-08: three clearly separated parts (calendar, the chosen day, your plans), and
+        // no "Next up" here (Focus shows it), so a plan isn't listed three times.
+        SectionRule()
         DayAgenda(store, day, today, now, zone, profileName, onEdit)
+        SectionRule()
         if (all.isEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
-                Text("No sessions planned yet", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
+                Text("No sessions planned yet", style = Type.title, color = c.ink, modifier = Modifier.semantics { heading() })
                 Text("Plan a weekly routine, like weeknights at 7, or a one-time study block. The next one shows on Focus.",
                     style = UiType.caption, color = c.inkMuted)
                 GlassButton("Add session", add)
             }
             return@Column
         }
-        next?.let { n ->
-            Column {
-                SectionLabel("Next up")
-                Surface(shape = RoundedCornerShape(Dim.plate), color = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.fillMaxWidth().plate().clickable(role = Role.Button) { onEdit(n.session) }) {
-                    Row(Modifier.padding(horizontal = plateSide(Dim.s4), vertical = Dim.s3), verticalAlignment = Alignment.CenterVertically) {
-                        val st = Instant.ofEpochMilli(n.start).atZone(zone)
-                        Column(Modifier.widthIn(min = 64.dp).padding(end = Dim.s3).clearAndSetSemantics { }) {
-                            Text(st.format(DateTimeFormatter.ofPattern("h:mm")), style = Type.display.copy(fontSize = 19.sp, lineHeight = 24.sp), color = c.ink)
-                            Text(st.format(DateTimeFormatter.ofPattern("a", java.util.Locale.getDefault())), style = UiType.caption, color = c.inkMuted)
-                        }
-                        Column(Modifier.weight(1f)) {
-                            Text("${Fmt.dayLabel(n.start, now, zone)} · ${Fmt.clock(n.start, zone)}–${Fmt.clock(n.end, zone)}", style = UiType.caption, color = c.inkMuted)
-                            Text(n.session.title, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
-                            Text("${planLabel(n.session)} · ${profileName(n.session.profileId)}", style = UiType.caption, color = c.inkMuted)
-                            if (n.session.autoStart) Text("Starts automatically", style = UiType.caption.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
-                        }
-                        LockdIcon(LIcon.Chevron, size = 18.dp, tint = c.inkMuted)
-                    }
-                }
-                if (n.start > now) TextAction("Skip this time", {
-                    val day = Instant.ofEpochMilli(n.start).atZone(zone).toLocalDate()
-                    store.update { st -> st.copy(schedule = st.schedule.map { if (it.id == n.session.id) it.copy(skipped = it.skipped + day) else it }) }
-                })
-            }
-        }
-        if (routines.isNotEmpty()) Column {
-            SectionLabel("Weekly routines")
-            SettingsGroup {
+        Column(verticalArrangement = Arrangement.spacedBy(Dim.s4)) {
+            Text("Your plans", style = Type.title, color = c.ink, modifier = Modifier.semantics { heading() })
+            if (routines.isNotEmpty()) Column {
+                SectionLabel("Every week")
                 routines.forEachIndexed { i, s ->
-                    if (i > 0) GroupDivider()
+                    if (i > 0) androidx.compose.material3.HorizontalDivider(color = c.line)
                     PlanRow(store, s, daysLabel(s.days), profileName(s.profileId), onEdit)
                 }
             }
-        }
-        if (once.isNotEmpty()) Column {
-            SectionLabel("One-time")
-            SettingsGroup {
+            if (once.isNotEmpty()) Column {
+                SectionLabel("One time")
                 once.forEachIndexed { i, s ->
-                    if (i > 0) GroupDivider()
+                    if (i > 0) androidx.compose.material3.HorizontalDivider(color = c.line)
                     PlanRow(store, s, s.date!!.format(dateFmt), profileName(s.profileId), onEdit)
                 }
             }
+            if (past.isNotEmpty()) TextAction("Clear ${past.size} past one-time session${if (past.size > 1) "s" else ""}", {
+                store.update { st -> st.copy(schedule = st.schedule.filterNot { it in past }) }
+            })
         }
-        if (past.isNotEmpty()) TextAction("Clear ${past.size} past one-time session${if (past.size > 1) "s" else ""}", {
-            store.update { st -> st.copy(schedule = st.schedule.filterNot { it in past }) }
-        })
     }
 }
+
+/** A clear break between the parts of a screen. */
+@Composable
+fun SectionRule() = androidx.compose.material3.HorizontalDivider(thickness = 1.5.dp, color = LocalColors.current.inkMuted.copy(alpha = 0.45f))
 
 /** The chosen day: its planned sessions (tap to edit), a way to plan one, then free time. */
 @Composable
@@ -197,10 +179,11 @@ private fun DayAgenda(
     profileName: (String) -> String, onEdit: (ScheduledSession) -> Unit,
 ) {
     val c = LocalColors.current
-    val plans = store.state.schedule.filter { it.enabled && it.occursOn(day) }.sortedBy { it.startTime }
+    val past = day.isBefore(today)
+    val plans = if (past) emptyList() else store.state.schedule.filter { it.enabled && it.occursOn(day) }.sortedBy { it.startTime }
     Column(verticalArrangement = Arrangement.spacedBy(Dim.s4)) {
         Text(dayTitle(day, today), style = Type.title, color = c.ink, modifier = Modifier.semantics { heading() })
-        if (plans.isEmpty()) Text(if (day.isBefore(today)) "Nothing was planned." else "Nothing planned.", style = UiType.caption, color = c.inkMuted)
+        if (plans.isEmpty()) Text(if (past) "This day has passed. Finished sessions are in History." else "Nothing planned.", style = UiType.body, color = c.inkMuted)
         else Column {
             plans.forEachIndexed { i, s ->
                 if (i > 0) androidx.compose.material3.HorizontalDivider(color = c.line)
@@ -215,11 +198,14 @@ private fun DayAgenda(
                         Text(s.title.ifBlank { "Study" }, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
                         Text("${planLabel(s)} · ${profileName(s.profileId)}", style = UiType.caption, color = c.inkMuted)
                     }
-                    LockdIcon(LIcon.Chevron, size = 18.dp, tint = c.inkMuted)
+                    // Skip just this day (the plan stays); only before it starts.
+                    if (st > now) TextAction("Skip", {
+                        store.update { x -> x.copy(schedule = x.schedule.map { if (it.id == s.id) it.copy(skipped = it.skipped + day) else it }) }
+                    })
                 }
             }
         }
-        if (!day.isBefore(today)) {
+        if (!past) {
             TextAction("Plan a session ${if (day == today) "today" else if (day == today.plusDays(1)) "tomorrow" else "this day"}", {
                 onEdit(ScheduledSession("", "Study", emptySet(), LocalTime.of(19, 0), 40, 10, 2, store.state.last.profileId, date = day))
             })
@@ -234,18 +220,15 @@ private fun PlanRow(store: Store, s: ScheduledSession, whenText: String, profile
     val muted = !s.enabled
     Row(Modifier.fillMaxWidth().heightIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically) {
         Row(
-            Modifier.weight(1f).clickable(role = Role.Button, onClickLabel = "Edit ${s.title}") { onEdit(s) }.padding(start = plateSide(Dim.s4), top = Dim.s3, bottom = Dim.s3),
+            Modifier.weight(1f).clickable(role = Role.Button, onClickLabel = "Edit ${s.title}") { onEdit(s) }.padding(start = plateSide(Dim.s4), top = Dim.s4, bottom = Dim.s4),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Stamped start time (pass 5): hour in expanded LiterataText, AM/PM small underneath.
-            Column(Modifier.widthIn(min = 64.dp)) {
-                Text(s.startTime.format(DateTimeFormatter.ofPattern("h:mm")), style = Type.display.copy(fontSize = 18.sp, lineHeight = 22.sp), color = if (muted) c.inkMuted else c.ink)
-                Text(s.startTime.format(DateTimeFormatter.ofPattern("a", java.util.Locale.getDefault())), style = UiType.caption, color = c.inkMuted)
-            }
-            Spacer(Modifier.width(Dim.s3))
-            Column(Modifier.weight(1f)) {
-                Text(s.title, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = if (muted) c.inkMuted else c.ink)
-                Text("$whenText · ${planLabel(s)} · $profile", style = UiType.caption, color = c.inkMuted)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(s.startTime.format(timeFmt),
+                    style = Type.fact, color = if (muted) c.inkMuted else c.ink)
+                Text(s.title.ifBlank { "Study" }, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = if (muted) c.inkMuted else c.ink)
+                Text(whenText, style = UiType.caption, color = c.ink)
+                Text("${planLabel(s)} · $profile", style = UiType.caption, color = c.inkMuted)
                 val notes = listOfNotNull(
                     if (s.autoStart) "Starts automatically" else null,
                     if (s.remindMinutes > 0) "Reminder ${s.remindMinutes} min before" else null,

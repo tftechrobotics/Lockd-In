@@ -135,7 +135,9 @@ private fun Scene(choice: Backdrop, dark: Boolean) {
         else -> if (dark) R.drawable.bg_words else R.drawable.bg_words_light
     }
     // Faded into the theme's ground so the scene stays in the background; the words fade most.
-    val alpha = if (choice == Backdrop.WORDS) 0.5f else 0.8f
+    // Light scenes are grey-toned; at full strength they turn the cream ground flat and grey
+    // (owner 2026-11-08), so in light mode they sit further back.
+    val alpha = if (dark) { if (choice == Backdrop.WORDS) 0.5f else 0.8f } else { if (choice == Backdrop.WORDS) 0.3f else 0.45f }
     Image(painterResource(res), contentDescription = null, contentScale = ContentScale.Crop, alpha = alpha, modifier = Modifier.fillMaxSize())
 }
 

@@ -302,9 +302,17 @@ fun ClockLock(
                     startX = (CX - RO) * s, endX = (CX + RO) * s,
                 ))
                 drawPath(shackle, Brush.verticalGradient(
-                    0f to Color.White.copy(alpha = if (dark) 0.34f else 0.5f), 0.32f to Color.White.copy(alpha = 0.06f), 0.5f to Color.Transparent,
+                    0f to Color.White.copy(alpha = if (dark) 0.42f else 0.55f), 0.32f to Color.White.copy(alpha = 0.06f), 0.5f to Color.Transparent,
                     startY = (TOP - MIN_Y) * s, endY = (CY - MIN_Y) * s,
                 ))
+                // Specular streak along the top of the bow (owner 2026-11-08: make the gloss obvious).
+                val bowR = RO - STROKE * 0.32f
+                val bowC = Offset(CX * s, (TOP + RO - MIN_Y) * s)
+                drawArc(
+                    Color.White.copy(alpha = if (dark) 0.55f else 0.85f), startAngle = 200f, sweepAngle = 70f, useCenter = false,
+                    topLeft = Offset(bowC.x - bowR * s, bowC.y - bowR * s), size = androidx.compose.ui.geometry.Size(2 * bowR * s, 2 * bowR * s),
+                    style = Stroke(3.2f * s, cap = StrokeCap.Round),
+                )
             }
             // Dial: soft lower-right shadow, a rim lit from the upper left, a matte face.
             drawIntoCanvas { cv ->
@@ -312,9 +320,10 @@ fun ClockLock(
                 shadowPaint.setShadowLayer(18f * s, 5f * s, 8f * s, Color.Black.copy(alpha = if (dark) 0.5f else 0.16f).toArgb())
                 cv.nativeCanvas.drawCircle(center.x, center.y, R * s, shadowPaint)
             }
-            drawCircle(Brush.linearGradient(
-                listOf(hiFrame, lc.frame, loFrame),
-                start = Offset(center.x - R * s, center.y - R * s), end = Offset(center.x + R * s, center.y + R * s),
+            // Polished rim: turned-metal bands around the ring, lit from the upper left.
+            drawCircle(Brush.sweepGradient(
+                0f to lc.frame, 0.12f to loFrame, 0.3f to lc.frame, 0.5f to hiFrame, 0.62f to lerp(hiFrame, Color.White, 0.35f),
+                0.72f to hiFrame, 0.88f to lc.frame, 1f to lc.frame, center = center,
             ), R * s, center)
             // Rim highlight: a fine light edge on the upper left only.
             drawCircle(
@@ -345,11 +354,18 @@ fun ClockLock(
             clipPath(Path().apply { addOval(Rect(center, faceR)) }) {
                 drawOval(
                     Brush.verticalGradient(
-                        0f to Color.White.copy(alpha = if (dark) 0.16f else 0.42f), 1f to Color.Transparent,
+                        0f to Color.White.copy(alpha = if (dark) 0.3f else 0.62f), 0.55f to Color.White.copy(alpha = if (dark) 0.08f else 0.18f), 1f to Color.Transparent,
                         startY = center.y - faceR, endY = center.y - faceR * 0.05f,
                     ),
                     topLeft = Offset(center.x - faceR * 0.92f, center.y - faceR * 1.02f),
                     size = androidx.compose.ui.geometry.Size(faceR * 1.84f, faceR * 0.98f),
+                )
+                // A crisp glint on the upper-left of the glass.
+                val gR = faceR * 0.9f
+                drawArc(
+                    Color.White.copy(alpha = if (dark) 0.45f else 0.8f), startAngle = 205f, sweepAngle = 40f, useCenter = false,
+                    topLeft = Offset(center.x - gR, center.y - gR), size = androidx.compose.ui.geometry.Size(2 * gR, 2 * gR),
+                    style = Stroke(2.6f * s, cap = StrokeCap.Round),
                 )
             }
             // Tick ring: the only layer the start sequence turns. The 12 o'clock index is slightly

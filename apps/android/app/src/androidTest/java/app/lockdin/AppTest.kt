@@ -725,8 +725,7 @@ class AppTest {
         // The software keyboard can cover this summary on the test device; checking it exists is enough here.
         rule.onNodeWithText("every week at", substring = true).assertExists()
         rule.onNodeWithText("Save session").performClick()
-        rule.onNodeWithText("Weekly routines").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("Next up").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Every week").performScrollTo().assertIsDisplayed()
         rule.onAllNodesWithText("Physics review").onFirst().assertIsDisplayed()
         rule.onNodeWithContentDescription("Physics review on").performClick()
         rule.onNodeWithText("Off").assertIsDisplayed()
