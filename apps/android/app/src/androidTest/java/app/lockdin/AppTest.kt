@@ -432,7 +432,9 @@ class AppTest {
         rule.onNodeWithText("Save").performClick()
         org.junit.Assert.assertEquals(listOf("Outline"), store.state.presets.single().steps)
         rule.onNodeWithText("Essay").performScrollTo().performClick()
-        rule.onNodeWithText("Delete").performClick()
+        // The keyboard may still be closing; a touch sent mid-animation can be refused once.
+        rule.waitForIdle()
+        runCatching { rule.onNodeWithText("Delete").performClick() }.getOrElse { Thread.sleep(500); rule.waitForIdle(); rule.onNodeWithText("Delete").performClick() }
         rule.onAllNodesWithText("Delete").onLast().performClick()
         org.junit.Assert.assertTrue(store.state.presets.isEmpty())
     }
@@ -445,7 +447,7 @@ class AppTest {
         rule.onNodeWithTag("tab-history").performClick()
         rule.onNodeWithContentDescription("Focus streak: 30 of 30 days", substring = true).assertExists()
         shot("15-history-streak")
-        rule.onNodeWithText("Try an unlocked session").performScrollTo().performClick()
+        rule.onNodeWithText("Try an unlocked session").performClick()
         rule.onNodeWithText("Unlocked session").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Start unlocked").performScrollTo().performClick()
         org.junit.Assert.assertTrue(store.state.active!!.unlocked)
