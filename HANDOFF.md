@@ -30,7 +30,13 @@
   failures were the runner losing its emulator. Failed runs now print the emulator log. Screenshots are on
   `ci-screenshots`; publishing can race with the blocking E2E job's push, so re-fetch if it is stale.
 - Check with the owner: the open shackle now lifts less (50). Confirm it still reads clearly as unlocked.
-- Next: the focus streak in History (R59 spec in product-decisions). Mock it up first, then build.
+- R62 built (bde1d51+): Focus streak in History and unlocked sessions; see product-decisions R62.
+  - Unit tests in `StreakTest`. Emulator test `streakReachesGoalAndStartsAnUnlockedSession` seeds 30 clean
+    days, taps through, and checks that the session is unlocked. Screenshot: `15-history-streak.png`.
+  - Last emulator run: 69/71. The two failures were test-side (scroll in a LazyColumn, and a tap while the
+    keyboard was closing); both were adjusted in the next commit, which needs one clean emulator run.
+  - Not yet verified on a real phone: that an unlocked session shows no block screen while the attempt is
+    still noted. Check this on the S24+.
 
 **Earlier (2026-11-08): owner-led restyle R54-R56, build 428104d (emulator UI tests pass, screenshots reviewed)**
 - Home: lock (lower), then a greeting + one line about what's next (R54). No boxes outside Settings via
