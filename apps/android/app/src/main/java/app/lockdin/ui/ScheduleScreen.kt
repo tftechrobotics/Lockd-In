@@ -193,7 +193,7 @@ private fun PlanRow(store: Store, s: ScheduledSession, whenText: String, profile
             Modifier.weight(1f).clickable(role = Role.Button, onClickLabel = "Edit ${s.title}") { onEdit(s) }.padding(start = plateSide(Dim.s4), top = Dim.s3, bottom = Dim.s3),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Stamped start time (pass 5): hour in expanded Archivo, AM/PM small underneath.
+            // Stamped start time (pass 5): hour in expanded LiterataText, AM/PM small underneath.
             Column(Modifier.widthIn(min = 64.dp)) {
                 Text(s.startTime.format(DateTimeFormatter.ofPattern("h:mm")), style = Type.display.copy(fontSize = 18.sp, lineHeight = 22.sp), color = if (muted) c.inkMuted else c.ink)
                 Text(s.startTime.format(DateTimeFormatter.ofPattern("a", java.util.Locale.getDefault())), style = UiType.caption, color = c.inkMuted)

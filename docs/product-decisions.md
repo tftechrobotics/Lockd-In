@@ -234,4 +234,10 @@ Three kinds of entry, kept apart on purpose:
 - **Motion (all off with Android's Remove animations):** buttons press in; selection bar grows/slides;
   tabs fade and slide toward the chosen tab; Settings pages slide in and out; the Home greeting rises in;
   tapping the lock makes it rattle with a haptic tick; the "Ends at" time rolls when the length changes.
-- **Font:** owner still unhappy with the font (2026-11-07); choice pending.
+- **Font:** see R56.
+
+## R56: Literata throughout (2026-11-08, owner)
+- Owner picked Literata (book serif) from four options shown on the home screen (Bricolage, Literata,
+  Gabarito + Nunito Sans, Unbounded + Nunito Sans). Literata (OFL) now sets all app text: text cuts (opsz 12-14,
+  400/500/600), display cuts (opsz 36, 600/700) for headings, buttons and the greeting, opsz 48 for clock
+  digits (lining, tabular). Archivo and Bricolage removed from the app. The wordmark is unchanged (vector).

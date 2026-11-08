@@ -58,11 +58,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.lockdin.R
-import app.lockdin.ui.Archivo
+import app.lockdin.ui.LiterataText
 import app.lockdin.ui.LIcon
 import app.lockdin.ui.LocalColors
 import app.lockdin.ui.LockdIcon
-import app.lockdin.ui.ArchivoWide
+import app.lockdin.ui.LiterataDisplay
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -85,15 +85,15 @@ object Sample {
 }
 
 private object LabType {
-    val numeralsA = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum")
-    val numeralsB = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.Medium, fontFeatureSettings = "tnum", letterSpacing = (-2).sp)
-    val question = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.Medium, fontSize = 18.sp, lineHeight = 24.sp)
-    val task = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.Medium, fontSize = 22.sp, lineHeight = 28.sp)
-    val title = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.Medium, fontSize = 20.sp, lineHeight = 26.sp)
-    val body = TextStyle(fontFamily = Archivo, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 22.sp)
-    val label = TextStyle(fontFamily = Archivo, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 20.sp)
-    val meta = TextStyle(fontFamily = Archivo, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp)
-    val strong = TextStyle(fontFamily = Archivo, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 20.sp)
+    val numeralsA = TextStyle(fontFamily = LiterataDisplay, fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum")
+    val numeralsB = TextStyle(fontFamily = LiterataDisplay, fontWeight = FontWeight.Medium, fontFeatureSettings = "tnum", letterSpacing = (-2).sp)
+    val question = TextStyle(fontFamily = LiterataDisplay, fontWeight = FontWeight.Medium, fontSize = 18.sp, lineHeight = 24.sp)
+    val task = TextStyle(fontFamily = LiterataDisplay, fontWeight = FontWeight.Medium, fontSize = 22.sp, lineHeight = 28.sp)
+    val title = TextStyle(fontFamily = LiterataDisplay, fontWeight = FontWeight.Medium, fontSize = 20.sp, lineHeight = 26.sp)
+    val body = TextStyle(fontFamily = LiterataText, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 22.sp)
+    val label = TextStyle(fontFamily = LiterataText, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 20.sp)
+    val meta = TextStyle(fontFamily = LiterataText, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp)
+    val strong = TextStyle(fontFamily = LiterataText, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 20.sp)
 }
 
 @Composable private fun deep() = LocalColors.current.let { lerp(it.taupe, it.ink, 0.45f) }

@@ -370,7 +370,7 @@ fun ClockLock(
         }
         val px = maxWidth / W // dp per unit
         val showCaption = maxWidth >= 130.dp
-        // 46 units: "10:35" in Bricolage fits inside the tick ring (owner 2026-11-07: digits overlapped it).
+        // 46 units: "10:35" in LiterataDisplay fits inside the tick ring (owner 2026-11-07: digits overlapped it).
         val digits = with(LocalDensity.current) { (46f * px.value).dp.toSp() }
         val small = with(LocalDensity.current) { (14f * px.value).dp.toSp() }
         Column(

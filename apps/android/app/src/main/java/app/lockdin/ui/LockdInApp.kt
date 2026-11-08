@@ -172,7 +172,7 @@ fun LockdInApp(
                 Column {
                     HorizontalDivider(color = c.line)
                     // Tab labels grow up to 150% of normal; beyond that "Schedule" breaks mid-word in the
-                    // wider Archivo (pass 5). Screen content still follows the full system text size.
+                    // wider LiterataText (pass 5). Screen content still follows the full system text size.
                     val dens = androidx.compose.ui.platform.LocalDensity.current
                     androidx.compose.runtime.CompositionLocalProvider(
                         androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(dens.density, dens.fontScale.coerceAtMost(1.5f)),

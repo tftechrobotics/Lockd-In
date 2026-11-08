@@ -1,5 +1,5 @@
-// Lockd In interface kit: the reusable pieces every screen is built from. Pass 5 (R53): Archivo
-// normal width for the interface, Archivo Expanded for titles, numbers and the primary button.
+// Lockd In interface kit: the reusable pieces every screen is built from. Pass 5 (R53): LiterataText
+// normal width for the interface, LiterataText Expanded for titles, numbers and the primary button.
 // Grouped content sits on solid tonal plates (no outlined cards); rows are separated by a cut
 // of the background colour, like machined plates. One spacing scale, one control height.
 package app.lockdin.ui
@@ -77,7 +77,7 @@ object Dim {
     val plate = 20.dp        // grouped plates (settings, lists, summaries)
 }
 
-/** Interface type: Archivo. Expanded Archivo only for titles, digits and the primary button. */
+/** Interface type: LiterataText. Expanded LiterataText only for titles, digits and the primary button. */
 object UiType {
     val title = Type.title
     val section = Type.caption.copy(fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 18.sp)

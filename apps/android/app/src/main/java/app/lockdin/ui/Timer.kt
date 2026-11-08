@@ -50,10 +50,10 @@ import java.time.ZoneId
 enum class TimerState { READY, FOCUS, BREAK, DONE }
 
 object TimerType {
-    val numerals = TextStyle(fontFamily = BricolageDigits, fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum", letterSpacing = (-1).sp)
-    val question = TextStyle(fontFamily = Bricolage, fontWeight = FontWeight.SemiBold, fontSize = 19.sp, lineHeight = 24.sp)
-    val task = TextStyle(fontFamily = Bricolage, fontWeight = FontWeight.SemiBold, fontSize = 19.sp, lineHeight = 24.sp)
-    val bigField = TextStyle(fontFamily = Archivo, fontWeight = FontWeight.Normal, fontSize = 19.sp, lineHeight = 26.sp)
+    val numerals = TextStyle(fontFamily = LiterataDigits, fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum", letterSpacing = (-1).sp)
+    val question = TextStyle(fontFamily = LiterataDisplay, fontWeight = FontWeight.SemiBold, fontSize = 19.sp, lineHeight = 24.sp)
+    val task = TextStyle(fontFamily = LiterataDisplay, fontWeight = FontWeight.SemiBold, fontSize = 19.sp, lineHeight = 24.sp)
+    val bigField = TextStyle(fontFamily = LiterataText, fontWeight = FontWeight.Normal, fontSize = 19.sp, lineHeight = 26.sp)
     val status = Type.caption.copy(fontWeight = FontWeight.SemiBold)
 }
 

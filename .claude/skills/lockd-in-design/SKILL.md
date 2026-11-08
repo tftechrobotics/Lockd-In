@@ -25,7 +25,10 @@ UI is faithful implementation and refinement of that reference, not new aestheti
 - **Colors only from tokens.** Change `design/tokens.json`, then regenerate:
   `node apps/web/scripts/gen-tokens.mjs`, `python3 design/export-android.py`, and run
   `node design/check-contrast.mjs` (must pass: text 4.5:1, control borders and focus 3:1).
-- **Type (R54, current):** Bricolage Grotesque (display 600/700, text 600, digits wdth 92) for greetings,
+- **Type (R56, current):** Literata (book serif, OFL) for all app text: display cuts for headings, the
+  greeting and buttons; text cuts for the interface; opsz-48 lining tabular digits on the clock. Boxes only
+  in Settings (R55); elsewhere plain rows and underline-bar choices.
+- *(Superseded by R56)* **Type (R54):** Bricolage Grotesque (display 600/700, text 600, digits wdth 92) for greetings,
   headings, buttons and clock digits; Archivo (400/500/600) for interface text. Home = lock, then a
   greeting + one line about what's next under it (no "Next session" box).
 - *(Superseded by R54)* **Type (pass 5, R53):** Archivo only. Archivo Expanded (wdth 125, 600/800) for screen titles,
