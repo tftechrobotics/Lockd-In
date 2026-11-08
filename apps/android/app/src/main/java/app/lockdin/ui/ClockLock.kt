@@ -78,10 +78,11 @@ private const val RIM = 7f
 private const val RO = 74.5f
 private const val STROKE = 21f
 private const val TOP = 40f
-private const val LIFT = 36f
+/** How far the open shackle rises (owner 2026-11-04: higher, so open can't be mistaken for locked; was 36). */
+private const val LIFT = 62f
 private const val TICKS = 60
-private const val MIN_Y = TOP - LIFT - 4f            // 0
-private const val H = CY + R + 4f - MIN_Y             // 344
+private const val MIN_Y = TOP - LIFT - 4f            // -26
+private const val H = CY + R + 4f - MIN_Y             // 370
 
 private fun shacklePath(s: Float): Path {
     val ri = RO - STROKE

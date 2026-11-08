@@ -408,8 +408,7 @@ fun DayPicker(days: Set<DayOfWeek>, onToggle: (DayOfWeek) -> Unit) {
                     val full = d.getDisplayName(JTextStyle.FULL, loc)
                     Box(
                         Modifier.weight(1f).heightIn(min = Dim.control)
-                            .background(if (on) c.ink else c.surface, CircleShape)
-                            .then(if (on) Modifier else Modifier.border(1.dp, c.controlLine, CircleShape))
+                            .background(if (on) c.ink else c.taupeSoft, CircleShape)
                             .toggleable(on, role = Role.Checkbox) { onToggle(d) }
                             .semantics { contentDescription = full; stateDescription = if (on) "Included" else "Not included" },
                         contentAlignment = Alignment.Center,

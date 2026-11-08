@@ -169,6 +169,12 @@ fun LockdInApp(
             bottomBar = {
                 Column {
                     HorizontalDivider(color = c.line)
+                    // Tab labels grow up to 150% of normal; beyond that "Schedule" breaks mid-word in the
+                    // wider Archivo (pass 5). Screen content still follows the full system text size.
+                    val dens = androidx.compose.ui.platform.LocalDensity.current
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(dens.density, dens.fontScale.coerceAtMost(1.5f)),
+                    ) {
                     NavigationBar(containerColor = c.ground, contentColor = c.ink, tonalElevation = 0.dp) {
                         Route.entries.filter { it.tab }.forEach { r ->
                             val selected = (if (route.tab) route else lastTab) == r
@@ -184,6 +190,7 @@ fun LockdInApp(
                                 ),
                             )
                         }
+                    }
                     }
                 }
             },

@@ -270,10 +270,11 @@ fun MainButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
 @Composable
 fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val c = LocalColors.current
-    // Tonal, not outlined (pass 5). The label alone identifies it, so no border is needed.
+    // Tonal, not outlined (pass 5). Taupe, one step stronger than the plates, so it shows on
+    // the background and on a plate alike. The label identifies it, so no border is needed.
     Button(
         onClick = onClick, shape = RoundedCornerShape(Dim.radiusLarge),
-        colors = ButtonDefaults.buttonColors(containerColor = c.taupeSoft, contentColor = c.ink),
+        colors = ButtonDefaults.buttonColors(containerColor = c.taupe, contentColor = c.ink),
         modifier = modifier.heightIn(min = Dim.control),
     ) { Text(text, style = UiType.label.copy(fontWeight = FontWeight.SemiBold)) }
 }
