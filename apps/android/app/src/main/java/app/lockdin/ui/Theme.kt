@@ -25,6 +25,9 @@ val LiterataText = FontFamily(
     Font(R.font.literata_text_500, FontWeight.Medium),
     Font(R.font.literata_text_600, FontWeight.SemiBold),
 )
+/** Literata italic (static instance opsz 36, wght 500; OFL) for the streak line (R63). */
+val LiterataItalic = FontFamily(Font(app.lockdin.R.font.literata_display_italic_500, FontWeight.Medium, androidx.compose.ui.text.font.FontStyle.Italic))
+
 val LiterataDisplay = FontFamily(
     Font(R.font.literata_text_500, FontWeight.Medium),
     Font(R.font.literata_display_600, FontWeight.SemiBold),

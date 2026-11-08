@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
@@ -285,52 +286,88 @@ private fun HistoryDetail(e: HistoryEntry, zone: ZoneId, now: Long, onBack: () -
 }
 
 /**
- * Focus streak (R62): days in a row with clean sessions, as a bar toward 30 days. At 30 it offers an
- * unlocked session, which only starts if the person taps it.
+ * Focus streak (R62; ring design R63 from the owner's reference): one tick per day around a dial —
+ * filled clockwise from the top for days done, light for days ahead — with the count in the middle.
+ * At 30 days it offers an unlocked session, which only starts if the person taps it.
  */
 @Composable
 private fun StreakCard(st: app.lockdin.engine.Streak.Result, canStart: Boolean, onTryUnlocked: () -> Unit) {
     val c = LocalColors.current
     val goal = app.lockdin.engine.Streak.GOAL
-    val fill by androidx.compose.animation.core.animateFloatAsState(st.progress, androidx.compose.animation.core.tween(if (reducedMotion()) 0 else 700), label = "streak")
-    Column(
-        Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
-            contentDescription = "Focus streak: ${st.days} of $goal days" + if (st.best > st.days) ", best ${st.best}" else ""
-        },
-        verticalArrangement = Arrangement.spacedBy(Dim.s2),
-    ) {
-        Text("Focus streak", style = UiType.section, color = c.inkMuted, modifier = Modifier.semantics { heading() })
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text("${st.days}", style = Type.timer.copy(fontSize = 40.sp, lineHeight = 44.sp), color = c.ink)
-            Text(if (st.days == 1) " day" else " days", style = Type.fact, color = c.ink, modifier = Modifier.padding(bottom = 6.dp))
-            Spacer(Modifier.weight(1f))
-            Text(if (st.reachedGoal) "Goal reached" else "${goal - st.days} to go", style = UiType.caption, color = c.inkMuted, modifier = Modifier.padding(bottom = 6.dp))
+    val shown = st.days.coerceAtMost(goal)
+    // Ticks fill one after another when the screen opens.
+    val fill by androidx.compose.animation.core.animateFloatAsState(
+        shown.toFloat(), androidx.compose.animation.core.tween(if (reducedMotion()) 0 else 60 * shown.coerceAtLeast(1), easing = androidx.compose.animation.core.LinearEasing), label = "streak",
+    )
+    val ahead = c.taupe
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
+        Text("Focus streak", style = Type.title, color = c.ink, modifier = Modifier.fillMaxWidth().semantics { heading() })
+        Box(
+            Modifier.padding(vertical = Dim.s2).size(260.dp).semantics(mergeDescendants = true) {
+                contentDescription = "Focus streak: ${st.days} of $goal days" + if (st.best > st.days) ", best ${st.best}" else ""
+            },
+            contentAlignment = Alignment.Center,
+        ) {
+            androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
+                val r = size.minDimension / 2
+                val outer = r - 4.dp.toPx(); val inner = outer - 22.dp.toPx()
+                val w = 7.dp.toPx()
+                for (i in 0 until goal) {
+                    val a = Math.toRadians((i * 360.0 / goal) - 90.0)
+                    val done = i < fill
+                    val col = if (done) c.ink else ahead
+                    val cs = kotlin.math.cos(a).toFloat(); val sn = kotlin.math.sin(a).toFloat()
+                    drawLine(col, androidx.compose.ui.geometry.Offset(center.x + inner * cs, center.y + inner * sn),
+                        androidx.compose.ui.geometry.Offset(center.x + outer * cs, center.y + outer * sn), strokeWidth = w, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                }
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                LockdIcon(LIcon.Focus, size = 30.dp, tint = c.ink)
+                Text("${st.days}", style = Type.timer.copy(fontSize = 72.sp, lineHeight = 76.sp), color = c.ink)
+                Text(if (st.days > goal) "days" else "of $goal days", style = Type.fact, color = c.ink)
+            }
         }
-        // The bar: a glass track with an ink fill.
-        Box(Modifier.fillMaxWidth().height(12.dp).clip(RoundedCornerShape(6.dp)).glass(RoundedCornerShape(6.dp))) {
-            Box(Modifier.fillMaxWidth(fill).height(12.dp).clip(RoundedCornerShape(6.dp)).background(c.ink))
+        Text("One day at a time.", style = Type.title.copy(fontFamily = LiterataItalic, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, fontWeight = FontWeight.Medium, fontSize = 26.sp, lineHeight = 32.sp), color = c.ink)
+        Row(horizontalArrangement = Arrangement.spacedBy(Dim.s5), verticalAlignment = Alignment.CenterVertically) {
+            LegendItem(c.ink, "Completed day")
+            LegendItem(ahead, "Day ahead")
         }
         Text(
-            "Days in a row where your sessions finished without ending early or a blocked app coming up. Days without a session don’t count against it.",
-            style = UiType.caption, color = c.inkMuted,
+            if (st.reachedGoal) "Goal reached" else "${goal - st.days} day${if (goal - st.days == 1) "" else "s"} until your next milestone",
+            style = UiType.body, color = c.inkMuted,
+        )
+        Text(
+            "A day counts when your sessions finish without ending early or a blocked app coming up. Days without a session don’t count against it.",
+            style = UiType.caption, color = c.inkMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
         val now = LocalDate.now()
         if (st.lastBreak != null && st.days < 7 && st.lastBreak >= now.minusDays(14)) {
             val h = dayHeading(st.lastBreak, now)
             val whenText = if (h == "Today" || h == "Yesterday") h.lowercase() else "on $h"
-            Text("Started over $whenText: ${st.lastBreakReason}.", style = UiType.caption, color = c.ink)
+            Text("Started over $whenText: ${st.lastBreakReason}.", style = UiType.caption, color = c.ink, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         }
         if (st.best > st.days) Text("Best so far: ${st.best} days", style = UiType.caption, color = c.inkMuted)
         if (st.reachedGoal) {
             Spacer(Modifier.height(Dim.s1))
-            Text("$goal days without slipping. Try a session with nothing locked?", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
-            Text(
-                "Your apps stay open. Lockd In only notes if you open one this profile would block. It’s a check on your own control, not the app’s." +
-                    if (st.unlockedClean > 0) " You’ve done ${st.unlockedClean} cleanly so far." else "",
-                style = UiType.caption, color = c.inkMuted,
-            )
-            if (canStart) GlassButton("Try an unlocked session", onTryUnlocked)
-            else Text("Available when no session is running.", style = UiType.caption, color = c.inkMuted)
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+                Text("$goal days without slipping. Try a session with nothing locked?", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
+                Text(
+                    "Your apps stay open. Lockd In only notes if you open one this profile would block. It’s a check on your own control, not the app’s." +
+                        if (st.unlockedClean > 0) " You’ve done ${st.unlockedClean} cleanly so far." else "",
+                    style = UiType.caption, color = c.inkMuted,
+                )
+                if (canStart) GlassButton("Try an unlocked session", onTryUnlocked)
+                else Text("Available when no session is running.", style = UiType.caption, color = c.inkMuted)
+            }
         }
+    }
+}
+
+@Composable
+private fun LegendItem(color: androidx.compose.ui.graphics.Color, label: String) {
+    val c = LocalColors.current
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s2)) {
+        Box(Modifier.size(width = 26.dp, height = 7.dp).clip(RoundedCornerShape(4.dp)).background(color))
+        Text(label, style = UiType.caption, color = c.ink)
     }
 }

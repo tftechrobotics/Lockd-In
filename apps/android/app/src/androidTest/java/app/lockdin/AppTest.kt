@@ -447,7 +447,7 @@ class AppTest {
         rule.onNodeWithTag("tab-history").performClick()
         rule.onNodeWithContentDescription("Focus streak: 30 of 30 days", substring = true).assertExists()
         shot("15-history-streak")
-        rule.onNodeWithText("Try an unlocked session").performClick()
+        rule.onNodeWithText("Try an unlocked session").performScrollTo().performClick()
         rule.onNodeWithText("Unlocked session").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Start unlocked").performScrollTo().performClick()
         org.junit.Assert.assertTrue(store.state.active!!.unlocked)

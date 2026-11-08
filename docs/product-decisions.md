@@ -295,3 +295,12 @@ Three kinds of entry, kept apart on purpose:
   opening of a would-be-blocked app or site is noted once (5-minute window, `UnlockedNotes`) in the session's
   `blocked` map. That breaks the streak and appears in History as "Unlocked · blocked apps opened".
 - Limits: the streak counts Lockd In sessions only. Browser tabs count only where sites are watched today.
+
+## R63: Streak ring (2026-11-08, owner's reference image)
+- The streak bar is replaced by the owner's design: a 30-tick ring (one tick per day, filled clockwise from the
+  top in ink, days ahead in taupe), with a lock icon, the count and "of 30 days" in the centre. Below it are
+  "One day at a time." in Literata italic, a legend (Completed day / Day ahead) and "N days until your next
+  milestone". The rule text, start-over reason, best run and the 30-day unlocked offer stay under it.
+- "One day at a time." is fixed copy the owner asked for. It's a deliberate exception to the no-motivational-filler rule.
+- Added `res/font/literata_display_italic_500.ttf`: a static instance (opsz 36, wght 500) of Google Fonts'
+  Literata Italic, subset to Latin (OFL, same license as the other Literata files).
