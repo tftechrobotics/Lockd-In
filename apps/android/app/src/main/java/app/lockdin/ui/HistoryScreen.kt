@@ -38,6 +38,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -94,7 +95,7 @@ fun HistoryScreen(store: Store, history: HistoryStore, clock: AppClock, zone: Zo
     val days = remember(entries) { History.byDay(entries, zone) }
 
     LazyColumn(
-        Modifier.fillMaxSize(),
+        Modifier.fillMaxSize().testTag("history-list"),
         contentPadding = PaddingValues(start = Dim.gutter, end = Dim.gutter, top = LocalTopInset.current + Dim.s2, bottom = Dim.s5),
         verticalArrangement = Arrangement.spacedBy(Dim.s4),
     ) {

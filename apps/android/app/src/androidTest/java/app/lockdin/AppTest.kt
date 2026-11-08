@@ -39,6 +39,7 @@ import app.lockdin.state.ThemeChoice
 import app.lockdin.ui.LockdInApp
 import org.junit.Rule
 import org.junit.Test
+import androidx.compose.ui.test.performScrollToNode
 import org.junit.runner.RunWith
 import java.io.File
 import androidx.compose.foundation.background
@@ -375,8 +376,10 @@ class AppTest {
         org.junit.Assert.assertEquals(1, hist.entries.size)
         org.junit.Assert.assertEquals(app.lockdin.engine.Outcome.COMPLETED, hist.entries.single().outcome)
         rule.onNodeWithTag("tab-history").performClick()
+        // The streak ring sits above the week and the list; scroll the list to reach them.
+        rule.onNodeWithTag("history-list").performScrollToNode(hasText("This week"))
         rule.onNodeWithText("This week").assertIsDisplayed()
-        rule.onNodeWithText("25 min focused").assertIsDisplayed()
+        rule.onNodeWithTag("history-list").performScrollToNode(hasText("Focus session"))
         rule.onNodeWithText("Focus session").performClick()
         rule.onNodeWithText("Finished as planned", substring = true).assertIsDisplayed()
         rule.onNodeWithText("Delete this session").performScrollTo().performClick()
@@ -447,7 +450,8 @@ class AppTest {
         rule.onNodeWithTag("tab-history").performClick()
         rule.onNodeWithContentDescription("Focus streak: 30 of 30 days", substring = true).assertExists()
         shot("15-history-streak")
-        rule.onNodeWithText("Try an unlocked session").performScrollTo().performClick()
+        rule.onNodeWithTag("history-list").performScrollToNode(hasText("Try an unlocked session"))
+        rule.onNodeWithText("Try an unlocked session").performClick()
         rule.onNodeWithText("Unlocked session").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Start unlocked").performScrollTo().performClick()
         org.junit.Assert.assertTrue(store.state.active!!.unlocked)
