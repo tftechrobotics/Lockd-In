@@ -148,11 +148,20 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
                     TimerState.READY, 0, 1, locked = false, label = "It's ${Fmt.clock(now, zone)}, $weekday",
                     caption = "$period · $weekday", text = hm, width = 230.dp,
                 )
+                // Pass 5: a timetable plate. The start time is stamped in the left column.
                 androidx.compose.material3.Surface(
-                    shape = RoundedCornerShape(Dim.radius), color = c.surface, border = BorderStroke(1.dp, c.line),
+                    shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft,
                     modifier = Modifier.fillMaxWidth().tourTarget("next").clickable(role = Role.Button, onClickLabel = "Open schedule", onClick = openSchedule),
                 ) {
-                    Column(Modifier.padding(horizontal = Dim.s4, vertical = Dim.s3)) {
+                  Row(Modifier.padding(horizontal = Dim.s4, vertical = Dim.s4), verticalAlignment = Alignment.CenterVertically) {
+                    if (upcoming != null) {
+                        val st = java.time.Instant.ofEpochMilli(upcoming.start).atZone(zone)
+                        Column(Modifier.widthIn(min = 76.dp).padding(end = Dim.s3).clearAndSetSemantics { }) {
+                            Text(st.format(java.time.format.DateTimeFormatter.ofPattern("h:mm")), style = Type.display.copy(fontSize = 24.sp, lineHeight = 28.sp), color = c.ink)
+                            Text(st.format(java.time.format.DateTimeFormatter.ofPattern("a", java.util.Locale.getDefault())), style = UiType.caption, color = c.inkMuted)
+                        }
+                    }
+                    Column(Modifier.weight(1f)) {
                         Text(if (inProgress) "Scheduled now" else "Next session", style = UiType.caption, color = c.inkMuted)
                         Text(upcoming?.session?.title ?: "Nothing planned", style = TimerType.task, color = c.ink)
                         Text(
@@ -164,6 +173,8 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
                         )
                         if (upcoming?.session?.autoStart == true) Text("Starts automatically", style = UiType.caption.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
                     }
+                    LockdIcon(LIcon.Chevron, size = 18.dp, tint = c.inkMuted)
+                  }
                 }
                 // Presets: one tap starts the session (a manual start, so the start sequence plays).
                 val homeCtx = androidx.compose.ui.platform.LocalContext.current
@@ -174,7 +185,7 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
                             store.state.presets.take(6).forEach { p ->
                                 val due = p.due?.let { " · due ${Fmt.dueLabel(it, now, zone)}" } ?: ""
                                 Surface(
-                                    shape = CircleShape, color = Color.Transparent, contentColor = c.ink, border = BorderStroke(1.dp, c.line),
+                                    shape = RoundedCornerShape(Dim.radius), color = c.taupeSoft, contentColor = c.ink,
                                     modifier = Modifier.heightIn(min = Dim.control).clickable(role = Role.Button, onClickLabel = "Start ${p.name}") {
                                         startPreset(store, p, clock.now(), homeCtx)
                                     },
@@ -599,8 +610,7 @@ private fun LengthTiles(selected: Int, onSelect: (Int) -> Unit) {
                 row.forEach { m ->
                     val on = m == selected
                     Surface(
-                        shape = RoundedCornerShape(14.dp), color = if (on) c.ink else Color.Transparent, contentColor = if (on) c.onInk else c.ink,
-                        border = if (on) null else BorderStroke(1.dp, c.line),
+                        shape = RoundedCornerShape(Dim.radiusLarge), color = if (on) c.ink else c.taupeSoft, contentColor = if (on) c.onInk else c.ink,
                         modifier = Modifier.weight(1f).heightIn(min = 68.dp)
                             .selectable(on, role = Role.RadioButton, onClick = { onSelect(m) })
                             .semantics(mergeDescendants = true) {},
@@ -611,10 +621,10 @@ private fun LengthTiles(selected: Int, onSelect: (Int) -> Unit) {
                             verticalArrangement = Arrangement.Bottom,
                         ) {
                             if (m > 0) {
-                                Text("$m", style = TimerType.numerals.copy(letterSpacing = 0.sp, fontSize = 26.sp, lineHeight = 28.sp))
+                                Text("$m", style = Type.display.copy(fontSize = 28.sp, lineHeight = 30.sp, letterSpacing = 0.sp))
                                 Text("min", style = UiType.caption)
                             } else {
-                                Text("Custom", style = UiType.label)
+                                Text("Custom", style = UiType.label.copy(fontWeight = FontWeight.SemiBold))
                             }
                         }
                     }
@@ -649,8 +659,7 @@ private fun ProfileChips(profiles: List<Pair<String, String>>, selected: String,
         profiles.forEach { (id, name) ->
             val on = id == selected
             Surface(
-                shape = CircleShape, color = if (on) c.ink else Color.Transparent, contentColor = if (on) c.onInk else c.ink,
-                border = if (on) null else BorderStroke(1.dp, c.line),
+                shape = RoundedCornerShape(Dim.radius), color = if (on) c.ink else c.taupeSoft, contentColor = if (on) c.onInk else c.ink,
                 modifier = Modifier.heightIn(min = Dim.control).selectable(on, role = Role.RadioButton, onClick = { onSelect(id) }),
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
@@ -814,7 +823,7 @@ private fun AudioControl(session: ActiveSession, isBreak: Boolean) {
     val a = session.audio
     val player = app.lockdin.audio.StudyPlayer
     var open by rememberSaveable { mutableStateOf(false) }
-    Surface(shape = RoundedCornerShape(Dim.radius), color = c.surface, border = BorderStroke(1.dp, c.line), modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = Dim.s2, vertical = Dim.s1)) {
             if (a.builtIn) {
                 val playing = player.isPlaying
@@ -899,7 +908,7 @@ private fun QuestionTimer(store: Store, session: ActiveSession, now: Long) {
     }
     val t = app.lockdin.engine.Questions.elapsed(cur, q, now)
     val long = app.lockdin.engine.Questions.runningLong(q, store.state.questionTimes + app.lockdin.engine.Questions.durations(q), now)
-    Surface(shape = RoundedCornerShape(Dim.radius), color = c.surface, border = BorderStroke(1.dp, c.line), modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Question ${cur.n}", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink, modifier = Modifier.weight(1f))
@@ -976,7 +985,7 @@ private fun MoreToggle(text: String, open: Boolean, onToggle: () -> Unit) {
 @Composable
 private fun BlockingBadge() {
     val c = LocalColors.current
-    androidx.compose.material3.Surface(shape = RoundedCornerShape(50), color = c.taupeSoft, border = BorderStroke(1.dp, c.line)) {
+    androidx.compose.material3.Surface(shape = RoundedCornerShape(50), color = c.taupeSoft) {
         Row(Modifier.padding(horizontal = Dim.s3, vertical = 6.dp).semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically) {
             MiniLock(closed = true, tint = c.ink, size = 14.dp)
             Spacer(Modifier.width(6.dp))

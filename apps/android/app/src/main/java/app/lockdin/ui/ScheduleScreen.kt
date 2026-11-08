@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import app.lockdin.engine.Schedule
 import app.lockdin.engine.ScheduledSession
 import app.lockdin.engine.Session
@@ -123,7 +124,7 @@ fun ScheduleScreen(store: Store, now: Long, zone: ZoneId, onEdit: (ScheduledSess
         }
         CalendarSuggestions(store, now, zone, onPlan = onEdit)
         if (all.isEmpty()) {
-            Surface(shape = RoundedCornerShape(Dim.radius), color = c.surface, border = BorderStroke(1.dp, c.line), modifier = Modifier.fillMaxWidth()) {
+            Surface(shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft, modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(Dim.s5), verticalArrangement = Arrangement.spacedBy(Dim.s3), horizontalAlignment = Alignment.CenterHorizontally) {
                     LockdIcon(LIcon.Calendar, size = 28.dp, tint = c.inkMuted)
                     Text("No sessions planned yet", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
@@ -137,8 +138,13 @@ fun ScheduleScreen(store: Store, now: Long, zone: ZoneId, onEdit: (ScheduledSess
         next?.let { n ->
             Column {
                 SectionLabel("Next up")
-                Surface(shape = RoundedCornerShape(Dim.radius), color = c.taupeSoft, modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { onEdit(n.session) }) {
+                Surface(shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft, modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { onEdit(n.session) }) {
                     Row(Modifier.padding(Dim.s4), verticalAlignment = Alignment.CenterVertically) {
+                        val st = Instant.ofEpochMilli(n.start).atZone(zone)
+                        Column(Modifier.widthIn(min = 76.dp).padding(end = Dim.s3).clearAndSetSemantics { }) {
+                            Text(st.format(DateTimeFormatter.ofPattern("h:mm")), style = Type.display.copy(fontSize = 24.sp, lineHeight = 28.sp), color = c.ink)
+                            Text(st.format(DateTimeFormatter.ofPattern("a", java.util.Locale.getDefault())), style = UiType.caption, color = c.inkMuted)
+                        }
                         Column(Modifier.weight(1f)) {
                             Text("${Fmt.dayLabel(n.start, now, zone)} · ${Fmt.clock(n.start, zone)}–${Fmt.clock(n.end, zone)}", style = UiType.caption, color = c.inkMuted)
                             Text(n.session.title, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
@@ -187,7 +193,11 @@ private fun PlanRow(store: Store, s: ScheduledSession, whenText: String, profile
             Modifier.weight(1f).clickable(role = Role.Button, onClickLabel = "Edit ${s.title}") { onEdit(s) }.padding(start = Dim.s4, top = Dim.s3, bottom = Dim.s3),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(s.startTime.format(timeFmt), style = Type.fact.copy(fontWeight = FontWeight.SemiBold), color = if (muted) c.inkMuted else c.ink, modifier = Modifier.widthIn(min = 76.dp))
+            // Stamped start time (pass 5): hour in expanded Archivo, AM/PM small underneath.
+            Column(Modifier.widthIn(min = 76.dp)) {
+                Text(s.startTime.format(DateTimeFormatter.ofPattern("h:mm")), style = Type.display.copy(fontSize = 22.sp, lineHeight = 26.sp), color = if (muted) c.inkMuted else c.ink)
+                Text(s.startTime.format(DateTimeFormatter.ofPattern("a", java.util.Locale.getDefault())), style = UiType.caption, color = c.inkMuted)
+            }
             Spacer(Modifier.width(Dim.s3))
             Column(Modifier.weight(1f)) {
                 Text(s.title, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = if (muted) c.inkMuted else c.ink)

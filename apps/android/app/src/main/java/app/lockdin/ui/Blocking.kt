@@ -552,8 +552,8 @@ private fun RadioRow(title: String, detail: String, on: Boolean, onClick: () -> 
 private fun Chip(label: String, on: Boolean, onClick: () -> Unit) {
     val c = LocalColors.current
     androidx.compose.material3.Surface(
-        shape = androidx.compose.foundation.shape.CircleShape, color = if (on) c.ink else androidx.compose.ui.graphics.Color.Transparent,
-        contentColor = if (on) c.onInk else c.ink, border = if (on) null else androidx.compose.foundation.BorderStroke(1.dp, c.line),
+        shape = RoundedCornerShape(Dim.radius), color = if (on) c.ink else c.taupeSoft,
+        contentColor = if (on) c.onInk else c.ink,
         modifier = Modifier.heightIn(min = Dim.control).androidx_selectable(on, onClick),
     ) { Box(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), contentAlignment = Alignment.Center) { Text(label, style = UiType.label, maxLines = 1) } }
 }

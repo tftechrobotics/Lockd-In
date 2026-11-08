@@ -202,3 +202,16 @@ Three kinds of entry, kept apart on purpose:
 5. Tour: six small callouts that point at New session, the next-session card, Schedule, Profiles, History and the Settings gear, with the rest of the screen dimmed.
 6. Settings is a home list of categories (Account, Blocking, Ending early, Notifications / Sessions, Look and messages, Calendar and places / History and data, Help and tour) that open to their own pages, following the owner's Freedom reference. Replaces the R49 collapsible sections.
 7. First-run account and why-slides: see R50.
+
+## R53: Interface pass 5 with the new design skills (2026-11-07, owner)
+- **Owner:** update the app's interface using the newly added skills (ui-ux-pro-max set in `.claude/skills/`),
+  without generic fonts or the usual AI layouts, before the widgets.
+- **Built (Android):** Archivo (Omnibus-Type, OFL; static instances in `res/font/`, licence in
+  `design/fonts/Archivo-OFL.txt`) replaces Outfit + Figtree. Expanded cuts are the stamped voice (titles, big
+  numbers, timetable times, the primary button); width carries hierarchy. Outlined cards removed: tonal plates
+  with background-colour cuts, tonal secondary buttons and chips, rounded-rectangle segments instead of pills.
+  Home "Next session" and Schedule "Next up" are timetable plates with the start time stamped in a left column.
+- **Kept:** the approved Cream & Ink colours (contrast unchanged and passing) and the padlock.
+- The ui-ux-pro-max database suggested a blue Swiss-style system with testimonials; not used. Its rules
+  (contrast, 48 dp targets, reduced motion) were applied through the existing checks.
+- Web and Windows still use Outfit + Figtree (paused, R40).

@@ -25,7 +25,12 @@ UI is faithful implementation and refinement of that reference, not new aestheti
 - **Colors only from tokens.** Change `design/tokens.json`, then regenerate:
   `node apps/web/scripts/gen-tokens.mjs`, `python3 design/export-android.py`, and run
   `node design/check-contrast.mjs` (must pass: text 4.5:1, control borders and focus 3:1).
-- **Two families:** Outfit (wordmark, headlines, timer, primary button) and Figtree (interface).
+- **Type (pass 5, R53):** Archivo only. Archivo Expanded (wdth 125, 600/800) for screen titles,
+  big numbers, stamped times and the primary button; semi-expanded 800 for timer digits; normal width
+  400/500/600 for the interface. Width carries hierarchy. (Android done; web and Windows still use the
+  old Outfit + Figtree pair until they are updated.)
+- **Surfaces (pass 5):** grouped content on solid tonal plates (taupeSoft, radius 20) separated by
+  2 dp cuts of the ground colour. No outlined cards; secondary buttons and chips are tonal.
   Sentence case. No all-caps labels or eyebrows, no monospace data labels.
 - **Personality lives in four places only:** the wordmark (lock as the "o"), the padlock timer,
   the paper grain, and the faint architectural drawings. Everything else stays quiet.
@@ -42,7 +47,7 @@ UI is faithful implementation and refinement of that reference, not new aestheti
 Vector art with real text over it. Geometry (viewBox `0 36 240 260`): body x 14–226, y 120–292,
 radius 22; shackle stroke 22, centerline radius 44.5, legs at x 75.5 / 164.5. Open = left leg
 seated, right end released just above the arc's midline. Closed (focus restricting) = shackle
-dropped 14, both legs seated, colors 18% toward ink. Face = clock disc, digits (Outfit 800),
+dropped 14, both legs seated, colors 18% toward ink. Face = clock disc, digits (Archivo semi-expanded 800),
 caption. Screen readers get a single minute-level summary. Keep the web (`LockTimer.tsx`) and
 Compose (`Components.kt`) versions identical.
 

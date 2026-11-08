@@ -1,6 +1,7 @@
-// Lockd In interface kit (design pass 3): the reusable pieces the Focus and Schedule
-// screens are built from. Figtree for interface text, Outfit only for the wordmark,
-// page titles and timer digits. One spacing scale, one control height, one radius set.
+// Lockd In interface kit: the reusable pieces every screen is built from. Pass 5 (R53): Archivo
+// normal width for the interface, Archivo Expanded for titles, numbers and the primary button.
+// Grouped content sits on solid tonal plates (no outlined cards); rows are separated by a cut
+// of the background colour, like machined plates. One spacing scale, one control height.
 package app.lockdin.ui
 
 import androidx.compose.foundation.BorderStroke
@@ -68,24 +69,25 @@ object Dim {
     val segment = 44.dp
     val primary = 52.dp
     val icon = 20.dp
-    val radius = 12.dp       // controls and grouped lists
-    val radiusLarge = 16.dp  // sheets, dialogs
+    val radius = 12.dp       // controls, fields, segments
+    val radiusLarge = 16.dp  // sheets, dialogs, buttons
+    val plate = 20.dp        // grouped plates (settings, lists, summaries)
 }
 
-/** Interface type: Figtree. Outfit is reserved for titles, the wordmark and digits. */
+/** Interface type: Archivo. Expanded Archivo only for titles, digits and the primary button. */
 object UiType {
-    val title = Type.display.copy(fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 28.sp, letterSpacing = 0.sp)
-    val section = Type.caption.copy(fontWeight = FontWeight.SemiBold, fontSize = 13.sp, lineHeight = 18.sp)
+    val title = Type.title
+    val section = Type.caption.copy(fontFamily = ArchivoWide, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, lineHeight = 18.sp, letterSpacing = 0.2.sp)
     val body = Type.body
     val label = Type.label
     val value = Type.label.copy(fontWeight = FontWeight.Normal)
     val caption = Type.caption.copy(fontSize = 13.sp, lineHeight = 18.sp)
-    val figure = Type.timer.copy(fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 30.sp)
+    val figure = Type.timer.copy(fontSize = 24.sp, lineHeight = 30.sp)
 }
 
 @Composable
 fun ScreenTitle(text: String, modifier: Modifier = Modifier) {
-    Text(text, style = UiType.title, color = LocalColors.current.ink, modifier = modifier.semantics { heading() })
+    Text(text, style = Type.display, color = LocalColors.current.ink, modifier = modifier.semantics { heading() })
 }
 
 @Composable
@@ -98,7 +100,7 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) {
 fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T?, onSelect: (T) -> Unit, modifier: Modifier = Modifier, label: String? = null) {
     val c = LocalColors.current
     val perRow = if (LocalDensity.current.fontScale > 1.4f) 2 else options.size
-    Surface(shape = CircleShape, color = c.taupeSoft, border = BorderStroke(1.dp, c.line), modifier = modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(Dim.radius + 3.dp), color = c.taupeSoft, modifier = modifier.fillMaxWidth()) {
         Column(Modifier.padding(3.dp).selectableGroup().semantics { label?.let { contentDescription = it } }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
             options.chunked(perRow).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -106,11 +108,11 @@ fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T?, onSelect: 
                         val on = value == selected
                         Box(
                             Modifier.weight(1f).heightIn(min = Dim.segment - 6.dp)
-                                .background(if (on) c.ink else Color.Transparent, CircleShape)
+                                .background(if (on) c.ink else Color.Transparent, RoundedCornerShape(Dim.radius))
                                 .selectable(on, role = Role.RadioButton, onClick = { onSelect(value) }),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(text, style = UiType.label, color = if (on) c.onInk else c.ink, maxLines = 1, modifier = Modifier.padding(horizontal = 4.dp, vertical = 10.dp))
+                            Text(text, style = if (on) UiType.label.copy(fontWeight = FontWeight.SemiBold) else UiType.label, color = if (on) c.onInk else c.ink, maxLines = 1, modifier = Modifier.padding(horizontal = 4.dp, vertical = 10.dp))
                         }
                     }
                     repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
@@ -174,13 +176,14 @@ fun CustomLengthRow(minutes: Int, onChange: (Int) -> Unit, label: String = "Cust
 @Composable
 fun SettingsGroup(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val c = LocalColors.current
-    Surface(shape = RoundedCornerShape(Dim.radius), color = c.surface, border = BorderStroke(1.dp, c.line), modifier = modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft, modifier = modifier.fillMaxWidth()) {
         Column(content = content)
     }
 }
 
+/** A cut between rows of a plate: a band of the background colour, edge to edge. */
 @Composable
-fun GroupDivider() = HorizontalDivider(color = LocalColors.current.line, modifier = Modifier.padding(start = Dim.s4))
+fun GroupDivider() = HorizontalDivider(thickness = 2.dp, color = LocalColors.current.ground)
 
 /** One setting: label on the left, value and chevron on the right; opens a menu of options. */
 @Composable
@@ -255,11 +258,11 @@ fun MainButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
     val c = LocalColors.current
     Button(
         onClick = onClick,
-        shape = RoundedCornerShape(Dim.radius),
+        shape = RoundedCornerShape(Dim.radiusLarge),
         colors = ButtonDefaults.buttonColors(containerColor = c.ink, contentColor = c.onInk),
-        modifier = modifier.fillMaxWidth().heightIn(min = Dim.primary),
+        modifier = modifier.fillMaxWidth().heightIn(min = Dim.primary + 4.dp),
     ) {
-        Text(text, style = UiType.label.copy(fontSize = 17.sp, fontWeight = FontWeight.SemiBold))
+        Text(text, style = Type.button, maxLines = 1, overflow = TextOverflow.Ellipsis)
         icon?.let { Spacer(Modifier.width(Dim.s2)); LockdIcon(it, tint = c.onInk, size = Dim.icon) }
     }
 }
@@ -267,11 +270,12 @@ fun MainButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
 @Composable
 fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val c = LocalColors.current
-    OutlinedButton(
-        onClick = onClick, shape = RoundedCornerShape(Dim.radius), border = BorderStroke(1.dp, c.controlLine),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = c.ink),
+    // Tonal, not outlined (pass 5). The label alone identifies it, so no border is needed.
+    Button(
+        onClick = onClick, shape = RoundedCornerShape(Dim.radiusLarge),
+        colors = ButtonDefaults.buttonColors(containerColor = c.taupeSoft, contentColor = c.ink),
         modifier = modifier.heightIn(min = Dim.control),
-    ) { Text(text, style = UiType.label) }
+    ) { Text(text, style = UiType.label.copy(fontWeight = FontWeight.SemiBold)) }
 }
 
 @Composable
@@ -313,7 +317,7 @@ fun PhaseTag(text: String, active: Boolean) {
 @Composable
 fun SummaryText(lines: List<String>, modifier: Modifier = Modifier) {
     val c = LocalColors.current
-    Surface(shape = RoundedCornerShape(Dim.radius), color = c.taupeSoft, modifier = modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(Dim.plate), color = c.taupeSoft, modifier = modifier.fillMaxWidth()) {
         Column(Modifier.padding(Dim.s4), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             lines.forEachIndexed { i, l -> Text(l, style = if (i == 0) UiType.label else UiType.caption, color = if (i == 0) c.ink else c.inkMuted) }
         }

@@ -16,33 +16,39 @@ import androidx.compose.ui.unit.sp
 import app.lockdin.R
 import app.lockdin.state.ThemeChoice
 
-val Outfit = FontFamily(
-    Font(R.font.outfit_500, FontWeight.Medium),
-    Font(R.font.outfit_600, FontWeight.SemiBold),
-    Font(R.font.outfit_700, FontWeight.Bold),
-    Font(R.font.outfit_800, FontWeight.ExtraBold),
+// Type (R53, owner 2026-11-07: no generic fonts): Archivo by Omnibus-Type (OFL, design/fonts/), a
+// 19th-century American grotesque with a width axis. Expanded cuts are the "stamped" voice, like
+// lettering struck into a padlock body: titles, timer digits, big numbers, primary buttons. Normal
+// width runs the interface. Width, not colour, carries hierarchy. Static instances made from the
+// variable font with fontTools (wdth 100 / 112.5 / 125).
+val Archivo = FontFamily(
+    Font(R.font.archivo_400, FontWeight.Normal),
+    Font(R.font.archivo_500, FontWeight.Medium),
+    Font(R.font.archivo_600, FontWeight.SemiBold),
 )
-val Figtree = FontFamily(
-    Font(R.font.figtree_400, FontWeight.Normal),
-    Font(R.font.figtree_500, FontWeight.Medium),
-    Font(R.font.figtree_600, FontWeight.SemiBold),
+val ArchivoWide = FontFamily(
+    Font(R.font.archivo_wide_600, FontWeight.SemiBold),
+    Font(R.font.archivo_wide_800, FontWeight.ExtraBold),
 )
+/** Semi-expanded heavy digits: wide enough to feel stamped, narrow enough for the dial face. */
+val ArchivoDigits = FontFamily(Font(R.font.archivo_semiwide_800, FontWeight.ExtraBold))
 
 /** Lockd In's own palette, available everywhere (Material colors are mapped from it). */
 val LocalColors = staticCompositionLocalOf { LightColors }
 
 object Type {
-    val display = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.Bold, fontSize = 28.sp, lineHeight = 34.sp, letterSpacing = (-0.4).sp)
-    val taskTitle = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 28.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-    val timer = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.ExtraBold, fontSize = 52.sp, lineHeight = 56.sp, fontFeatureSettings = "tnum")
-    val title = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 28.sp)
-    val fact = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp, fontFeatureSettings = "tnum")
-    val body = TextStyle(fontFamily = Figtree, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp)
+    val display = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.ExtraBold, fontSize = 28.sp, lineHeight = 34.sp, letterSpacing = (-0.3).sp)
+    val taskTitle = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.SemiBold, fontSize = 19.sp, lineHeight = 26.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    val timer = TextStyle(fontFamily = ArchivoDigits, fontWeight = FontWeight.ExtraBold, fontSize = 52.sp, lineHeight = 56.sp, fontFeatureSettings = "tnum")
+    val title = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp)
+    val fact = TextStyle(fontFamily = ArchivoDigits, fontWeight = FontWeight.ExtraBold, fontSize = 19.sp, lineHeight = 26.sp, fontFeatureSettings = "tnum")
+    val body = TextStyle(fontFamily = Archivo, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp)
     val bodyStrong = body.copy(fontWeight = FontWeight.SemiBold)
-    val label = TextStyle(fontFamily = Figtree, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 20.sp)
-    val caption = TextStyle(fontFamily = Figtree, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp)
-    val button = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 24.sp)
+    val label = TextStyle(fontFamily = Archivo, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 20.sp)
+    val caption = TextStyle(fontFamily = Archivo, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp)
+    val button = TextStyle(fontFamily = ArchivoWide, fontWeight = FontWeight.ExtraBold, fontSize = 17.sp, lineHeight = 22.sp, letterSpacing = 0.2.sp)
 }
+
 
 @Composable
 fun isDark(choice: ThemeChoice): Boolean = when (choice) {

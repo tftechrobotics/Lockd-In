@@ -109,6 +109,11 @@ espresso; the lock body is a warm brown. No orange or terracotta anywhere.
 
 ## 2. Typography
 
+> **Pass 5 (R53, 2026-11-07), Android:** Archivo replaces Outfit and Figtree (owner: no generic fonts).
+> Expanded (wdth 125) for titles, big numbers, stamped times and the primary button; semi-expanded 800 for
+> timer digits; normal width for the interface. Grouped content sits on tonal plates (radius 20) with
+> ground-colour cuts between rows; no outlined cards. The table below is the earlier web/Windows spec.
+
 Two families, both OFL and self-hosted: **Outfit** (wordmark, headlines, timer, button) and
 **Figtree** (all interface text). Sentence case everywhere; no all-caps labels.
 

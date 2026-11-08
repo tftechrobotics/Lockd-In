@@ -242,8 +242,8 @@ private fun ProfileNameChips(names: List<String>, current: String, onPick: (Stri
         names.forEach { n ->
             val on = n == current.trim()
             Surface(
-                shape = androidx.compose.foundation.shape.CircleShape, color = if (on) c.ink else androidx.compose.ui.graphics.Color.Transparent,
-                contentColor = if (on) c.onInk else c.ink, border = if (on) null else androidx.compose.foundation.BorderStroke(1.dp, c.line),
+                shape = RoundedCornerShape(Dim.radius), color = if (on) c.ink else c.taupeSoft,
+                contentColor = if (on) c.onInk else c.ink,
                 modifier = Modifier.heightIn(min = Dim.control).clickable(role = Role.Button) { onPick(n) },
             ) { Box(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), contentAlignment = Alignment.Center) { Text(n, style = UiType.label) } }
         }
@@ -261,7 +261,7 @@ private fun Dots(at: Int, count: Int, what: String, modifier: Modifier) {
 }
 
 @Composable
-private fun Heading(t: String, center: Boolean = false) = Text(t, style = UiType.title, color = LocalColors.current.ink,
+private fun Heading(t: String, center: Boolean = false) = Text(t, style = Type.display, color = LocalColors.current.ink,
     textAlign = if (center) TextAlign.Center else TextAlign.Start, modifier = Modifier.semantics { heading() })
 
 @Composable

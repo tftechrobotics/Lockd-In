@@ -103,7 +103,7 @@ fun ReadyScreen(haptics: Boolean, onDone: () -> Unit) {
             LockBurst("ready", 200.dp, haptics)
             Column(Modifier.alpha(words.value).graphicsLayer { translationY = (1f - words.value) * 24f }.semantics { liveRegion = LiveRegionMode.Polite },
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
-                Text("You’re ready.", style = UiType.title, color = c.ink, textAlign = TextAlign.Center)
+                Text("You’re ready.", style = Type.display, color = c.ink, textAlign = TextAlign.Center)
                 Text("Time to lock in and take control.", style = UiType.body, color = c.inkMuted, textAlign = TextAlign.Center)
             }
             Spacer(Modifier.height(Dim.s2))
