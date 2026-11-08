@@ -326,7 +326,7 @@ class AppTest {
         rule.onNodeWithContentDescription("Search apps").performTextInput(two[0].label)
         rule.onAllNodesWithText(two[0].label).onFirst().performClick()
         rule.onNodeWithText("Save").performClick()
-        rule.onNodeWithText("Blocked apps · 1").assertIsDisplayed()
+        rule.onNodeWithText("Blocked apps · 1").performScrollTo().assertIsDisplayed()
         rule.onNodeWithContentDescription("${two[0].label}, blocked").assertDoesNotExist()
     }
 
