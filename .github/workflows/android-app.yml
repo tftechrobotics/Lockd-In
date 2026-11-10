@@ -138,7 +138,13 @@ jobs:
           cp shots/screens/*.png ../shots-branch/android/
           [ -d shots/screens/seq ] && cp -r shots/screens/seq ../shots-branch/android/seq
           echo "Screenshots from commit $sha (emulator, API 35, Pixel 6 profile)." > ../shots-branch/android/README.txt
-          cd ../shots-branch && git add -A && git commit -qm "Android screenshots for $sha" && git push -q origin ci-screenshots
+          cd ../shots-branch && git add -A && git commit -qm "Android screenshots for $sha"
+          # The blocking E2E job pushes to the same branch; rebase and retry instead of failing the run.
+          for i in 1 2 3 4; do
+            git push -q origin ci-screenshots && break
+            git fetch -q origin ci-screenshots && git rebase -q origin/ci-screenshots || { git rebase --abort; git reset -q --soft origin/ci-screenshots; git commit -qm "Android screenshots for $sha"; }
+            sleep $((i * 5))
+          done
           echo "::notice title=Screenshots::$(ls android | tr '\n' ' ')"
 
   enforcement:
