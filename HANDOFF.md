@@ -37,6 +37,11 @@
     keyboard was closing); both were adjusted in the next commit, which needs one clean emulator run.
   - R63: the streak is now a 30-tick ring (owner's reference image). Emulator run on 2026-11-08: 71/71 passed.
   - R64 profile summary: emulator run 74/74 passed. Screenshots 16/17 are on `ci-screenshots`.
+  - R65 polish pass (2026-11-09; see product-decisions R65). Emulator run on e6fe6d4: 85/85 passed.
+    - New device-shape screenshots `40-53-*` are rendered at Z Flip (407 × 994 dp) and short (360 × 640 dp)
+      viewports via `launch(viewport=)`.
+    - Limits: the test activity shows no software keyboard, and the Settings list is too short to scroll at
+      these sizes. Keyboard-open setup and the opaque header on scroll still need checking on a phone.
   - Not yet verified on a real phone: that an unlocked session shows no block screen while the attempt is
     still noted. Check this on the S24+.
 
