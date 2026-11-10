@@ -919,9 +919,16 @@ class AppTest {
         rule.onNodeWithText("Strings").assertIsSelected()
         rule.onNodeWithContentDescription("Preview Strings").assertExists()
         rule.onNodeWithText("Done").assertIsDisplayed()
-        // The picker is a dialog (its own window): capture that window.
-        rule.waitForIdle()
-        val bmp = rule.onNode(androidx.compose.ui.test.isRoot() and androidx.compose.ui.test.hasAnyDescendant(hasText("Music for this session"))).captureToImage().asAndroidBitmap()
+        deviceShot(name)
+    }
+
+    /**
+     * A real screenshot of the device screen (UiAutomation), for dialogs: Compose's captureToImage
+     * doesn't capture a dialog's own window reliably on API 35.
+     */
+    private fun deviceShot(name: String) {
+        rule.waitForIdle(); Thread.sleep(400); rule.waitForIdle()
+        val bmp = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: return
         val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir, "screens").apply { mkdirs() }
         File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
@@ -940,8 +947,8 @@ class AppTest {
         }
         // The site that sorts first (just added last) must be on screen, not scrolled above the list.
         rule.onNodeWithText("instagram.com").assertIsDisplayed()
-        rule.onNodeWithText("How website blocking works").assertExists()
-        shot(name)
+        rule.onNodeWithText("How website blocking works").assertIsDisplayed()
+        deviceShot(name)
     }
     @Test fun websitesTabLight() = websitesTab(false, "64-websites-light")
     @Test fun websitesTabDark() = websitesTab(true, "65-websites-dark")
