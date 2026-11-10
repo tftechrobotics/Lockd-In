@@ -220,12 +220,14 @@ class AppTest {
         rule.onNodeWithTag("start-session").assertExists()
     }
 
-    @Test fun customLengthMatchingAPresetSelectsIt() {
+    // Owner 2026-11-10 reversed the old rule: a typed custom value equal to a preset stays Custom.
+    @Test fun customLengthMatchingAPresetStaysCustom() {
         launch()
         rule.onNodeWithContentDescription("Custom minutes").performClick()
         rule.onNodeWithContentDescription("Minutes").performTextClearance()
         rule.onNodeWithContentDescription("Minutes").performTextInput("25")
-        rule.onNodeWithContentDescription("25 minutes").assertIsSelected()
+        rule.onNodeWithContentDescription("Custom minutes").assertIsSelected()
+        rule.onNodeWithContentDescription("25 minutes").assertIsNotSelected()
     }
 
     @Test fun unlockWaitsAndCanBeCancelled_emergencyIsImmediate() {
@@ -910,7 +912,11 @@ class AppTest {
         rule.onNodeWithText("Strings").assertIsSelected()
         rule.onNodeWithContentDescription("Preview Strings").assertExists()
         rule.onNodeWithText("Done").assertIsDisplayed()
-        shot(name)
+        // The picker is a dialog (its own window): capture that window.
+        rule.waitForIdle()
+        val bmp = rule.onAllNodes(androidx.compose.ui.test.isRoot()).onLast().captureToImage().asAndroidBitmap()
+        val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir, "screens").apply { mkdirs() }
+        File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
     @Test fun musicPickerLight() = musicPicker(false, "62-music-picker-light")
     @Test fun musicPickerDark() = musicPicker(true, "63-music-picker-dark")
