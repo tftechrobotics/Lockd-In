@@ -914,7 +914,7 @@ class AppTest {
         rule.onNodeWithText("Done").assertIsDisplayed()
         // The picker is a dialog (its own window): capture that window.
         rule.waitForIdle()
-        val bmp = rule.onAllNodes(androidx.compose.ui.test.isRoot()).onLast().captureToImage().asAndroidBitmap()
+        val bmp = rule.onNode(androidx.compose.ui.test.isRoot() and androidx.compose.ui.test.hasAnyDescendant(hasText("Music for this session"))).captureToImage().asAndroidBitmap()
         val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir, "screens").apply { mkdirs() }
         File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
