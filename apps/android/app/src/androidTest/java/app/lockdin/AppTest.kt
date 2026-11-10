@@ -915,7 +915,7 @@ class AppTest {
     @Test fun shapeFocus() {
         val store = launch(AppState(account = longEmail), viewport = flip)
         rule.onNodeWithContentDescription("What are you working on?").performTextInput(longTask)
-        rule.onNodeWithText("Start timer").performScrollTo().performClick()
+        rule.onNodeWithText("Start timer").performClick()
         clock.advanceMinutes(7); tick(store)
         vshot("49-flip-focus-light")
     }
