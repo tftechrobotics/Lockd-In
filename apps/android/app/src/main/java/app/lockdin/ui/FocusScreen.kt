@@ -342,7 +342,8 @@ private fun SessionOptions(summary: String, open: Boolean, onToggle: () -> Unit,
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("Session options", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
-                if (!open) Text(summary.replaceFirstChar { it.uppercase() }, style = UiType.caption, color = c.inkMuted)
+                // Slightly larger and darker than other captions so it reads over the library photo.
+                if (!open) Text(summary.replaceFirstChar { it.uppercase() }, style = UiType.caption.copy(fontSize = 15.sp, lineHeight = 21.sp), color = c.ink.copy(alpha = 0.8f))
             }
             LockdIcon(LIcon.Chevron, size = 18.dp, tint = c.inkMuted, modifier = Modifier.graphicsLayer { rotationZ = turn })
         }
@@ -384,22 +385,29 @@ private fun ChooseMusicDialog(initial: app.lockdin.state.ProfileAudio, onDismiss
         containerColor = c.surface,
         title = { Text("Music for this session", style = UiType.title, color = c.ink) },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
+            // A fixed-height scrolling list, so the dialog (and its Done button) doesn't jump as rows
+            // appear or disappear with the choice (owner 2026-11-10).
+            val listH = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.58f).dp
+            Column(Modifier.height(listH).verticalScroll(rememberScrollState()).testTag("music-list"), verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
                 Text("Nothing starts until you start focus.", style = UiType.caption, color = c.inkMuted)
+                // Owner 2026-11-10: each track is its own row (check + tint when chosen); the round button
+                // only previews, and is named for the track ("Stop Forest preview").
                 Text("Study audio", style = UiType.label, color = c.ink)
-                ProfileChips(listOf("off" to "Off"), if (a.builtIn) "" else "off") { app.lockdin.audio.StudyPlayer.stopPreview(); set(a.copy(builtIn = false)) }
-                app.lockdin.audio.AudioGroup.values().forEach { g ->
-                    Text(g.label, style = UiType.caption, color = c.inkMuted)
-                    ProfileChips(app.lockdin.audio.AudioCollection.values().filter { it.group == g }.map { it.name to it.label }, if (a.builtIn) a.collection.name else "") { k ->
-                        app.lockdin.audio.StudyPlayer.stopPreview()
-                        set(a.copy(builtIn = true, collection = app.lockdin.audio.AudioCollection.valueOf(k)))
+                Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
+                    OffRow(!a.builtIn) { app.lockdin.audio.StudyPlayer.stopPreview(); set(a.copy(builtIn = false)) }
+                    app.lockdin.audio.AudioGroup.values().forEach { g ->
+                        Text(g.label, style = UiType.section, color = c.inkMuted, modifier = Modifier.padding(top = Dim.s2, bottom = Dim.s1))
+                        app.lockdin.audio.AudioCollection.values().filter { it.group == g }.forEach { k ->
+                            TrackRow(k, a.builtIn && a.collection == k, onSelect = {
+                                app.lockdin.audio.StudyPlayer.stopPreview(); set(a.copy(builtIn = true, collection = k))
+                            }) {
+                                if (app.lockdin.audio.StudyPlayer.previewing == k) app.lockdin.audio.StudyPlayer.stopPreview()
+                                else app.lockdin.audio.StudyPlayer.preview(ctx, k, a.volume)
+                            }
+                        }
                     }
                 }
                 if (a.builtIn) {
-                    val previewing = app.lockdin.audio.StudyPlayer.previewing == a.collection
-                    TextAction(if (previewing) "Stop preview" else "Preview ${a.collection.label}", {
-                        if (previewing) app.lockdin.audio.StudyPlayer.stopPreview() else app.lockdin.audio.StudyPlayer.preview(ctx, a.collection, a.volume)
-                    })
                     androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Play when focus starts", style = UiType.body, color = c.ink, modifier = Modifier.weight(1f))
                         androidx.compose.material3.Switch(a.playOnStart, { set(a.copy(playOnStart = it)) },
@@ -509,10 +517,12 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
 
             Column(verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
                 Question("How long?")
-                LengthTiles(if (focus in LENGTHS) focus else -1) { m ->
+                // One selection at a time (owner 2026-11-10): Custom is selected whenever its stepper is
+                // open, even if its value happens to equal a preset; a preset closes the stepper.
+                LengthTiles(if (customOpen) -1 else focus) { m ->
                     if (m == -1) customOpen = true else { customOpen = false; focus = m; error = null }
                 }
-                if (customOpen || focus !in LENGTHS) CustomLengthRow(focus, { focus = it; error = null })
+                if (customOpen) CustomLengthRow(focus, { focus = it; error = null })
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(Dim.s3)) {

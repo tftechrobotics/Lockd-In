@@ -236,12 +236,13 @@ fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T?, onSelect: 
 @Composable
 fun LengthControl(minutes: Int, onChange: (Int) -> Unit, modifier: Modifier = Modifier, presets: List<Int> = listOf(25, 40, 60)) {
     var customOpen by remember { mutableStateOf(minutes !in presets) }
-    val selected = if (minutes in presets) minutes else -1
+    // Custom stays selected while its stepper is open, even at a preset's value (owner 2026-11-10).
+    val selected = if (customOpen) -1 else minutes
     Column(modifier, verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
         SegmentedChoice(presets.map { it to "$it min" } + (-1 to "Custom"), selected, { v ->
             if (v == -1) customOpen = true else { customOpen = false; onChange(v) }
         }, label = "Focus length")
-        if (customOpen || minutes !in presets) CustomLengthRow(minutes, onChange)
+        if (customOpen) CustomLengthRow(minutes, onChange)
     }
 }
 

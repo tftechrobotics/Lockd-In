@@ -39,6 +39,7 @@ import app.lockdin.state.ThemeChoice
 import app.lockdin.ui.LockdInApp
 import org.junit.Rule
 import org.junit.Test
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.performScrollToNode
 import org.junit.runner.RunWith
@@ -869,6 +870,83 @@ class AppTest {
         val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir, "screens").apply { mkdirs() }
         File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
+
+    // ---- Targeted fixes (owner 2026-11-10) ----
+    @Test fun lengthPresetAndCustomAreExclusive() {
+        launch()
+        fun ends(min: Int) = "Ends at ${app.lockdin.ui.Fmt.clock(clock.now() + min * 60_000L, zone)}"
+        rule.onNodeWithContentDescription("40 minutes").assertIsSelected()
+        rule.onNodeWithText(ends(40), substring = true).assertExists()
+        // Custom selects itself and opens the stepper; the preset lets go.
+        rule.onNodeWithContentDescription("Custom minutes").performClick()
+        rule.onNodeWithContentDescription("Custom minutes").assertIsSelected()
+        rule.onNodeWithContentDescription("40 minutes").assertIsNotSelected()
+        repeat(4) { rule.onNodeWithContentDescription("5 minutes longer").performScrollTo().performClick() }
+        // At 60 the stepper's value equals a preset, but Custom stays the one selection.
+        rule.onNodeWithContentDescription("Custom minutes").assertIsSelected()
+        rule.onNodeWithContentDescription("60 minutes").assertIsNotSelected()
+        rule.onNodeWithText(ends(60), substring = true).assertExists()
+        shot("60-length-custom-at-60")
+        // A preset takes the selection back and closes the stepper.
+        rule.onNodeWithContentDescription("25 minutes").performClick()
+        rule.onNodeWithContentDescription("25 minutes").assertIsSelected()
+        rule.onNodeWithContentDescription("Custom minutes").assertIsNotSelected()
+        rule.onAllNodesWithContentDescription("5 minutes longer").assertCountEquals(0)
+        rule.onNodeWithText(ends(25), substring = true).assertExists()
+        // And back: Custom at a preset value (25) is still Custom.
+        rule.onNodeWithContentDescription("Custom minutes").performClick()
+        rule.onNodeWithContentDescription("Custom minutes").assertIsSelected()
+        rule.onNodeWithContentDescription("25 minutes").assertIsNotSelected()
+        rule.onNodeWithContentDescription("5 minutes longer").performScrollTo().performClick()
+        rule.onNodeWithText(ends(30), substring = true).assertExists()
+        shot("61-length-preset-after-custom")
+    }
+
+    private fun musicPicker(dark: Boolean, name: String) {
+        launch(AppState(theme = if (dark) ThemeChoice.DARK else ThemeChoice.LIGHT), dark = dark)
+        openOptions()
+        rule.onNodeWithText("Choose music").performScrollTo().performClick()
+        rule.onNodeWithText("Strings").performClick()
+        rule.onNodeWithText("Strings").assertIsSelected()
+        rule.onNodeWithContentDescription("Preview Strings").assertExists()
+        rule.onNodeWithText("Done").assertIsDisplayed()
+        shot(name)
+    }
+    @Test fun musicPickerLight() = musicPicker(false, "62-music-picker-light")
+    @Test fun musicPickerDark() = musicPicker(true, "63-music-picker-dark")
+
+    private fun websitesTab(dark: Boolean, name: String) {
+        launch(AppState(theme = if (dark) ThemeChoice.DARK else ThemeChoice.LIGHT), dark = dark, home = true)
+        rule.onNodeWithTag("tab-profiles").performClick()
+        rule.onNodeWithText("Study").performClick()
+        rule.onNodeWithText("Edit apps and sites").performClick()
+        rule.onNodeWithText("Websites").performClick()
+        for (d in listOf("youtube.com", "reddit.com", "instagram.com")) {
+            rule.onNodeWithContentDescription("Website to block").performTextInput(d)
+            rule.onNodeWithText("Add").performClick()
+        }
+        rule.onAllNodesWithText("youtube.com").onFirst().assertExists()
+        rule.onNodeWithText("How website blocking works").assertExists()
+        shot(name)
+    }
+    @Test fun websitesTabLight() = websitesTab(false, "64-websites-light")
+    @Test fun websitesTabDark() = websitesTab(true, "65-websites-dark")
+
+    private fun streak(days: Int, dark: Boolean, name: String) {
+        launch(AppState(theme = if (dark) ThemeChoice.DARK else ThemeChoice.LIGHT), dark = dark, home = true)
+        val day = 86_400_000L
+        for (i in 1..days) hist.add(app.lockdin.engine.HistoryEntry("d$i", clock.now() - i * day, clock.now() - i * day + 1_500_000, clock.now() - i * day + 1_500_000,
+            1_500_000, 1_500_000, 1, 1, "Read", "study", "Study", app.lockdin.engine.Outcome.COMPLETED), 365, clock.now())
+        if (days == 0) hist.add(app.lockdin.engine.HistoryEntry("x", clock.now() - day, clock.now() - day + 600_000, clock.now() - day + 600_000,
+            600_000, 0, 1, 0, null, "study", "Study", app.lockdin.engine.Outcome.ENDED_EARLY), 365, clock.now())
+        rule.onNodeWithTag("tab-history").performClick()
+        rule.onNodeWithContentDescription("Focus streak: $days of 30 days", substring = true).assertExists()
+        shot(name)
+    }
+    @Test fun streakHalfLight() = streak(15, false, "66-streak-15-light")
+    @Test fun streakHalfDark() = streak(15, true, "67-streak-15-dark")
+    @Test fun streakZeroLight() = streak(0, false, "68-streak-0-light")
+    @Test fun streakZeroDark() = streak(0, true, "69-streak-0-dark")
 
     // ---- Device shapes (polish pass, 2026-11-09): Galaxy Z Flip (tall, narrow) and a short phone. ----
     private val flip = DpSize(407.dp, 994.dp)

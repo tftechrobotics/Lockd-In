@@ -330,19 +330,11 @@ private fun StreakCard(st: app.lockdin.engine.Streak.Result, canStart: Boolean, 
                 }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                LockdIcon(LIcon.Focus, size = 30.dp, tint = c.ink)
-                if (st.days == 0) {
-                    Text("0-day streak", style = Type.title, color = c.ink, modifier = Modifier.padding(top = Dim.s2))
-                } else {
-                    Text("${st.days}", style = Type.timer.copy(fontSize = 72.sp, lineHeight = 76.sp), color = c.ink)
-                    Text(if (st.days > goal) "days" else "of $goal days", style = Type.fact, color = c.ink)
-                }
+                // The numeral is the focal point, 0 included (owner 2026-11-10).
+                LockdIcon(LIcon.Focus, size = 26.dp, tint = c.inkMuted)
+                Text("${st.days}", style = Type.timer.copy(fontSize = 76.sp, lineHeight = 80.sp), color = c.ink)
+                Text("day streak", style = Type.fact, color = c.ink)
             }
-        }
-        Text("One day at a time.", style = Type.title.copy(fontFamily = LiterataItalic, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, fontWeight = FontWeight.Medium, fontSize = 26.sp, lineHeight = 32.sp), color = c.ink)
-        Row(horizontalArrangement = Arrangement.spacedBy(Dim.s5), verticalAlignment = Alignment.CenterVertically) {
-            LegendItem(c.ink, "Completed day")
-            LegendItem(ahead, "Day ahead")
         }
         Text(
             when {
@@ -350,8 +342,13 @@ private fun StreakCard(st: app.lockdin.engine.Streak.Result, canStart: Boolean, 
                 st.reachedGoal -> "Goal reached"
                 else -> "${goal - st.days} day${if (goal - st.days == 1) "" else "s"} until your next milestone"
             },
-            style = UiType.body, color = c.inkMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            style = UiType.body, color = c.ink, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
+        Row(horizontalArrangement = Arrangement.spacedBy(Dim.s5), verticalAlignment = Alignment.CenterVertically) {
+            LegendItem(c.ink, "Completed day")
+            LegendItem(ahead, "Day ahead")
+        }
+        Text("One day at a time.", style = Type.body.copy(fontFamily = LiterataItalic, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, fontWeight = FontWeight.Medium), color = c.inkMuted)
         HowStreaksWork()
         val now = LocalDate.now()
         if (st.lastBreak != null && st.days < 7 && st.lastBreak >= now.minusDays(14)) {

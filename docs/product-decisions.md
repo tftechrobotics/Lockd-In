@@ -356,3 +356,22 @@ Three kinds of entry, kept apart on purpose:
    - Home shows any missing blocking permission, with "Finish setup".
 8. **Typography:** Source Sans 3 (OFL, static 400/600) for captions, section labels, values, settings rows and
    list times. Literata stays for greetings, titles, task names and the clock.
+
+## R66: Targeted fixes after the Z Flip review (2026-11-10, owner)
+- The clear Home pill is approved as-is (transparency, outline, label).
+- **Length:** exactly one selection. Custom is selected whenever its stepper is open, even at a preset's value
+  (e.g. 60). A preset selects itself and closes the stepper. The same rule applies to `LengthControl`
+  elsewhere. Emulator test `lengthPresetAndCustomAreExclusive` checks the finish time both ways.
+- **Music picker:**
+  - Off plus one row per track under "Study music" / "Quiet and chill", each a full-width radio row with a
+    check and a tint when chosen.
+  - Preview is a separate round button named for the track ("Preview Forest" / "Stop Forest preview").
+  - The list has a fixed height, so Done (the dialog's button row) doesn't move.
+- **Websites tab:** order is mode selector, domain field + Add, Accessibility status under the field (with
+  "Turn on"), count, saved domains. The browser list and subdomain note sit under "How website blocking works"
+  at the end of the list.
+- **Streak:** the numeral is the dial's focal point (0 included) with "day streak" under it. The
+  instruction or milestone sits directly under the ring, then the legend, then "One day at a time." at body size.
+- **Settings › Sessions:** a single heading per group ("New session defaults", "Check-ins"), and the same fix for
+  "Look and background" / "Look".
+- **Session options summary:** 15 sp at 80% ink, so it reads over the library photo.

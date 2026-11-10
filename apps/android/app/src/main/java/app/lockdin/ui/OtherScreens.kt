@@ -343,9 +343,8 @@ private fun SettingsScreenBody(
                     SwitchRow("Click sound", "A quiet mechanical click. Follows your phone’s touch sounds and silent mode.",
                         st.startSound) { v -> store.update { it.copy(startSound = v) } }
                 }
-                SubHead("New session defaults")
+                // One heading per group (owner 2026-11-10): the groups label themselves.
                 DefaultsSettings(store)
-                SubHead("Check-ins and coaching")
                 CoachingSettings(store)
             }
             SettingsPage.LOOK -> {
@@ -556,7 +555,7 @@ private fun LookSettings(store: Store) {
     }
     val current = runCatching { Backdrop.valueOf(store.state.backdrop) }.getOrDefault(Backdrop.NONE)
     Column {
-        SectionLabel("Look")
+        // "Look and background" above already heads this group (owner 2026-11-10: one heading each).
         Text("Background", style = UiType.label, color = c.ink)
         Spacer(Modifier.height(Dim.s2))
         // Picker with real previews of each background (the same drawing, scaled down).

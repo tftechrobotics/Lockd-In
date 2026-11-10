@@ -309,17 +309,8 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
                     listOf(RuleMode.BLOCK_LIST to "Block these", RuleMode.APPROVED_ONLY to "Allow only these"),
                     siteMode, { siteMode = it }, label = "Website rule",
                 )
-                Text(
-                    if (!allowSites) "The sites you add are covered during focus, including their subdomains (youtube.com covers m.youtube.com). Every other site works."
-                    else "During focus, only the sites you add open. Every other site is covered. Add google.com if you need search.",
-                    style = UiType.caption, color = c.inkMuted,
-                )
-                Text(
-                    if (!allowSites) "Works in Chrome, Samsung Internet, Edge, Firefox, Brave and Opera. Other browsers can be blocked as apps."
-                    else "Works in Chrome, Samsung Internet, Edge, Firefox, Brave and Opera. Other browsers are blocked completely during focus, because Lockd In can’t see which site they show.",
-                    style = UiType.caption, color = c.inkMuted,
-                )
-                if (!a11y) Text("Website rules need Accessibility. Turn it on in Settings › Blocking.", style = UiType.caption, color = c.ink)
+                // Owner 2026-11-10: like Apps, the field and Add come first, then the saved domains;
+                // the browser list and subdomain note fold into "How website blocking works".
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s2)) {
                     OutlinedTextField(
                         siteText, { siteText = it.take(253); siteError = null }, singleLine = true,
@@ -334,9 +325,19 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
                     })
                 }
                 siteError?.let { Text(it, style = UiType.caption, color = c.danger) }
-                if (sites.isEmpty()) Text(
-                    if (allowSites) "No sites allowed yet, so every website is covered during focus." else "No websites blocked yet.",
-                    style = UiType.body, color = c.inkMuted,
+                // The status sits right under the control it affects.
+                if (!a11y) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s2)) {
+                    Box(Modifier.size(9.dp).border(1.5.dp, c.inkMuted, CircleShape))
+                    Text("Website rules need Accessibility, which is off.", style = UiType.caption, color = c.ink, modifier = Modifier.weight(1f))
+                    TextAction("Turn on", {
+                        runCatching { ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    })
+                }
+                Text(
+                    if (sites.isEmpty()) (if (allowSites) "No sites allowed yet, so every website is covered during focus." else "No websites blocked yet.")
+                    else "${sites.size} ${if (allowSites) "allowed" else "blocked"}",
+                    style = if (sites.isEmpty()) UiType.body else UiType.label.copy(fontWeight = FontWeight.SemiBold),
+                    color = if (sites.isEmpty()) c.inkMuted else c.ink,
                 )
             }
             LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
@@ -346,6 +347,17 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
                         TextAction("Remove", { sites = sites - d })
                     }
                     HorizontalDivider(color = c.line, modifier = Modifier.padding(start = Dim.gutter))
+                }
+                item(key = "how") {
+                    Box(Modifier.padding(horizontal = Dim.gutter, vertical = Dim.s3)) {
+                        HowBlockingWorks(
+                            if (!allowSites) "The sites you add are covered during focus, including their subdomains (youtube.com covers m.youtube.com). Every other site works."
+                            else "During focus, only the sites you add open. Every other site is covered. Add google.com if you need search.",
+                            if (!allowSites) "Works in Chrome, Samsung Internet, Edge, Firefox, Brave and Opera. Other browsers can be blocked as apps."
+                            else "Works in Chrome, Samsung Internet, Edge, Firefox, Brave and Opera. Other browsers are blocked completely during focus, because Lockd In can’t see which site they show.",
+                            title = "How website blocking works",
+                        )
+                    }
                 }
             }
         } else {
@@ -557,7 +569,7 @@ private fun RadioRow(title: String, detail: String, on: Boolean, onClick: () -> 
 
 /** "How blocking works": the longer explanation, folded away until asked for. */
 @Composable
-private fun HowBlockingWorks(vararg lines: String) {
+private fun HowBlockingWorks(vararg lines: String, title: String = "How blocking works") {
     val c = LocalColors.current
     var open by remember { mutableStateOf(false) }
     Column {
@@ -565,7 +577,7 @@ private fun HowBlockingWorks(vararg lines: String) {
             Modifier.fillMaxWidth().heightIn(min = Dim.control).clickable(role = Role.Button, onClickLabel = if (open) "Hide" else "Show") { open = !open },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("How blocking works", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink, modifier = Modifier.weight(1f))
+            Text(title, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink, modifier = Modifier.weight(1f))
             LockdIcon(if (open) LIcon.ChevronUp else LIcon.ChevronDown, size = 18.dp, tint = c.inkMuted)
         }
         androidx.compose.animation.AnimatedVisibility(open) {
@@ -574,9 +586,24 @@ private fun HowBlockingWorks(vararg lines: String) {
     }
 }
 
+/** "Off" in the music picker: same row shape as a track, without a preview. */
+@Composable
+internal fun OffRow(on: Boolean, onSelect: () -> Unit) {
+    val c = LocalColors.current
+    val bg by androidx.compose.animation.animateColorAsState(if (on) c.taupeSoft else androidx.compose.ui.graphics.Color.Transparent, label = "off")
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(Dim.radius)).background(bg).heightIn(min = 56.dp)
+            .selectable(on, role = Role.RadioButton, onClick = onSelect).padding(horizontal = Dim.s3),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s3),
+    ) {
+        Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { if (on) LockdIcon(LIcon.Check, size = 22.dp, tint = c.ink) }
+        Text("Off", style = UiType.label.copy(fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium), color = c.ink)
+    }
+}
+
 /** One study-audio track: tap the row to choose it; the round button on the right only previews. */
 @Composable
-private fun TrackRow(k: app.lockdin.audio.AudioCollection, on: Boolean, onSelect: () -> Unit, onPreview: () -> Unit) {
+internal fun TrackRow(k: app.lockdin.audio.AudioCollection, on: Boolean, onSelect: () -> Unit, onPreview: () -> Unit) {
     val c = LocalColors.current
     val previewing = app.lockdin.audio.StudyPlayer.previewing == k
     val bg by androidx.compose.animation.animateColorAsState(if (on) c.taupeSoft else androidx.compose.ui.graphics.Color.Transparent, label = "track")
@@ -602,7 +629,7 @@ private fun TrackRow(k: app.lockdin.audio.AudioCollection, on: Boolean, onSelect
         androidx.compose.material3.IconButton(onClick = onPreview, modifier = Modifier.size(48.dp)) {
             Box(Modifier.size(36.dp).border(1.5.dp, c.ink.copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.Center) {
                 LockdIcon(if (previewing) LIcon.Pause else LIcon.Play, size = 16.dp, tint = c.ink,
-                    description = if (previewing) "Stop preview of ${k.label}" else "Preview ${k.label}")
+                    description = if (previewing) "Stop ${k.label} preview" else "Preview ${k.label}")
             }
         }
     }
