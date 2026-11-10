@@ -61,6 +61,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -254,7 +255,7 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
                 }
             }
         },
-        actions = { GlassButton("Start a session", onNew, modifier = Modifier.tourTarget("new")) },
+        actions = { GlassButton("Start a session", onNew, modifier = Modifier.tourTarget("new").testTag("start-session")) },
     )
 }
 

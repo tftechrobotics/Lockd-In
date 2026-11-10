@@ -49,6 +49,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
@@ -101,7 +105,13 @@ class AppTest {
         rule.waitForIdle()
     }
 
-    private fun launch(state: AppState = AppState(), dark: Boolean = false, fontScale: Float = 1f, home: Boolean = false): Store {
+    /**
+     * [viewport] renders the app at an exact device size in dp (e.g. a Galaxy Z Flip, 407 × 994 dp), at
+     * whatever density makes it fit this emulator's screen, so one emulator can check several phone
+     * shapes. Layout is decided in dp, so the result matches the real shape; only the pixel scale differs.
+     */
+    private fun launch(state: AppState = AppState(), dark: Boolean = false, fontScale: Float = 1f, home: Boolean = false,
+                       viewport: androidx.compose.ui.unit.DpSize? = null): Store {
         val store = Store(state) {}
         app.lockdin.ui.SettingsNav.page = null
         hist = app.lockdin.state.HistoryStore(emptyList()) {}
@@ -109,12 +119,31 @@ class AppTest {
         store.onLeft = { a, st, now -> hist.record(a, st, now) }
         rule.setContent {
             val d = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(d.density, fontScale)) {
-                LockdInApp(store, clock, zone, dark, history = hist)
+            if (viewport == null) {
+                CompositionLocalProvider(LocalDensity provides Density(d.density, fontScale)) {
+                    LockdInApp(store, clock, zone, dark, history = hist)
+                }
+            } else {
+                val conf = androidx.compose.ui.platform.LocalConfiguration.current
+                val wPx = conf.screenWidthDp * d.density; val hPx = conf.screenHeightDp * d.density
+                val dens = minOf(d.density, wPx / viewport.width.value, hPx / viewport.height.value)
+                CompositionLocalProvider(LocalDensity provides Density(dens, fontScale)) {
+                    androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.requiredSize(viewport).testTag("viewport")) {
+                        LockdInApp(store, clock, zone, dark, history = hist)
+                    }
+                }
             }
         }
-        if (!home && state.active == null) rule.onNodeWithText("Start a session").performClick()
+        if (!home && state.active == null) rule.onNodeWithTag("start-session").performClick()
         return store
+    }
+
+    /** Captures just the viewport box (see [launch]). */
+    private fun vshot(name: String) {
+        rule.waitForIdle()
+        val bmp = runCatching { rule.onNodeWithTag("viewport").captureToImage() }.getOrElse { rule.waitForIdle(); rule.onNodeWithTag("viewport").captureToImage() }.asAndroidBitmap()
+        val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir, "screens").apply { mkdirs() }
+        File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
     private fun openDetails() = rule.onNodeWithText("Details and options").performScrollTo().performClick()
@@ -823,6 +852,66 @@ class AppTest {
         val bmp = runCatching { rule.onRoot().captureToImage() }.getOrElse { rule.waitForIdle(); rule.onRoot().captureToImage() }.asAndroidBitmap()
         val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir, "screens").apply { mkdirs() }
         File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    // ---- Device shapes (polish pass, 2026-11-09): Galaxy Z Flip (tall, narrow) and a short phone. ----
+    private val flip = DpSize(407.dp, 994.dp)
+    private val short = DpSize(360.dp, 640.dp)
+    private val longEmail = app.lockdin.state.Account("u1", "trayvonn.foster.longer.address.2024@university-example.edu", "Tray")
+    private val longTask = "TAM 212 · Rigid body dynamics practice problems, chapters 14 through 16"
+
+    @Test fun shapeHome() {
+        launch(AppState(account = longEmail), home = true, viewport = flip); vshot("40-flip-home-light")
+    }
+    @Test fun shapeHomeLibrary() {
+        launch(AppState(account = longEmail, backdrop = "LIBRARY", theme = ThemeChoice.DARK), dark = true, home = true, viewport = flip); vshot("41-flip-home-library-dark")
+    }
+    @Test fun shapeHomeLibraryLight() {
+        launch(AppState(account = longEmail, backdrop = "LIBRARY"), home = true, viewport = flip); vshot("42-flip-home-library-light")
+    }
+    @Test fun shapeSetup() {
+        launch(AppState(account = longEmail), viewport = flip); vshot("43-flip-setup-light")
+        rule.onNodeWithContentDescription("What are you working on?").performTextInput(longTask)
+        vshot("44-flip-setup-keyboard")
+    }
+    @Test fun shapeSetupLibraryDark() {
+        launch(AppState(account = longEmail, backdrop = "LIBRARY", theme = ThemeChoice.DARK), dark = true, viewport = flip); vshot("45-flip-setup-library-dark")
+    }
+    @Test fun shapeSettings() {
+        launch(AppState(account = longEmail), home = true, viewport = flip)
+        rule.onNodeWithContentDescription("Settings").performClick()
+        vshot("46-flip-settings")
+        rule.onNodeWithTag("viewport").performTouchInput { swipeUp() }
+        vshot("47-flip-settings-scrolled")
+    }
+    @Test fun shapeSettingsLargeText() {
+        launch(AppState(account = longEmail, theme = ThemeChoice.DARK), dark = true, fontScale = 1.5f, home = true, viewport = flip)
+        rule.onNodeWithContentDescription("Settings").performClick()
+        vshot("48-flip-settings-font150-dark")
+    }
+    @Test fun shapeShortHomeAndSetup() {
+        launch(AppState(account = longEmail, theme = ThemeChoice.DARK), dark = true, home = true, viewport = short); vshot("50-short-home-dark")
+        rule.onNodeWithTag("start-session").performClick()
+        vshot("51-short-setup-dark")
+    }
+    @Test fun shapeShortSettings() {
+        launch(AppState(account = longEmail), home = true, viewport = short)
+        rule.onNodeWithContentDescription("Settings").performClick()
+        vshot("52-short-settings-light")
+    }
+    @Test fun shapeFocus() {
+        val store = launch(AppState(account = longEmail), viewport = flip)
+        rule.onNodeWithContentDescription("What are you working on?").performTextInput(longTask)
+        rule.onNodeWithText("Start timer").performScrollTo().performClick()
+        clock.advanceMinutes(7); tick(store)
+        vshot("49-flip-focus-light")
+    }
+    @Test fun shapeStreakZero() {
+        launch(home = true, viewport = flip)
+        hist.add(app.lockdin.engine.HistoryEntry("x", clock.now() - 86_400_000, clock.now() - 86_400_000 + 600_000, clock.now() - 86_400_000 + 600_000,
+            600_000, 0, 1, 0, null, "study", "Study", app.lockdin.engine.Outcome.ENDED_EARLY), 365, clock.now())
+        rule.onNodeWithTag("tab-history").performClick()
+        vshot("53-flip-streak-zero")
     }
 
     @Test fun screenshotSetupLight() { launch(); shot("01-setup-light") }
