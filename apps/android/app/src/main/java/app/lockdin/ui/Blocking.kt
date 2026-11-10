@@ -340,7 +340,11 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
                     color = if (sites.isEmpty()) c.inkMuted else c.ink,
                 )
             }
-            LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
+            // Keyed rows keep the old first row in view when a new domain sorts above it; jump back to
+            // the top after each change so a just-added site is always visible.
+            val siteList = androidx.compose.foundation.lazy.rememberLazyListState()
+            LaunchedEffect(sites.size) { siteList.scrollToItem(0) }
+            LazyColumn(Modifier.fillMaxWidth().weight(1f), state = siteList) {
                 items(sites.sorted(), key = { it }) { d ->
                     Row(Modifier.fillMaxWidth().heightIn(min = Dim.control + 4.dp).padding(start = Dim.gutter, end = Dim.s2), verticalAlignment = Alignment.CenterVertically) {
                         Text(d, style = UiType.body, color = c.ink, modifier = Modifier.weight(1f))

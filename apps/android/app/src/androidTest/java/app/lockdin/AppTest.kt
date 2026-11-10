@@ -931,7 +931,8 @@ class AppTest {
             rule.onNodeWithContentDescription("Website to block").performTextInput(d)
             rule.onNodeWithText("Add").performClick()
         }
-        rule.onAllNodesWithText("youtube.com").onFirst().assertExists()
+        // The site that sorts first (just added last) must be on screen, not scrolled above the list.
+        rule.onNodeWithText("instagram.com").assertIsDisplayed()
         rule.onNodeWithText("How website blocking works").assertExists()
         shot(name)
     }
