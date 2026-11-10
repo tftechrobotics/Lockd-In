@@ -397,6 +397,9 @@ class AppTest {
         rule.onNodeWithContentDescription("New profile name").performTextInput("Lab report")
         rule.onNodeWithText("Create").performClick()
         // The editor opens straight away, with the essentials note.
+        // The essentials note now lives under "How blocking works" (polish pass).
+        rule.onNodeWithText("How blocking works").assertIsDisplayed()
+        rule.onNodeWithText("How blocking works").performClick()
         rule.onNodeWithText("Never blocked", substring = true).assertIsDisplayed()
         rule.onNodeWithText("Delete").performClick()
         rule.onNodeWithText("Delete “Lab report”?").assertIsDisplayed()
