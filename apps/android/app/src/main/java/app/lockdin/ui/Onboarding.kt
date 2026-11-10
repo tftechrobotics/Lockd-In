@@ -183,9 +183,10 @@ fun Onboarding(store: Store) {
                     else TextAction("Not now, use Lockd In on this phone only", { step = 1 }, modifier = Modifier.align(Alignment.CenterHorizontally))
                 1 -> MainButton("Continue", { if (name.isNotBlank()) { saveProfile(); step = 2 } })
                 2 -> MainButton("Continue", { step = 3 })
-                3 -> MainButton(if (store.state.partner != null) "Continue" else "Skip for now", {
-                    if (store.state.partner?.claimed == true) store.update { it.copy(commitment = app.lockdin.enforce.Commitment.PARTNER) }
-                    step = 4
+                // Polish pass (owner 2026-11-09): setup ends straight on Home. The tour stays in
+                // Settings › Help and tour; Home shows any blocking permission still missing.
+                3 -> MainButton(if (store.state.partner != null) "Done" else "Skip and finish", {
+                    store.update { it.copy(onboarded = true, tourStep = -1, commitment = if (it.partner?.claimed == true) app.lockdin.enforce.Commitment.PARTNER else it.commitment) }
                 })
                 else -> MainButton("Show me around", { store.update { it.copy(onboarded = true, tourStep = 0) } })
             }
@@ -302,7 +303,7 @@ fun TourOverlay(store: Store) {
     val hole = target?.let { androidx.compose.ui.geometry.Rect(it.left - pad, it.top - pad, it.right + pad, it.bottom + pad) }
     val scrim = c.ink.copy(alpha = 0.55f)
     val next = {
-        if (step + 1 >= TOUR.size) ReadyMoment.showing = true
+        // The tour now ends quietly back on Home (polish pass: no extra "You’re ready" screen).
         store.update { it.copy(tourStep = if (step + 1 < TOUR.size) step + 1 else -1) }
     }
     val end = { store.update { it.copy(tourStep = -1) } }

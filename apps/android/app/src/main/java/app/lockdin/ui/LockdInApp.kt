@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.background
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.testTag
@@ -84,6 +85,7 @@ fun LockdInApp(
         var editingProfile by remember { mutableStateOf<String?>(null) }
         // R64: an existing profile opens on its summary first; the editor opens from there.
         var viewingProfile by rememberSaveable { mutableStateOf<String?>(null) }
+        val headerScrolled = remember { mutableStateOf(false) }
         var editingPreset by remember { mutableStateOf<String?>(null) }
         var editingPlace by remember { mutableStateOf<app.lockdin.engine.Place?>(null) }
         fun go(r: Route) { if (r.tab) lastTab = r; viewingProfile = null; route = r }
@@ -157,11 +159,15 @@ fun LockdInApp(
             containerColor = if (backdrop != Backdrop.NONE) androidx.compose.ui.graphics.Color.Transparent else c.ground,
             contentWindowInsets = WindowInsets.safeDrawing,
             topBar = {
+                // At rest a soft fade keeps the wordmark readable over the background; once content scrolls
+                // under it the header becomes an opaque surface with a hairline (owner 2026-11-09).
+                val solid by androidx.compose.animation.core.animateFloatAsState(if (headerScrolled.value) 1f else 0f, label = "header")
                 Row(
-                    // A soft fade behind the header keeps the wordmark and gear readable over scrolled content.
                     Modifier.fillMaxWidth().background(androidx.compose.ui.graphics.Brush.verticalGradient(
-                        listOf(c.ground.copy(alpha = 0.92f), c.ground.copy(alpha = 0.75f), c.ground.copy(alpha = 0f)),
-                    )).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                        listOf(c.ground.copy(alpha = 0.92f + 0.08f * solid), c.ground.copy(alpha = 0.75f + 0.25f * solid), c.ground.copy(alpha = solid)),
+                    )).drawBehind {
+                        if (solid > 0f) drawLine(c.line.copy(alpha = solid), androidx.compose.ui.geometry.Offset(0f, size.height - 1f), androidx.compose.ui.geometry.Offset(size.width, size.height - 1f), 1.dp.toPx())
+                    }.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
                         .height(56.dp).padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -227,7 +233,7 @@ fun LockdInApp(
                 ).consumeWindowInsets(padding).imePadding(),
                 contentAlignment = Alignment.TopCenter,
             ) {
-                androidx.compose.runtime.CompositionLocalProvider(LocalTopInset provides padding.calculateTopPadding()) {
+                androidx.compose.runtime.CompositionLocalProvider(LocalTopInset provides padding.calculateTopPadding(), LocalHeaderScrolled provides headerScrolled) {
                 Box(Modifier.widthIn(max = 600.dp).fillMaxSize().semantics { contentDescription = "${route.label} screen" }) {
                     // R55: screens slide a little toward the tab you chose and fade in.
                     val still = reducedMotion()

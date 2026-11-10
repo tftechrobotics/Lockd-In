@@ -166,8 +166,15 @@ class AppTest {
         pickMenuItem(item)
     }
 
+    /** Opens the collapsed "Session options" row on setup, if it isn't open yet. */
+    private fun openOptions() {
+        if (rule.onAllNodesWithContentDescription("Change rounds and breaks").fetchSemanticsNodes().isEmpty())
+            rule.onNodeWithText("Session options").performScrollTo().performClick()
+    }
+
     /** Opens "Change rounds and breaks" and picks a value from one of its menus. */
     private fun pickRounds(row: String, item: String) {
+        openOptions()
         rule.onNodeWithContentDescription("Change rounds and breaks").performScrollTo().performClick()
         pickSetting(row, item)
     }
@@ -186,21 +193,20 @@ class AppTest {
         // pinned bar here (the app's activity uses adjustResize + imePadding).
         rule.onNodeWithContentDescription("What are you working on?").performTextInput("TAM 212 · Practice problems")
         rule.onNodeWithText("Start timer").performClick()
-        rule.onNodeWithText("Focusing · round 1 of 2").assertIsDisplayed()
+        rule.onNodeWithText("Round 1 of 2").assertIsDisplayed()
         rule.onNodeWithContentDescription("Focus: 25 minutes left").assertIsDisplayed()
-        rule.onNodeWithText("Next break", substring = true).assertIsDisplayed()
-        // The phone view is just the lock and what's next; details and End now are one tap away.
+        rule.onNodeWithText("break at", substring = true).assertIsDisplayed()
+        // The phone view: task, this phone's status, the lock and what's next; End now is one tap away.
         rule.onAllNodesWithText("End now").assertCountEquals(0)
-        rule.onAllNodesWithText("Timer only. Apps stay available on this phone.").assertCountEquals(0)
+        rule.onNodeWithText("Timer only. Apps stay available on this phone.").assertIsDisplayed()
         openDetails()
-        rule.onNodeWithText("Timer only. Apps stay available on this phone.").performScrollTo().assertIsDisplayed()
 
         clock.advanceMinutes(25); tick(store)
         // Details are open and scrolled; the status line is above them.
         rule.onNodeWithText("On a break · round 1 of 2").performScrollTo().assertIsDisplayed()
         rule.onAllNodesWithText("Focus resumes", substring = true).onFirst().assertExists()
         clock.advanceMinutes(5); tick(store)
-        rule.onNodeWithText("Focusing · round 2 of 2").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Round 2 of 2").performScrollTo().assertIsDisplayed()
         clock.advanceMinutes(25); tick(store)
         rule.onNodeWithText("Session complete").assertIsDisplayed()
         rule.onNodeWithText("Focused 50 min").assertIsDisplayed()
@@ -210,7 +216,7 @@ class AppTest {
         rule.onNodeWithText("Timer only: nothing was blocked on this phone.").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Done").performClick()
         // Back to the idle lock.
-        rule.onNodeWithText("Start a session").assertExists()
+        rule.onNodeWithTag("start-session").assertExists()
     }
 
     @Test fun customLengthMatchingAPresetSelectsIt() {
@@ -403,7 +409,7 @@ class AppTest {
         val tester = androidx.compose.ui.test.junit4.StateRestorationTester(rule)
         val store = Store(AppState()) {}
         tester.setContent { LockdInApp(store, clock, zone, false) }
-        rule.onNodeWithText("Start a session").performClick()
+        rule.onNodeWithTag("start-session").performClick()
         val before = app.lockdin.ui.StartIntro.plays
         rule.onNodeWithText("Start timer").performClick()
         rule.waitForIdle()
@@ -412,7 +418,7 @@ class AppTest {
         tester.emulateSavedInstanceStateRestore()
         rule.waitForIdle()
         org.junit.Assert.assertEquals("no replay after re-creation", before + 1, app.lockdin.ui.StartIntro.plays)
-        rule.onNodeWithText("Focusing", substring = true).assertExists()
+        rule.onNodeWithText("Ends at", substring = true).assertExists()
     }
 
     @Test fun startSequencePlaysOnEveryManualStart() {
@@ -423,7 +429,7 @@ class AppTest {
         rule.onNodeWithText("Start timer").performClick(); rule.waitForIdle()
         clock.advanceMinutes(26); tick(store)
         rule.onNodeWithText("Done").performClick()
-        rule.onNodeWithText("Start a session").performClick()
+        rule.onNodeWithTag("start-session").performClick()
         rule.onNodeWithText("Start timer").performClick(); rule.waitForIdle()
         clock.advanceMinutes(26); tick(store)
         rule.onNodeWithText("Same again").performClick(); rule.waitForIdle()
@@ -586,6 +592,7 @@ class AppTest {
         val audio = app.lockdin.state.ProfileAudio(builtIn = true, collection = app.lockdin.audio.AudioCollection.RAIN,
             access = app.lockdin.audio.MusicAccess.LIMITED, musicApps = setOf("com.spotify.music"))
         launch(base.copy(profiles = base.profiles.map { if (it.id == "study") it.copy(audio = audio) else it }))
+        openOptions()
         rule.onNodeWithText("Audio: Rain · music apps 5 min").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Start timer").performClick()
         rule.onNodeWithContentDescription("Play study audio").performScrollTo().assertExists()
@@ -618,7 +625,7 @@ class AppTest {
         rule.onNodeWithText("Quotes").performScrollTo().performClick()
         org.junit.Assert.assertTrue(store.state.quotesOn)
         rule.onNodeWithTag("tab-focus").performClick()
-        rule.onNodeWithText("Start a session").performClick()
+        rule.onNodeWithTag("start-session").performClick()
         rule.onNodeWithText("Start timer").performClick()
         val line = app.lockdin.ui.Quotes.forSession(store.state.active!!.id)
         rule.onNodeWithText(line).assertIsDisplayed()
@@ -636,7 +643,7 @@ class AppTest {
         rule.onAllNodesWithText("Add").onFirst().performClick()
         org.junit.Assert.assertEquals(listOf("Problem set first, then rest."), store.state.customMessages)
         rule.onNodeWithTag("tab-focus").performClick()
-        rule.onNodeWithText("Start a session").performClick()
+        rule.onNodeWithTag("start-session").performClick()
         rule.onNodeWithText("Start timer").performClick()
         openDetails()
         rule.onNodeWithText("Problem set first, then rest.").performScrollTo().assertIsDisplayed()
@@ -708,9 +715,14 @@ class AppTest {
         rule.onNodeWithText("Turn on blocking").assertIsDisplayed()
         rule.onNodeWithText("Continue").performClick()
         rule.onNodeWithText("Add a partner (optional)").assertIsDisplayed()
-        rule.onNodeWithText("Skip for now").performClick()
-        rule.onNodeWithText("Show me around").performClick()
+        // Polish pass: setup ends straight on Home, ready for the first session; the tour is in Help.
+        rule.onNodeWithText("Skip and finish").performClick()
         org.junit.Assert.assertTrue(store.state.onboarded)
+        org.junit.Assert.assertEquals(-1, store.state.tourStep)
+        rule.onNodeWithText("Start your first session").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Settings").performClick()
+        openSection("Help and tour")
+        rule.onNodeWithText("Replay the tour").performClick()
         // The tour points at parts of the home screen, one small bubble at a time.
         rule.onNodeWithText("1 of 6").assertIsDisplayed()
         rule.onNodeWithText("Start here").assertIsDisplayed()
@@ -728,7 +740,7 @@ class AppTest {
         rule.onNodeWithText("End tutorial").performClick()
         org.junit.Assert.assertTrue(store.state.onboarded)
         org.junit.Assert.assertEquals(-1, store.state.tourStep)
-        rule.onNodeWithText("Start a session").assertIsDisplayed()
+        rule.onNodeWithTag("start-session").assertIsDisplayed()
     }
 
     @Test fun signInFormChecksEmailAndPassword() {
@@ -764,7 +776,8 @@ class AppTest {
         val now = clock.now()
         val p = app.lockdin.state.Partner("Sam", "acct_test_0001", "link_test_0001", claimed = true)
         val store = launch(AppState(partner = p, commitment = app.lockdin.enforce.Commitment.PARTNER), home = true)
-        rule.onNodeWithText("Start a session").performClick()
+        rule.onNodeWithTag("start-session").performClick()
+        openOptions()
         rule.onNodeWithText("Ending early:", substring = true).performScrollTo().assertIsDisplayed()
         store.update { s -> s.copy(active = app.lockdin.state.ActiveSession(
             "sess_partner_1", now, listOf(app.lockdin.engine.Segment(app.lockdin.engine.PhaseKind.FOCUS, 60)), "Essay",
@@ -945,6 +958,7 @@ class AppTest {
     @Test fun screenshotSetupRoundsOpen() {
         launch()
         rule.onNodeWithContentDescription("What are you working on?").performTextInput("TAM 212 · Problem set 6")
+        openOptions()
         rule.onNodeWithContentDescription("Change rounds and breaks").performScrollTo().performClick()
         shot("12-setup-rounds-open")
     }
@@ -971,10 +985,10 @@ class AppTest {
         // Greeting under the lock (R54): "Good evening" and "Physics review in 1 h."
         rule.onNodeWithText("Good evening").assertIsDisplayed()
         rule.onNodeWithText("Physics review in 1 h.").assertIsDisplayed()
-        rule.onNodeWithText("Start a session").performClick()
+        rule.onNodeWithTag("start-session").performClick()
         rule.onNodeWithText("Start timer").assertExists()
         rule.onNodeWithText("Back").performClick()
-        rule.onNodeWithText("Start a session").assertExists()
+        rule.onNodeWithTag("start-session").assertExists()
     }
     @Test fun recapListsBlockedAttemptsAndReturnsHomeAfter30s() {
         val rules = app.lockdin.enforce.AppRules(sites = setOf("youtube.com"))
@@ -989,7 +1003,7 @@ class AppTest {
         rule.onNodeWithText("3 times").assertExists()
         rule.onNodeWithText("Back to home in 30 s").assertExists()
         clock.advanceMinutes(1); tick(store)
-        rule.onNodeWithText("Start a session").assertIsDisplayed()
+        rule.onNodeWithTag("start-session").assertIsDisplayed()
     }
     @Test fun autoStartIsExplainedBeforeItTurnsOn() {
         launch()

@@ -39,6 +39,17 @@ val LiterataDigits = FontFamily(
     Font(R.font.literata_digits_600, FontWeight.ExtraBold),
 )
 
+/**
+ * Source Sans 3 (OFL; static 400/600 instances, Latin subset) for dense, functional text: settings
+ * rows, helper text, permission instructions and timestamps (polish pass, owner 2026-11-09). Literata
+ * stays for greetings, screen titles, task names and the clock.
+ */
+val SourceSans = FontFamily(
+    Font(R.font.source_sans_400, FontWeight.Normal),
+    Font(R.font.source_sans_600, FontWeight.Medium),
+    Font(R.font.source_sans_600, FontWeight.SemiBold),
+)
+
 /** Lockd In's own palette, available everywhere (Material colors are mapped from it). */
 val LocalColors = staticCompositionLocalOf { LightColors }
 
@@ -52,7 +63,7 @@ object Type {
     val body = TextStyle(fontFamily = LiterataText, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp)
     val bodyStrong = body.copy(fontWeight = FontWeight.SemiBold)
     val label = TextStyle(fontFamily = LiterataText, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 20.sp)
-    val caption = TextStyle(fontFamily = LiterataText, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp)
+    val caption = TextStyle(fontFamily = SourceSans, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 21.sp)
     val button = TextStyle(fontFamily = LiterataDisplay, fontWeight = FontWeight.Medium, fontSize = 17.sp, lineHeight = 22.sp)
     /** The home greeting under the lock. */
     val greeting = TextStyle(fontFamily = LiterataDisplay, fontWeight = FontWeight.SemiBold, fontSize = 32.sp, lineHeight = 38.sp, letterSpacing = (-0.3).sp)

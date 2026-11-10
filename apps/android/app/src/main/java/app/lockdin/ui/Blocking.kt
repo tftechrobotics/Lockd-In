@@ -44,6 +44,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
@@ -341,24 +349,25 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
                 }
             }
         } else {
+            // Polish pass: search and the chosen count first; the longer explanation folds away.
             Column(Modifier.padding(horizontal = Dim.gutter, vertical = Dim.s3), verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
-                SegmentedChoice(
-                    listOf(RuleMode.BLOCK_LIST to "Block these", RuleMode.APPROVED_ONLY to "Allow only these"),
-                    mode, { mode = it }, label = "Rule type",
-                )
-                Text(
-                    if (mode == RuleMode.BLOCK_LIST) "The apps you tick are covered during focus. Everything else stays available."
-                    else "During focus, only the apps you tick open normally. Everything else is covered.",
-                    style = UiType.caption, color = c.inkMuted,
-                )
-                Text(
-                    "Never blocked, so your phone keeps working: phone and emergency calls, contacts, Settings, keyboard, home screen, Samsung and Google Wallet, clock, camera and Lockd In. They aren’t listed here.",
-                    style = UiType.caption, color = c.inkMuted,
-                )
                 OutlinedTextField(
                     query, { query = it.take(40) }, singleLine = true, placeholder = { Text("Search apps") },
                     shape = RoundedCornerShape(Dim.radius), colors = fieldColors(),
                     modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Search apps" },
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${chosen.size} chosen", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink,
+                        modifier = Modifier.weight(1f).semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite })
+                }
+                SegmentedChoice(
+                    listOf(RuleMode.BLOCK_LIST to "Block these", RuleMode.APPROVED_ONLY to "Allow only these"),
+                    mode, { mode = it }, label = "Rule type",
+                )
+                HowBlockingWorks(
+                    if (mode == RuleMode.BLOCK_LIST) "The apps you tick are covered during focus. Everything else stays available."
+                    else "During focus, only the apps you tick open normally. Everything else is covered.",
+                    "Never blocked, so your phone keeps working: phone and emergency calls, contacts, Settings, keyboard, home screen, Samsung and Google Wallet, clock, camera and Lockd In. They aren’t listed here.",
                 )
             }
             val list = apps
@@ -369,10 +378,6 @@ fun ProfileEditor(store: Store, profile: Profile, onClose: () -> Unit) {
                 list.isEmpty() -> Text("No apps found. Apps without a home-screen icon can’t be chosen.", style = UiType.body, color = c.inkMuted, modifier = Modifier.padding(Dim.gutter))
                 else -> {
                     val shown = list.filter { query.isBlank() || it.label.contains(query, ignoreCase = true) }
-                    Text(
-                        "${chosen.size} chosen", style = UiType.caption, color = c.inkMuted,
-                        modifier = Modifier.padding(horizontal = Dim.gutter, vertical = Dim.s2),
-                    )
                     LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
                         items(shown, key = { it.packageName }) { app ->
                             val on = app.packageName in chosen
@@ -449,23 +454,23 @@ private fun AudioTab(audio: app.lockdin.state.ProfileAudio, onAudio: (app.lockdi
                 }
             }
             if (audio.builtIn) {
+                // Polish pass (owner 2026-11-09): each track is its own row. Choosing it (check + tint) and
+                // listening to it (the separate round Preview button) are visibly different actions.
                 app.lockdin.audio.AudioGroup.values().forEach { g ->
-                    Text(g.label, style = UiType.caption, color = c.inkMuted)
-                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Dim.s2), verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
+                    Text(g.label, style = UiType.caption, color = c.inkMuted, modifier = Modifier.padding(top = Dim.s2))
+                    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
                         app.lockdin.audio.AudioCollection.values().filter { it.group == g }.forEach { k ->
-                            Chip(k.label, audio.collection == k) { onAudio(audio.copy(collection = k)); app.lockdin.audio.StudyPlayer.stopPreview() }
+                            TrackRow(k, audio.collection == k, onSelect = { onAudio(audio.copy(collection = k)); app.lockdin.audio.StudyPlayer.stopPreview() }) {
+                                val previewing = app.lockdin.audio.StudyPlayer.previewing == k
+                                if (previewing) app.lockdin.audio.StudyPlayer.stopPreview() else app.lockdin.audio.StudyPlayer.preview(ctx, k, audio.volume)
+                            }
                         }
                     }
                 }
-                Text(audio.collection.blurb + " · ${audio.collection.tracks.size} " + if (audio.collection.loop) "seamless loop" else "tracks, played in order", style = UiType.caption, color = c.inkMuted)
                 if (audio.collection.development) Text(
                     "Development recordings: made by Lockd In for testing. They’ll be replaced with produced recordings.",
                     style = UiType.caption, color = c.inkMuted,
                 )
-                val previewing = app.lockdin.audio.StudyPlayer.previewing == audio.collection
-                SecondaryButton(if (previewing) "Stop preview" else "Preview", {
-                    if (previewing) app.lockdin.audio.StudyPlayer.stopPreview() else app.lockdin.audio.StudyPlayer.preview(ctx, audio.collection, audio.volume)
-                })
                 Text("Volume", style = UiType.caption, color = c.inkMuted)
                 androidx.compose.material3.Slider(
                     audio.volume, { onAudio(audio.copy(volume = it)) }, valueRange = 0f..1f,
@@ -544,8 +549,61 @@ private fun RadioRow(title: String, detail: String, on: Boolean, onClick: () -> 
     ) {
         androidx.compose.material3.RadioButton(on, null, colors = androidx.compose.material3.RadioButtonDefaults.colors(selectedColor = c.ink))
         Column(Modifier.weight(1f)) {
-            Text(title, style = UiType.label, color = c.ink)
+            Text(title, style = UiType.row, color = c.ink)
             Text(detail, style = UiType.caption, color = c.inkMuted)
+        }
+    }
+}
+
+/** "How blocking works": the longer explanation, folded away until asked for. */
+@Composable
+private fun HowBlockingWorks(vararg lines: String) {
+    val c = LocalColors.current
+    var open by remember { mutableStateOf(false) }
+    Column {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = Dim.control).clickable(role = Role.Button, onClickLabel = if (open) "Hide" else "Show") { open = !open },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("How blocking works", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink, modifier = Modifier.weight(1f))
+            LockdIcon(if (open) LIcon.ChevronUp else LIcon.ChevronDown, size = 18.dp, tint = c.inkMuted)
+        }
+        androidx.compose.animation.AnimatedVisibility(open) {
+            Column(verticalArrangement = Arrangement.spacedBy(Dim.s2)) { lines.forEach { Text(it, style = UiType.caption, color = c.inkMuted) } }
+        }
+    }
+}
+
+/** One study-audio track: tap the row to choose it; the round button on the right only previews. */
+@Composable
+private fun TrackRow(k: app.lockdin.audio.AudioCollection, on: Boolean, onSelect: () -> Unit, onPreview: () -> Unit) {
+    val c = LocalColors.current
+    val previewing = app.lockdin.audio.StudyPlayer.previewing == k
+    val bg by androidx.compose.animation.animateColorAsState(if (on) c.taupeSoft else androidx.compose.ui.graphics.Color.Transparent, label = "track")
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(Dim.radius)).background(bg).padding(start = Dim.s3, end = Dim.s1),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            Modifier.weight(1f).heightIn(min = 64.dp)
+                .selectable(on, role = Role.RadioButton, onClick = onSelect).padding(vertical = Dim.s2),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s3),
+        ) {
+            Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) {
+                if (on) LockdIcon(LIcon.Check, size = 22.dp, tint = c.ink)
+            }
+            Column(Modifier.weight(1f)) {
+                Text(k.label, style = UiType.label.copy(fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium), color = c.ink)
+                Text(k.blurb + " · " + if (k.loop) "seamless loop" else "${k.tracks.size} tracks", style = UiType.caption, color = c.inkMuted)
+            }
+        }
+        // A thin rule separates choosing from listening.
+        Box(Modifier.width(1.dp).height(32.dp).background(c.line))
+        androidx.compose.material3.IconButton(onClick = onPreview, modifier = Modifier.size(48.dp)) {
+            Box(Modifier.size(36.dp).border(1.5.dp, c.ink.copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.Center) {
+                LockdIcon(if (previewing) LIcon.Pause else LIcon.Play, size = 16.dp, tint = c.ink,
+                    description = if (previewing) "Stop preview of ${k.label}" else "Preview ${k.label}")
+            }
         }
     }
 }

@@ -123,7 +123,7 @@ private fun WindowRow(w: FreeWindow, zone: ZoneId, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("${Fmt.clock(w.start, zone)} – ${Fmt.clock(w.end, zone)}", style = Type.fact, color = c.ink)
+            Text("${Fmt.clock(w.start, zone)} – ${Fmt.clock(w.end, zone)}", style = UiType.time, color = c.ink)
             Text("${minutesLabel(w.minutes)} free", style = UiType.caption, color = c.inkMuted)
         }
         Text("Plan", style = UiType.label.copy(fontWeight = FontWeight.SemiBold, textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline), color = c.ink)

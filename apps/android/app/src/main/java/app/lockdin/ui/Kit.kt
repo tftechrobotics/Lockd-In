@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
@@ -84,11 +86,16 @@ object Dim {
 /** Interface type: LiterataText. Expanded LiterataText only for titles, digits and the primary button. */
 object UiType {
     val title = Type.title
-    val section = Type.caption.copy(fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 18.sp)
+    // Sans for functional text (polish pass): section labels, values, helper text, rows, timestamps.
+    val section = Type.caption.copy(fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 18.sp, letterSpacing = 0.2.sp)
     val body = Type.body
     val label = Type.label
-    val value = Type.label.copy(fontWeight = FontWeight.Normal)
-    val caption = Type.caption.copy(fontSize = 13.sp, lineHeight = 18.sp)
+    val value = Type.caption.copy(fontSize = 16.sp, lineHeight = 22.sp)
+    val caption = Type.caption.copy(fontSize = 14.sp, lineHeight = 20.sp)
+    /** Settings rows and other list rows that are controls, not content. */
+    val row = Type.caption.copy(fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 22.sp)
+    /** Clock times in lists (Schedule, History), with tabular figures. */
+    val time = Type.caption.copy(fontWeight = FontWeight.SemiBold, fontSize = 17.sp, lineHeight = 23.sp, fontFeatureSettings = "tnum, lnum")
     val figure = Type.timer.copy(fontSize = 24.sp, lineHeight = 30.sp)
 }
 
@@ -113,6 +120,22 @@ val LocalBoxed = androidx.compose.runtime.staticCompositionLocalOf { false }
 /** A Settings plate is frosted glass (R58); elsewhere there is no box. */
 @Composable fun Modifier.plate(): Modifier = if (LocalBoxed.current) this.glass(RoundedCornerShape(Dim.plate)) else this
 @Composable fun plateSide(d: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp = if (LocalBoxed.current) d else 0.dp
+
+/**
+ * Whether the current screen's content is scrolled under the header (polish pass 2026-11-09): the
+ * header turns opaque then, so titles don't show through behind the wordmark.
+ */
+val LocalHeaderScrolled = androidx.compose.runtime.staticCompositionLocalOf { androidx.compose.runtime.mutableStateOf(false) }
+
+/** A vertical scroll that also tells the header when content has moved under it. */
+@Composable
+fun Modifier.screenScroll(): Modifier {
+    val state = androidx.compose.foundation.rememberScrollState()
+    val flag = LocalHeaderScrolled.current
+    androidx.compose.runtime.LaunchedEffect(state) { androidx.compose.runtime.snapshotFlow { state.value > 4 }.collect { flag.value = it } }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { flag.value = false } }
+    return this.verticalScroll(state)
+}
 
 /** Height of the see-through header; scrolling screens pad their content by it so it can scroll up behind the header. */
 val LocalTopInset = androidx.compose.runtime.staticCompositionLocalOf { 0.dp }
@@ -306,15 +329,20 @@ fun GlassButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier
     val dark = c == DarkColors
     val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val shape = RoundedCornerShape(50)
-    val fill = if (dark) listOf(0f to Color(0x4DFFF8EC), 0.48f to Color(0x1AFFF0DC), 1f to Color(0x2EFFF0DC))
-        else listOf(0f to Color(0xF2FFFFFF), 0.48f to Color(0xA6FFFFFF), 1f to Color(0xC7FFFFFF))
-    val rim = if (dark) Color(0x73FFF5E6) else Color(0xFFFFFFFF)
-    val lip = if (dark) Color(0x52000000) else Color(0x24302A25)
+    // Polish pass (owner 2026-11-09): keep the clear centre, but a brighter label, a clearer rim and a
+    // faint smoke tint underneath so the pill separates from a busy photo (the library desk). In light
+    // mode the centre is genuinely see-through with an ink rim, so it still reads on plain cream.
+    val tint = if (dark) Color(0x2E120C08) else Color(0x14302A25)
+    val fill = if (dark) listOf(0f to Color(0x40FFF8EC), 0.48f to Color(0x0FFFF0DC), 1f to Color(0x24FFF0DC))
+        else listOf(0f to Color(0x8CFFFFFF), 0.48f to Color(0x33FFFFFF), 1f to Color(0x59FFFFFF))
+    val rim = if (dark) Color(0xB3FFF5E6) else c.ink.copy(alpha = 0.42f)
+    val lip = if (dark) Color(0x52000000) else Color(0x1F302A25)
     Box(
         modifier.fillMaxWidth().heightIn(min = 58.dp).pressScale(source)
             .clip(shape)
+            .background(tint, shape)
             .background(androidx.compose.ui.graphics.Brush.verticalGradient(*fill.toTypedArray()), shape)
-            .border(1.5.dp, rim, shape)
+            .border(1.75.dp, rim, shape)
             .drawWithContent {
                 drawContent()
                 val r = size.height / 2
@@ -332,12 +360,13 @@ fun GlassButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            text, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             style = Type.button.copy(
                 fontWeight = FontWeight.SemiBold,
-                shadow = if (dark) androidx.compose.ui.graphics.Shadow(Color(0x80000000), androidx.compose.ui.geometry.Offset(0f, 2f), 4f) else null,
+                shadow = if (dark) androidx.compose.ui.graphics.Shadow(Color(0xB3000000), androidx.compose.ui.geometry.Offset(0f, 1.5f), 6f) else null,
             ),
-            color = if (dark) Color(0xFFFFF8EE) else c.ink,
+            color = if (dark) Color(0xFFFFFDF8) else c.ink,
+            modifier = Modifier.padding(vertical = Dim.s2),
         )
     }
 }
@@ -396,12 +425,19 @@ fun SettingRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         icon?.let { LockdIcon(it, size = Dim.icon, tint = tint); Spacer(Modifier.width(Dim.s3)) }
+        // A long value (an email address) or large text stacks under the label and wraps, instead of
+        // squeezing the label to one letter per line on narrow phones (Galaxy Z Flip, owner 2026-11-09).
+        val stacked = value.length > 18 || androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
         Column(Modifier.weight(1f)) {
-            Text(label, style = UiType.label, color = tint)
+            Text(label, style = UiType.row, color = tint)
+            if (stacked && value.isNotEmpty()) Text(value, style = UiType.value, color = if (enabled) c.ink else c.inkMuted)
             supporting?.let { Text(it, style = UiType.caption, color = c.inkMuted) }
         }
-        Spacer(Modifier.width(Dim.s3))
-        Text(value, style = UiType.value, color = if (enabled) c.ink else c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (!stacked) {
+            Spacer(Modifier.width(Dim.s3))
+            Text(value, style = UiType.value, color = if (enabled) c.ink else c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 200.dp))
+        }
         if (chevron != null && onClick != null && enabled) { Spacer(Modifier.width(Dim.s1)); LockdIcon(chevron, size = 18.dp, tint = c.inkMuted) }
     }
 }

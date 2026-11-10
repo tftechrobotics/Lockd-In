@@ -115,7 +115,7 @@ fun ScheduleScreen(store: Store, now: Long, zone: ZoneId, onEdit: (ScheduledSess
     val profileName = { id: String -> store.state.profiles.firstOrNull { it.id == id }?.name ?: "Study" }
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = LocalTopInset.current).padding(horizontal = Dim.gutter).padding(top = Dim.s2, bottom = Dim.s5),
+        Modifier.fillMaxSize().screenScroll().padding(top = LocalTopInset.current).padding(horizontal = Dim.gutter).padding(top = Dim.s2, bottom = Dim.s5),
         verticalArrangement = Arrangement.spacedBy(Dim.s5),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -194,7 +194,7 @@ private fun DayAgenda(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text("${Fmt.clock(st, zone)} – ${Fmt.clock(st + s.totalMinutes * 60_000L, zone)}", style = Type.fact, color = c.ink)
+                        Text("${Fmt.clock(st, zone)} – ${Fmt.clock(st + s.totalMinutes * 60_000L, zone)}", style = UiType.time, color = c.ink)
                         Text(s.title.ifBlank { "Study" }, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
                         Text("${planLabel(s)} · ${profileName(s.profileId)}", style = UiType.caption, color = c.inkMuted)
                     }
@@ -225,7 +225,7 @@ private fun PlanRow(store: Store, s: ScheduledSession, whenText: String, profile
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(s.startTime.format(timeFmt),
-                    style = Type.fact, color = if (muted) c.inkMuted else c.ink)
+                    style = UiType.time, color = if (muted) c.inkMuted else c.ink)
                 Text(s.title.ifBlank { "Study" }, style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = if (muted) c.inkMuted else c.ink)
                 Text(whenText, style = UiType.caption, color = c.ink)
                 Text("${planLabel(s)} · $profile", style = UiType.caption, color = c.inkMuted)

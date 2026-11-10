@@ -56,7 +56,7 @@ import app.lockdin.state.Tone
 @Composable
 fun ScrollScreen(content: @Composable () -> Unit) {
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = LocalTopInset.current).padding(horizontal = Dim.gutter).padding(top = Dim.s2, bottom = Dim.s5),
+        Modifier.fillMaxSize().screenScroll().padding(top = LocalTopInset.current).padding(horizontal = Dim.gutter).padding(top = Dim.s2, bottom = Dim.s5),
         verticalArrangement = Arrangement.spacedBy(Dim.s5),
     ) { content() }
 }
@@ -369,9 +369,8 @@ private fun SettingsScreenBody(
                 if (st.tone != Tone.QUIET) AppMessagesEditor(store)
             }
             SettingsPage.CALENDAR -> {
-                SubHead("Calendar")
+                // Each section labels itself once (CalendarSettings / PlacesSettings carry their own heading).
                 CalendarSettings(store)
-                SubHead("Places")
                 PlacesSettings(store, onEditPlace)
             }
             SettingsPage.DATA -> {
@@ -450,7 +449,7 @@ private fun RadioRow(label: String, selected: Boolean, onClick: () -> Unit) {
         Modifier.fillMaxWidth().heightIn(min = Dim.control + 4.dp).selectable(selected, role = Role.RadioButton, onClick = onClick).padding(horizontal = Dim.s4),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = UiType.body, color = c.ink, modifier = Modifier.weight(1f))
+        Text(label, style = UiType.row, color = c.ink, modifier = Modifier.weight(1f))
         RadioButton(selected = selected, onClick = null, colors = RadioButtonDefaults.colors(selectedColor = c.ink, unselectedColor = c.controlLine))
     }
 }
@@ -531,7 +530,7 @@ fun SwitchRow(label: String, supporting: String, on: Boolean, onChange: (Boolean
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(label, style = UiType.label, color = c.ink)
+            Text(label, style = UiType.row, color = c.ink)
             Text(supporting, style = UiType.caption, color = c.inkMuted)
         }
         androidx.compose.material3.Switch(

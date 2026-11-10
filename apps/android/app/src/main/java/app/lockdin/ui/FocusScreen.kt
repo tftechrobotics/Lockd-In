@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.graphics.Color
@@ -61,6 +63,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -138,14 +141,14 @@ fun FocusScreen(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -> 
             BackHandler { viewingLast = false }
             Recap(store, last, FocusService.evaluate(last, clock.now()), clock, zone, onClose = { viewingLast = false })
         }
-        else -> Home(store, clock, zone, onNew = { composing = true }, openSchedule = openSchedule, onViewLast = { viewingLast = true })
+        else -> Home(store, clock, zone, onNew = { composing = true }, openSchedule = openSchedule, onViewLast = { viewingLast = true }, openDevices = openDevices)
     }
 }
 
 /** The idle lock: the time of day on its face, the next planned session below, one way to begin. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit, openSchedule: () -> Unit, onViewLast: () -> Unit = {}) {
+private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit, openSchedule: () -> Unit, onViewLast: () -> Unit = {}, openDevices: () -> Unit = {}) {
     val c = LocalColors.current
     val now = rememberNow(clock, true)
     val upcoming = Schedule.nextUp(store.state.schedule, now, zone)
@@ -210,6 +213,18 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
                     if (upcoming == null) Text("Plan one", style = UiType.label.copy(fontSize = 16.sp, fontWeight = FontWeight.SemiBold, textDecoration = TextDecoration.Underline), color = c.ink)
                 }
                 }
+                // Polish pass (owner 2026-11-09): onboarding now ends here, so if blocking still needs a
+                // permission Home says exactly what, with a direct way to finish.
+                val homeMissing = rememberMissing()
+                val homeRules = store.state.profiles.firstOrNull { it.id == store.state.last.profileId }?.rules
+                if (homeMissing.isNotEmpty() && homeRules?.restrictsAnything == true) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s2)) {
+                        Box(Modifier.size(9.dp).border(1.5.dp, c.inkMuted, CircleShape))
+                        Text("Blocking needs ${FocusService.describe(homeMissing)}. Until then, sessions are timer only.",
+                            style = UiType.caption, color = c.inkMuted, modifier = Modifier.weight(1f))
+                        TextAction("Finish setup", openDevices)
+                    }
+                }
                 // Presets: one tap starts the session (a manual start, so the start sequence plays).
                 val homeCtx = androidx.compose.ui.platform.LocalContext.current
                 if (store.state.presets.isNotEmpty()) {
@@ -255,7 +270,10 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
                 }
             }
         },
-        actions = { GlassButton("Start a session", onNew, modifier = Modifier.tourTarget("new").testTag("start-session")) },
+        actions = {
+            val firstTime = store.state.recentStarts.isEmpty() && store.state.lastSession == null
+            GlassButton(if (firstTime) "Start your first session" else "Start a session", onNew, modifier = Modifier.tourTarget("new").testTag("start-session"))
+        },
     )
 }
 
@@ -278,7 +296,7 @@ fun WithActionBar(content: @Composable () -> Unit, actions: @Composable () -> Un
     val large = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
     Column(Modifier.fillMaxSize()) {
         Column(
-            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = LocalTopInset.current)
+            Modifier.weight(1f).fillMaxWidth().screenScroll().padding(top = LocalTopInset.current)
                 .padding(horizontal = Dim.gutter).padding(top = Dim.s2, bottom = Dim.s5),
             verticalArrangement = Arrangement.spacedBy(Dim.s5),
         ) { content(); if (large) note?.invoke() }
@@ -297,6 +315,33 @@ private fun sessionLockWidth(): androidx.compose.ui.unit.Dp {
 }
 
 /** One line about this session's audio, with the way to choose music first (R48). */
+/** Short audio label for the Session options summary. */
+private fun audioShort(a: app.lockdin.state.ProfileAudio): String = if (a.builtIn) a.collection.label.lowercase().replaceFirstChar { it.uppercase() } else "no study audio"
+
+/** One expandable row for the less-used setup choices; collapsed it shows what is actually chosen. */
+@Composable
+private fun SessionOptions(summary: String, open: Boolean, onToggle: () -> Unit, content: @Composable () -> Unit) {
+    val c = LocalColors.current
+    val turn by androidx.compose.animation.core.animateFloatAsState(if (open) 90f else 0f, label = "chev")
+    Column(Modifier.fillMaxWidth()) {
+        HorizontalDivider(color = c.line)
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable(role = Role.Button, onClickLabel = if (open) "Hide options" else "Show options", onClick = onToggle)
+                .semantics(mergeDescendants = true) { stateDescription = if (open) "Expanded" else "Collapsed" }
+                .padding(vertical = Dim.s3),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Session options", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
+                if (!open) Text(summary.replaceFirstChar { it.uppercase() }, style = UiType.caption, color = c.inkMuted)
+            }
+            LockdIcon(LIcon.Chevron, size = 18.dp, tint = c.inkMuted, modifier = Modifier.graphicsLayer { rotationZ = turn })
+        }
+        androidx.compose.animation.AnimatedVisibility(open) { Column(Modifier.padding(bottom = Dim.s3)) { content() } }
+        HorizontalDivider(color = c.line)
+    }
+}
+
 @Composable
 private fun AudioSummary(a: app.lockdin.state.ProfileAudio, onChoose: () -> Unit) {
     val c = LocalColors.current
@@ -402,6 +447,7 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
     var pickingCommitment by remember { mutableStateOf(false) }
     var customOpen by rememberSaveable { mutableStateOf(s.last.focusMinutes !in LENGTHS) }
     var roundsOpen by rememberSaveable { mutableStateOf(false) }
+    var optionsOpen by rememberSaveable { mutableStateOf(false) }
     var presetId by rememberSaveable { mutableStateOf<String?>(null) }
     var savingPreset by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -428,6 +474,12 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
         setOf(app.lockdin.enforce.Capability.ACCESSIBILITY) else appMissing
     val blockingReady = rules.restrictsAnything && missing.isEmpty()
 
+    // Polish pass: over a photo background the lower half darkens gradually, so the lamp and desk
+    // in the library scene don't compete with the controls and their text.
+    Box(Modifier.fillMaxSize()) {
+    if (s.backdrop != "NONE") Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(
+        0f to androidx.compose.ui.graphics.Color.Transparent, 0.35f to c.ground.copy(alpha = 0.15f), 0.7f to c.ground.copy(alpha = 0.72f), 1f to c.ground.copy(alpha = 0.9f),
+    )))
     WithActionBar(
         content = {
             onBack?.let { back ->
@@ -439,6 +491,67 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
                     }
                 }
             }
+            // Polish pass (owner 2026-11-09): the three things people set every time come first: the
+            // task, the length and the profile. Everything else sits in one "Session options" row.
+            Column(verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
+                Question("What are you working on?")
+                TaskField(intention, { intention = it.take(120) }, onDone = { focusManager.clearFocus() })
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
+                Question("How long?")
+                LengthTiles(if (focus in LENGTHS) focus else -1) { m ->
+                    if (m == -1) customOpen = true else { customOpen = false; focus = m; error = null }
+                }
+                if (customOpen || focus !in LENGTHS) CustomLengthRow(focus, { focus = it; error = null })
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
+                Question("Which profile?")
+                ProfileChips(s.profiles.map { it.id to it.name } + ("+new" to "+ New profile"), profileId) {
+                    if (it == "+new") namingProfile = true else { profileId = it; audioOverride = null }
+                }
+            }
+
+            SessionOptions(
+                summary = listOf(planText, audioShort(sessionAudio), "ending early: " + commitmentLabel(commitment).lowercase()).joinToString(" · "),
+                open = optionsOpen, onToggle = { optionsOpen = !optionsOpen },
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
+                    RoundsLine(planText, roundsOpen) { roundsOpen = !roundsOpen }
+                    if (roundsOpen) {
+                        SettingsGroup {
+                            SettingMenuRow(
+                                "Focus rounds", (1..6).map { it to if (it == 1) "1 round" else "$it rounds" }, effectiveRounds,
+                                { rounds = it; breakMin = if (it > 1) (if (breakMin == 0) 10 else breakMin) else 0 }, icon = LIcon.Repeat,
+                            )
+                            GroupDivider()
+                            SettingMenuRow(
+                                "Breaks", listOf(0 to "None") + listOf(5, 10, 15, 20).map { it to "$it min" }, if (effectiveRounds > 1) breakMin else 0,
+                                { breakMin = it; if (it > 0) rounds = maxOf(2, rounds); error = null }, icon = LIcon.Coffee,
+                            )
+                        }
+                    }
+                    AudioSummary(sessionAudio) { choosingMusic = true }
+                    // How this session can end early (owner 2026-11-02: Locked and Partner code here too).
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Ending early: " + commitmentLabel(commitment).lowercase().replaceFirstChar { it.uppercase() },
+                            style = UiType.caption, color = c.inkMuted, modifier = Modifier.weight(1f))
+                        Box {
+                            TextAction("Change", { pickingCommitment = true })
+                            androidx.compose.material3.DropdownMenu(pickingCommitment, { pickingCommitment = false }, containerColor = c.surface) {
+                                commitmentChoices(s).forEach { (v, l) ->
+                                    androidx.compose.material3.DropdownMenuItem(
+                                        text = { Text(l + if (v == commitment) " ✓" else "", style = UiType.body, color = c.ink) },
+                                        onClick = { commitment = v; pickingCommitment = false },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             if (s.presets.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(Dim.s2)) {
                     Text("Presets", style = UiType.section, color = c.inkMuted, modifier = Modifier.semantics { heading() })
@@ -456,57 +569,6 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
                     }
                 }
             }
-            Column(verticalArrangement = Arrangement.spacedBy(Dim.s1)) {
-                Question("What are you working on?")
-                TaskField(intention, { intention = it.take(120) }, onDone = { focusManager.clearFocus() })
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
-                Question("How long?")
-                LengthTiles(if (focus in LENGTHS) focus else -1) { m ->
-                    if (m == -1) customOpen = true else { customOpen = false; focus = m; error = null }
-                }
-                if (customOpen || focus !in LENGTHS) CustomLengthRow(focus, { focus = it; error = null })
-                RoundsLine(planText, roundsOpen) { roundsOpen = !roundsOpen }
-                if (roundsOpen) {
-                    SettingsGroup {
-                        SettingMenuRow(
-                            "Focus rounds", (1..6).map { it to if (it == 1) "1 round" else "$it rounds" }, effectiveRounds,
-                            { rounds = it; breakMin = if (it > 1) (if (breakMin == 0) 10 else breakMin) else 0 }, icon = LIcon.Repeat,
-                        )
-                        GroupDivider()
-                        SettingMenuRow(
-                            "Breaks", listOf(0 to "None") + listOf(5, 10, 15, 20).map { it to "$it min" }, if (effectiveRounds > 1) breakMin else 0,
-                            { breakMin = it; if (it > 0) rounds = maxOf(2, rounds); error = null }, icon = LIcon.Coffee,
-                        )
-                    }
-                }
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
-                Question("Which profile?")
-                ProfileChips(s.profiles.map { it.id to it.name } + ("+new" to "+ New profile"), profileId) {
-                    if (it == "+new") namingProfile = true else { profileId = it; audioOverride = null }
-                }
-                AudioSummary(sessionAudio) { choosingMusic = true }
-                // How this session can end early (owner 2026-11-02: Locked and Partner code here too).
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Ending early: " + commitmentLabel(commitment).lowercase().replaceFirstChar { it.uppercase() },
-                        style = UiType.caption, color = c.inkMuted, modifier = Modifier.weight(1f))
-                    Box {
-                        TextAction("Change", { pickingCommitment = true })
-                        androidx.compose.material3.DropdownMenu(pickingCommitment, { pickingCommitment = false }, containerColor = c.surface) {
-                            commitmentChoices(s).forEach { (v, l) ->
-                                androidx.compose.material3.DropdownMenuItem(
-                                    text = { Text(l + if (v == commitment) " ✓" else "", style = UiType.body, color = c.ink) },
-                                    onClick = { commitment = v; pickingCommitment = false },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
             TextAction("Save as preset", { savingPreset = true })
 
             error?.let {
@@ -582,6 +644,7 @@ private fun Setup(store: Store, clock: AppClock, zone: ZoneId, openDevices: () -
             })
         },
     )
+    }
     if (namingProfile) NewProfileDialog(onDismiss = { namingProfile = false }) { n ->
         val p = Profile(Store.newId(), n, "Only what you add", false)
         store.update { it.copy(profiles = it.profiles + p) }
@@ -785,32 +848,38 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
         isBreak -> "Apps are available until focus resumes"
         lifted -> "Apps are available this round"
         permissionNeeded -> "Blocking paused: turn on ${FocusService.describe(report?.missing ?: emptySet())}"
+        // Just started and not yet confirmed: say so, distinct from "timer only" (polish pass 2026-11-09).
+        now - session.start < 20_000 -> "Confirming blocking on this phone…"
         else -> "Blocking isn’t running on this phone right now"
     }
 
     val setUpAlready = rememberMissing().isEmpty()
-    val note: @Composable () -> Unit = {
-        // A timer-only session on a phone that's already set up has nothing to fix mid-session.
-        ProtectionLine(protection, protected, if (protected || (blocks && (isBreak || lifted)) || (!blocks && setUpAlready)) null else "Set up blocking", openDevices)
-    }
     // Phone (approved R36): the task, the lock and what's next; everything else is one tap away.
     var more by rememberSaveable { mutableStateOf(false) }
     val pending = snap.overrideState is OverrideState.Pending
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = LocalTopInset.current).padding(horizontal = Dim.gutter).padding(top = Dim.s4, bottom = Dim.s6),
+        Modifier.fillMaxSize().screenScroll().padding(top = LocalTopInset.current).padding(horizontal = Dim.gutter).padding(top = Dim.s4, bottom = Dim.s6),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        // Polish pass (owner 2026-11-09): the task, then this phone's real blocking status, then the
+        // lock and countdown with the finish time right under it. "Focusing" only appears when it adds
+        // something (a round count, a break, an unlocked round).
         Text(task ?: if (isBreak) "Break" else "Focus session", style = TimerType.task, color = c.ink, textAlign = TextAlign.Center,
             modifier = Modifier.semantics { heading() })
-        Spacer(Modifier.height(Dim.s1))
-        Text(status, style = TimerType.status, color = c.inkMuted, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+        Spacer(Modifier.height(Dim.s2))
+        SessionStatusLine(protection, when {
+            protected -> StatusKind.ON
+            session.unlocked || !blocks || isBreak || lifted -> StatusKind.OFF
+            else -> StatusKind.PENDING
+        })
+        if (isBreak || lifted || focusCount > 1) {
+            Spacer(Modifier.height(Dim.s1))
+            Text(if (isBreak || lifted) status else "Round $focusIndex of $focusCount", style = TimerType.status, color = c.inkMuted,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+        }
         if (store.state.quotesOn) {
             Spacer(Modifier.height(Dim.s1))
             Text(Quotes.forSession(session.id), style = UiType.caption.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = c.inkMuted, textAlign = TextAlign.Center)
-        }
-        if (protected) {
-            Spacer(Modifier.height(Dim.s2))
-            BlockingBadge()
         }
         Spacer(Modifier.height(Dim.s4))
         ClockLock(
@@ -818,16 +887,17 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
             caption = if (isBreak) "left in break" else "left this round", width = sessionLockWidth(),
             introFor = intro, haptics = store.state.startHaptics, sound = store.state.startSound,
         )
-        Spacer(Modifier.height(Dim.s4))
-        facts.firstOrNull()?.let { (k, v) ->
-            Text(
-                buildAnnotatedString {
-                    append("$k ")
-                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = c.ink)) { append(v) }
-                },
-                style = UiType.body.copy(fontFeatureSettings = "tnum"), color = c.inkMuted,
-            )
-        }
+        Spacer(Modifier.height(Dim.s3))
+        Text(
+            buildAnnotatedString {
+                if (isBreak) { append("Focus resumes "); withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = c.ink)) { append(Fmt.clock(phase.end, zone)) } }
+                else {
+                    append("Ends at "); withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = c.ink)) { append(Fmt.clock(occ.end, zone)) }
+                    if (next != null) append(" · break at ${Fmt.clock(phase.end, zone)}")
+                }
+            },
+            style = UiType.body.copy(fontFeatureSettings = "tnum"), color = c.inkMuted, textAlign = TextAlign.Center,
+        )
         if (session.audio.builtIn || session.audio.access == app.lockdin.audio.MusicAccess.LIMITED) {
             Spacer(Modifier.height(Dim.s3))
             AudioControl(session, isBreak)
@@ -842,7 +912,8 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
                 SessionRail(occ.phases, now, zone)
                 FactList(facts)
                 nudge?.let { Text(it, style = UiType.body, color = c.inkMuted) }
-                note()
+                // The fix-it action lives here; the status itself is shown under the task.
+                if (!protected && !(blocks && (isBreak || lifted)) && !(!blocks && setUpAlready)) TextAction("Set up blocking", openDevices)
                 OutPanel(store, session, snap, now, clock)
             }
         }
@@ -854,6 +925,25 @@ private fun SessionView(store: Store, session: ActiveSession, clock: AppClock, z
  * playing, next), which opens to volume and the other collections. The remaining music
  * browsing time shows only for a profile with limited music access. The lock stays the main visual.
  */
+enum class StatusKind { ON, PENDING, OFF }
+
+/** This phone's blocking status under the task: filled dot = verified, ring = waiting, none = off. */
+@Composable
+private fun SessionStatusLine(text: String, kind: StatusKind) {
+    val c = LocalColors.current
+    Row(
+        Modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dim.s2),
+    ) {
+        when (kind) {
+            StatusKind.ON -> Box(Modifier.size(9.dp).background(c.statusDot, CircleShape))
+            StatusKind.PENDING -> Box(Modifier.size(9.dp).border(1.5.dp, c.inkMuted, CircleShape))
+            StatusKind.OFF -> Unit
+        }
+        Text(text, style = UiType.caption, color = if (kind == StatusKind.ON) c.ink else c.inkMuted, textAlign = TextAlign.Center)
+    }
+}
+
 @Composable
 private fun AudioControl(session: ActiveSession, isBreak: Boolean) {
     val c = LocalColors.current

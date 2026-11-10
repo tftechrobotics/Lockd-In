@@ -321,3 +321,38 @@ Three kinds of entry, kept apart on purpose:
 - Empty block list: "No apps blocked yet" with an "Add apps" button that opens the editor on its Apps tab (the
   picker). An uninstalled app keeps its row, with a generic icon and "Not installed".
 - CI screenshots: `16-profile-summary-light.png`, `17-profile-summary-dark.png`.
+
+## R65: Visual polish pass (2026-11-09, owner's 8-point brief)
+1. **Home clear pill:** keeps the transparent centre. The label is brighter (with a soft shadow in dark), the rim
+   is clearer (1.75 dp; ink at 42% in light), and there's a faint smoke tint underneath so it separates from
+   the library desk. In light mode the centre is now truly see-through. The label wraps to two lines at large
+   text sizes.
+2. **Settings:**
+   - Rows with a long value (over 18 characters, e.g. an email) or large text stack the value under the label
+     and wrap it (Z Flip bug).
+   - The header turns opaque, with a hairline, once content scrolls under it (`LocalHeaderScrolled` /
+     `Modifier.screenScroll()`).
+   - Calendar and places shows each heading once.
+3. **Setup:**
+   - Task, length and profile come first. Rounds and breaks, music and ending early sit in one "Session
+     options" row that shows a summary when collapsed.
+   - Over a photo background the lower half darkens gradually.
+   - Start stays pinned (and rises with the keyboard via imePadding).
+4. **Profile editor:**
+   - Apps: search and "N chosen" are at the top, and the explanation sits under "How blocking works".
+   - Audio: each track is a row (a check plus a tint when chosen) with a separate round Preview button.
+5. **Session screen:**
+   - Order is task, then this phone's blocking status (a dot when verified, a ring while confirming, nothing
+     for timer only), then the lock, then "Ends at …" (· break at …).
+   - "Focusing" shows only as "Round n of m", or for a break or unlocked round.
+   - The shackle still closes only on verified protection, and reduced motion is respected (unchanged).
+6. **Streak:**
+   - Day 0 shows "0-day streak" with the first-tick instruction.
+   - Upcoming ticks read in dark (inkMuted at 38%).
+   - The full rules are under "How streaks work".
+7. **Onboarding:**
+   - Setup ends on Home ("Start your first session" until the first start). The "You're set", tour and
+     "You're ready" screens no longer play automatically; the tour stays in Settings › Help and tour.
+   - Home shows any missing blocking permission, with "Finish setup".
+8. **Typography:** Source Sans 3 (OFL, static 400/600) for captions, section labels, values, settings rows and
+   list times. Literata stays for greetings, titles, task names and the clock.

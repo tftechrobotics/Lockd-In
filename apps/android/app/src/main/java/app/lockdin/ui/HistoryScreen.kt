@@ -94,8 +94,14 @@ fun HistoryScreen(store: Store, history: HistoryStore, clock: AppClock, zone: Zo
     val week = remember(entries, weekStart, store.state.schedule, now / 60_000) { History.week(entries, ws, zone, store.state.schedule, now) }
     val days = remember(entries) { History.byDay(entries, zone) }
 
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val headerFlag = LocalHeaderScrolled.current
+    androidx.compose.runtime.LaunchedEffect(listState) {
+        androidx.compose.runtime.snapshotFlow { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 4 }.collect { headerFlag.value = it }
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { headerFlag.value = false } }
     LazyColumn(
-        Modifier.fillMaxSize().testTag("history-list"),
+        Modifier.fillMaxSize().testTag("history-list"), state = listState,
         contentPadding = PaddingValues(start = Dim.gutter, end = Dim.gutter, top = LocalTopInset.current + Dim.s2, bottom = Dim.s5),
         verticalArrangement = Arrangement.spacedBy(Dim.s4),
     ) {
@@ -231,7 +237,7 @@ private fun EntryRow(e: HistoryEntry, zone: ZoneId, onOpen: () -> Unit) {
     ) {
         // Same shape as Schedule rows: the time first, then what it was, then the details.
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("${Fmt.clock(e.start, zone)} – ${Fmt.clock(e.end, zone)}", style = Type.fact, color = c.ink)
+            Text("${Fmt.clock(e.start, zone)} – ${Fmt.clock(e.end, zone)}", style = UiType.time, color = c.ink)
             Text(e.task ?: "Focus session", style = UiType.label.copy(fontWeight = FontWeight.SemiBold), color = c.ink, maxLines = 1)
             Text("${minutesLabel(e.focusedMinutes)} focused · ${e.profileName}", style = UiType.caption, color = c.inkMuted, maxLines = 2)
             if (e.outcome != Outcome.COMPLETED) Text(outcomeText(e.outcome), style = UiType.caption, color = c.ink)
@@ -300,7 +306,8 @@ private fun StreakCard(st: app.lockdin.engine.Streak.Result, canStart: Boolean, 
     val fill by androidx.compose.animation.core.animateFloatAsState(
         shown.toFloat(), androidx.compose.animation.core.tween(if (reducedMotion()) 0 else 60 * shown.coerceAtLeast(1), easing = androidx.compose.animation.core.LinearEasing), label = "streak",
     )
-    val ahead = c.taupe
+    // Upcoming ticks must read as "not yet" in both themes without disappearing (polish pass).
+    val ahead = if (c == DarkColors) c.inkMuted.copy(alpha = 0.38f) else c.taupe
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Dim.s3)) {
         Text("Focus streak", style = Type.title, color = c.ink, modifier = Modifier.fillMaxWidth().semantics { heading() })
         Box(
@@ -324,8 +331,12 @@ private fun StreakCard(st: app.lockdin.engine.Streak.Result, canStart: Boolean, 
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 LockdIcon(LIcon.Focus, size = 30.dp, tint = c.ink)
-                Text("${st.days}", style = Type.timer.copy(fontSize = 72.sp, lineHeight = 76.sp), color = c.ink)
-                Text(if (st.days > goal) "days" else "of $goal days", style = Type.fact, color = c.ink)
+                if (st.days == 0) {
+                    Text("0-day streak", style = Type.title, color = c.ink, modifier = Modifier.padding(top = Dim.s2))
+                } else {
+                    Text("${st.days}", style = Type.timer.copy(fontSize = 72.sp, lineHeight = 76.sp), color = c.ink)
+                    Text(if (st.days > goal) "days" else "of $goal days", style = Type.fact, color = c.ink)
+                }
             }
         }
         Text("One day at a time.", style = Type.title.copy(fontFamily = LiterataItalic, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, fontWeight = FontWeight.Medium, fontSize = 26.sp, lineHeight = 32.sp), color = c.ink)
@@ -334,13 +345,14 @@ private fun StreakCard(st: app.lockdin.engine.Streak.Result, canStart: Boolean, 
             LegendItem(ahead, "Day ahead")
         }
         Text(
-            if (st.reachedGoal) "Goal reached" else "${goal - st.days} day${if (goal - st.days == 1) "" else "s"} until your next milestone",
-            style = UiType.body, color = c.inkMuted,
+            when {
+                st.days == 0 -> "Finish a session as planned, without ending early or a blocked app coming up, to earn your first tick."
+                st.reachedGoal -> "Goal reached"
+                else -> "${goal - st.days} day${if (goal - st.days == 1) "" else "s"} until your next milestone"
+            },
+            style = UiType.body, color = c.inkMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
-        Text(
-            "A day counts when your sessions finish without ending early or a blocked app coming up. Days without a session don’t count against it.",
-            style = UiType.caption, color = c.inkMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
+        HowStreaksWork()
         val now = LocalDate.now()
         if (st.lastBreak != null && st.days < 7 && st.lastBreak >= now.minusDays(14)) {
             val h = dayHeading(st.lastBreak, now)
@@ -359,6 +371,32 @@ private fun StreakCard(st: app.lockdin.engine.Streak.Result, canStart: Boolean, 
                 )
                 if (canStart) GlassButton("Try an unlocked session", onTryUnlocked)
                 else Text("Available when no session is running.", style = UiType.caption, color = c.inkMuted)
+            }
+        }
+    }
+}
+
+/** The full rules (engine/Streak.kt), folded away until asked for. */
+@Composable
+private fun HowStreaksWork() {
+    val c = LocalColors.current
+    var open by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = Dim.control).clickable(role = Role.Button, onClickLabel = if (open) "Hide" else "Show") { open = !open },
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
+        ) {
+            Text("How streaks work", style = UiType.label.copy(fontWeight = FontWeight.SemiBold, textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline), color = c.ink)
+            LockdIcon(if (open) LIcon.ChevronUp else LIcon.ChevronDown, size = 18.dp, tint = c.inkMuted, modifier = Modifier.padding(start = Dim.s1))
+        }
+        androidx.compose.animation.AnimatedVisibility(open) {
+            Column(verticalArrangement = Arrangement.spacedBy(Dim.s2), modifier = Modifier.padding(top = Dim.s2)) {
+                listOf(
+                    "Each tick is one day. A day earns its tick when at least one session finishes as planned.",
+                    "That day’s tick is lost if any session ends early (including emergency recovery) or a blocked app or site comes up. The streak then starts over.",
+                    "Days with no session don’t count either way: the streak waits for you.",
+                    "At ${app.lockdin.engine.Streak.GOAL} days you can try an unlocked session: nothing is blocked, and opening a blocked app starts the streak over.",
+                ).forEach { Text(it, style = UiType.caption, color = c.inkMuted) }
             }
         }
     }
