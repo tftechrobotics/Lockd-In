@@ -166,11 +166,12 @@ private fun Home(store: Store, clock: AppClock, zone: ZoneId, onNew: () -> Unit,
             val scope = rememberCoroutineScope()
             var shown by remember { mutableStateOf(still) }
             LaunchedEffect(Unit) { shown = true }
-            Column(Modifier.fillMaxWidth().padding(top = 56.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Dim.s6)) {
+            val shortScreen = LocalShortScreen.current
+            Column(Modifier.fillMaxWidth().padding(top = if (shortScreen) Dim.s4 else 56.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (shortScreen) Dim.s4 else Dim.s6)) {
                 // R55: tap the lock and it rattles on its shackle (a small haptic tick too).
                 ClockLock(
                     TimerState.READY, 0, 1, locked = false, label = "It's ${Fmt.clock(now, zone)}, $weekday",
-                    caption = "$period · $weekday", text = hm, width = 210.dp,
+                    caption = "$period · $weekday", text = hm, width = if (shortScreen) 150.dp else 210.dp,
                     modifier = Modifier
                         .graphicsLayer { rotationZ = rattle.value; transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.05f) }
                         .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, onClickLabel = "Rattle the lock") {
@@ -291,9 +292,12 @@ fun startPreset(store: Store, p: app.lockdin.state.Preset, now: Long, ctx: andro
 /** Scrolling content with the action area pinned below it (above the bottom navigation). */
 @Composable
 fun WithActionBar(content: @Composable () -> Unit, actions: @Composable () -> Unit, note: (@Composable () -> Unit)? = null) {
-    // With large text the pinned bar would eat the screen, so the status note moves into
-    // the scrolling content and only the actions stay pinned.
-    val large = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
+    // With large text, or on a short screen (under 680 dp of room, e.g. 360 × 640 dp phones), the pinned
+    // bar would eat the screen, so the status note moves into the scrolling content and only the
+    // actions stay pinned.
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+    val large = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f || maxHeight < 680.dp
+    androidx.compose.runtime.CompositionLocalProvider(LocalShortScreen provides (maxHeight < 680.dp)) {
     Column(Modifier.fillMaxSize()) {
         Column(
             Modifier.weight(1f).fillMaxWidth().screenScroll().padding(top = LocalTopInset.current)
@@ -302,7 +306,12 @@ fun WithActionBar(content: @Composable () -> Unit, actions: @Composable () -> Un
         ) { content(); if (large) note?.invoke() }
         ActionBar { if (!large) note?.invoke(); actions() }
     }
+    }
+    }
 }
+
+/** True on short screens (under 680 dp of room), where the Home lock shrinks so the greeting fits. */
+val LocalShortScreen = androidx.compose.runtime.staticCompositionLocalOf { false }
 
 /**
  * The lock's size on the session screen: as large as before on tall phones, smaller on short ones,
