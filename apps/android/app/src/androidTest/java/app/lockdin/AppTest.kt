@@ -169,8 +169,15 @@ class AppTest {
 
     /** Opens the collapsed "Session options" row on setup, if it isn't open yet. */
     private fun openOptions() {
-        if (rule.onAllNodesWithContentDescription("Change rounds and breaks").fetchSemanticsNodes().isEmpty())
+        fun open() = rule.onAllNodesWithContentDescription("Change rounds and breaks").fetchSemanticsNodes().isNotEmpty()
+        rule.waitForIdle()
+        if (open()) return
+        rule.onNodeWithText("Session options").performScrollTo().performClick()
+        // Right after typing, the keyboard closing can swallow the first tap; wait, then try once more.
+        runCatching { rule.waitUntil(2_000) { open() } }.onFailure {
             rule.onNodeWithText("Session options").performScrollTo().performClick()
+            rule.waitUntil(3_000) { open() }
+        }
     }
 
     /** Opens "Change rounds and breaks" and picks a value from one of its menus. */
