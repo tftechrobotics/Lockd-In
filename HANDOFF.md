@@ -42,6 +42,9 @@
       viewports via `launch(viewport=)`.
     - Limits: the test activity shows no software keyboard, and the Settings list is too short to scroll at
       these sizes. Keyboard-open setup and the opaque header on scroll still need checking on a phone.
+  - R66 fixes after the Z Flip review: emulator run on 8717e82, 94/94 passed. Screenshots 60-69 are on
+    `ci-screenshots`. Dialogs and IME states use `deviceShot()` (UiAutomation), which does capture the
+    keyboard. The screenshot push now rebases and retries if the E2E job pushed first.
   - Not yet verified on a real phone: that an unlocked session shows no block screen while the attempt is
     still noted. Check this on the S24+.
 
